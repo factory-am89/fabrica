@@ -6,7 +6,7 @@
 # id de la App aunque aun no haya corrido (solo corre en PR). Se puede relanzar: si el ruleset existe, no lo toca. Textos sin tildes a proposito (Windows PowerShell 5.1
 # lee un .ps1 sin BOM como ANSI).
 param(
-  [string]$Repo = 'pabloam89/fabrica',
+  [string]$Repo = 'factory-am89/fabrica',
   [string]$AppRevisor = 'fabrica-revisor',
   [string]$NombreRuleset = 'main',
   [switch]$SesionAbierta   # la sesion de gh es del script que me llama: ni login ni logout

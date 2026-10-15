@@ -2,14 +2,14 @@
 // privada sin imprimirla: la del constructor, en 1Password; la del revisor, en
 // los secretos del environment `revisor` del repo. Si no puede, la deja en un fichero temporal protegido y lo dice.
 // Uso: node apps/convertir.mjs <code>
-// Variables opcionales: REPO (por defecto pabloam89/fabrica), OP_VAULT (bóveda de 1Password).
+// Variables opcionales: REPO (por defecto factory-am89/fabrica), OP_VAULT (bóveda de 1Password).
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO = process.env.REPO ?? 'pabloam89/fabrica';
+const REPO = process.env.REPO ?? 'factory-am89/fabrica';
 export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
 
 // Argumentos de `gh secret set` para un secreto del revisor: siempre en su environment.

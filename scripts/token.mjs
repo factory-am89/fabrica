@@ -4,7 +4,7 @@
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen, no van por argumentos y no se guardan en disco: cada uso, un token.
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de la App, no es secreto; lo imprime
-// convertir.mjs), FABRICA_REPO (por defecto pabloam89/fabrica), OP_VAULT (por defecto Fabrica).
+// convertir.mjs), FABRICA_REPO (por defecto factory-am89/fabrica), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -113,7 +113,7 @@ async function main() {
   const cmd = orden(process.argv.slice(2));
   const clientId = process.env.FABRICA_CONSTRUCTOR_CLIENT_ID;
   if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
-  const repo = process.env.FABRICA_REPO ?? 'pabloam89/fabrica';
+  const repo = process.env.FABRICA_REPO ?? 'factory-am89/fabrica';
   const firmado = jwt(clientId, clavePrivada());
   const { id } = await api(firmado, 'GET', `/repos/${repo}/installation`);
   const { token } = await api(firmado, 'POST', `/app/installations/${id}/access_tokens`);
