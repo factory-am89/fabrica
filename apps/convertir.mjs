@@ -1,6 +1,6 @@
 // Canjea el código del manifest por las credenciales de la App y guarda la clave
 // privada sin imprimirla: la del constructor, en 1Password; la del revisor, en
-// los secretos del repo. Si no puede, la deja en un fichero temporal protegido y lo dice.
+// los secretos del environment `revisor` del repo. Si no puede, la deja en un fichero temporal protegido y lo dice.
 // Uso: node apps/convertir.mjs <code>
 // Variables opcionales: REPO (por defecto pabloam89/fabrica), OP_VAULT (bóveda de 1Password).
 import { spawnSync } from 'node:child_process';
@@ -10,6 +10,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = process.env.REPO ?? 'pabloam89/fabrica';
+export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
+
+// Argumentos de `gh secret set` para un secreto del revisor: siempre en su environment.
+export const argsSecreto = (nombre, repo = REPO) => ['secret', 'set', nombre, '--repo', repo, '--env', ENTORNO];
 
 export function destino(slug) {
   if (slug.startsWith('fabrica-constructor')) return 'constructor';
@@ -39,11 +43,11 @@ function guardar(app, quien) {
     if (r.ok) return console.log(`Clave del constructor guardada en 1Password como «${app.slug}.pem».`);
     return guardarEnFichero(app.slug, app.pem, `no pude escribir en 1Password (${r.error})`);
   }
-  const clave = conStdin('gh', ['secret', 'set', 'REVISOR_APP_KEY', '--repo', REPO], app.pem);
-  const id = conStdin('gh', ['secret', 'set', 'REVISOR_APP_ID', '--repo', REPO], String(app.id));
-  if (clave.ok && id.ok) return console.log(`Secretos REVISOR_APP_KEY y REVISOR_APP_ID guardados en ${REPO}.`);
+  const clave = conStdin('gh', argsSecreto('REVISOR_APP_KEY'), app.pem);
+  const id = conStdin('gh', argsSecreto('REVISOR_CLIENT_ID'), String(app.client_id));
+  if (clave.ok && id.ok) return console.log(`Secretos REVISOR_APP_KEY y REVISOR_CLIENT_ID guardados en el environment ${ENTORNO} de ${REPO}.`);
   guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`);
-  console.log(`Cuando puedas: gh secret set REVISOR_APP_ID --repo ${REPO} (el id es ${app.id}, no es secreto).`);
+  console.log(`Cuando puedas: gh secret set REVISOR_CLIENT_ID --repo ${REPO} --env ${ENTORNO} (el client id es ${app.client_id}, no es secreto). ¿Existe el environment ${ENTORNO}? Es el paso 2 de PASOS-PABLO.md.`);
 }
 
 async function main() {
@@ -56,7 +60,7 @@ async function main() {
   if (!res.ok) throw new Error(`GitHub respondió ${res.status}: el código vale una sola vez y caduca en una hora.`);
   const app = await res.json();
   const quien = destino(app.slug);
-  console.log(`App creada: ${app.slug} (id ${app.id}). Falta instalarla en ${REPO}: ${app.html_url}/installations/new`);
+  console.log(`App creada: ${app.slug} (id ${app.id}, client id ${app.client_id}). Falta instalarla en ${REPO}: ${app.html_url}/installations/new`);
   guardar(app, quien);
 }
 
