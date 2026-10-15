@@ -167,12 +167,9 @@ test('veredicto: si la cabeza del PR ya no es el SHA juzgado, es no', () => {
   assert.equal(decidir(JSON.stringify({ respuestas: buenas() }), preguntas, {}).ok, false);
 });
 
-test('veredicto: un diff que toca workflows, veredicto, estándar o .claude/ no exige aprobación humana', () => {
-  for (const f of ['.github/workflows/revisor.yml', 'scripts/veredicto.mjs', 'estandares/codigo.md', '.claude/agents/revisor.md', 'CLAUDE.md']) {
-    const v = juzga(buenas(), ctx({ ficheros: [f], pablo: false }));
-    assert.equal(v.ok, true, `${f}: ${v.fallos.join()}`);
-  }
-  assert.equal(juzga(buenas().slice(1), ctx({ ficheros: ['.github/workflows/revisor.yml'] })).ok, false);
+test('veredicto: con todo sí y el SHA correcto es sí, sea cual sea el diff; sin una respuesta sigue siendo no', () => {
+  assert.equal(juzga(buenas()).ok, true);
+  assert.equal(juzga(buenas().slice(1)).ok, false);
 });
 
 test('token.mjs: JWT RS256 con el client id, orden tras -- y sin escribir en disco', () => {

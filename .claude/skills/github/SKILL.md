@@ -24,6 +24,7 @@ comprobado: 2026-10-15
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
 - **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
   la pregunta C13 está en `estandares/codigo.md` (única fuente).
+- **Cuando `revisor` dice no**, el motivo de cada respuesta está en el log del job `juzgar`: `node scripts/token.mjs -- gh run view <id> --log | grep -oE '"id":"C[0-9]+","respuesta":"no","prueba":"[^"]*'`.
 
 ## Identidad del constructor
 
