@@ -3,13 +3,20 @@
 // Saca la clave privada de 1Password (bóveda Fabrica) en memoria, firma un JWT, canjea un
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen, no van por argumentos y no se guardan en disco: cada uso, un token.
-// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de la App, no es secreto; lo imprime
-// convertir.mjs), FABRICA_REPO (por defecto pabloam89/fabrica), OP_VAULT (por defecto Fabrica).
+// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto), FABRICA_REPO (por defecto pabloam89/fabrica), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// Client id de fabrica-constructor. No es secreto (el secreto es la clave privada, en 1Password):
+// vive aquí para que ninguna sesión dependa de que alguien se lo pase.
+export const CLIENT_ID_CONSTRUCTOR = 'Iv23liur4l1hSrzmpd7h';
+
+export function clientId(env = process.env) {
+  return (env.FABRICA_CONSTRUCTOR_CLIENT_ID ?? '').trim() || CLIENT_ID_CONSTRUCTOR;
+}
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
 
@@ -111,10 +118,8 @@ function clavePrivada() {
 
 async function main() {
   const cmd = orden(process.argv.slice(2));
-  const clientId = process.env.FABRICA_CONSTRUCTOR_CLIENT_ID;
-  if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
   const repo = process.env.FABRICA_REPO ?? 'pabloam89/fabrica';
-  const firmado = jwt(clientId, clavePrivada());
+  const firmado = jwt(clientId(), clavePrivada());
   const { id } = await api(firmado, 'GET', `/repos/${repo}/installation`);
   const { token } = await api(firmado, 'POST', `/app/installations/${id}/access_tokens`);
   const r = spawnSync(cmd[0], cmd.slice(1), { stdio: 'inherit', env: entornoHijo(cmd, token) });
