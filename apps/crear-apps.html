@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Crear las dos Apps de la Fábrica</title>
+  <style>body{font:18px system-ui;max-width:34rem;margin:3rem auto;padding:0 1rem}button{font:inherit;padding:.7rem 1.2rem;margin:.5rem 0}</style>
+</head>
+<body>
+  <h1>Crear las dos Apps</h1>
+  <p>Pulsa cada botón, y en GitHub pulsa <b>Create GitHub App</b>. Al terminar, GitHub te lleva a una página que no carga (<code>localhost:8787</code>): es normal. Copia de la barra de direcciones lo que va detrás de <code>code=</code>. Ese código sirve una vez y caduca en una hora: ejecuta enseguida <code>node apps/convertir.mjs EL_CODIGO</code>.</p>
+  <h2>1. fabrica-constructor</h2>
+    <form action="https://github.com/settings/apps/new" method="post">
+      <input type="hidden" name="manifest" value="{&quot;url&quot;:&quot;https://github.com/pabloam89/fabrica&quot;,&quot;redirect_url&quot;:&quot;http://localhost:8787/&quot;,&quot;public&quot;:false,&quot;default_events&quot;:[],&quot;name&quot;:&quot;fabrica-constructor&quot;,&quot;description&quot;:&quot;Construye en fabrica: empuja ramas y abre PR. Nunca fusiona.&quot;,&quot;default_permissions&quot;:{&quot;contents&quot;:&quot;write&quot;,&quot;pull_requests&quot;:&quot;write&quot;,&quot;issues&quot;:&quot;write&quot;,&quot;workflows&quot;:&quot;write&quot;,&quot;checks&quot;:&quot;read&quot;,&quot;actions&quot;:&quot;read&quot;}}">
+      <button type="submit">Crear fabrica-constructor</button>
+    </form>
+  <h2>2. fabrica-revisor</h2>
+    <form action="https://github.com/settings/apps/new" method="post">
+      <input type="hidden" name="manifest" value="{&quot;url&quot;:&quot;https://github.com/pabloam89/fabrica&quot;,&quot;redirect_url&quot;:&quot;http://localhost:8787/&quot;,&quot;public&quot;:false,&quot;default_events&quot;:[],&quot;name&quot;:&quot;fabrica-revisor&quot;,&quot;description&quot;:&quot;Revisa los PR de fabrica: publica el check revisor y aprueba.&quot;,&quot;default_permissions&quot;:{&quot;pull_requests&quot;:&quot;write&quot;,&quot;checks&quot;:&quot;write&quot;,&quot;contents&quot;:&quot;read&quot;}}">
+      <button type="submit">Crear fabrica-revisor</button>
+    </form>
+</body>
+</html>
