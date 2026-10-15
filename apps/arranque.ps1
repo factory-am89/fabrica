@@ -51,7 +51,7 @@ function Titulo($t) { Write-Host ''; Write-Host "=== $t ===" -ForegroundColor Cy
 function Info($t)   { Write-Host "  $t" }
 function Bien($t)   { Write-Host "  [ok] $t" -ForegroundColor Green }
 function Aviso($t)  { Write-Host "  [!] $t" -ForegroundColor Yellow }
-. (Join-Path $PSScriptRoot 'lib-gh.ps1')   # Gh-Login y Subir-Main (usan Info, Aviso y Bien)
+. (Join-Path $PSScriptRoot 'lib-gh.ps1')   # Gh, Gh-Login, Subir-Main y llavero (usan Info, Aviso y Bien)
 
 # Ejecuta un paso: registra ok / ya hecho / FALLO y, si falla, corta todo.
 function Paso([string]$Nombre, [scriptblock]$Cuerpo) {
@@ -64,13 +64,6 @@ function Paso([string]$Nombre, [scriptblock]$Cuerpo) {
     $Pasos[$Nombre] = 'FALLO: ' + $_.Exception.Message
     throw
   }
-}
-
-# gh con captura de salida y codigo (la salida no se pinta nunca sola).
-function Gh([string[]]$A, [string]$Entrada) {
-  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh.exe @A 2>&1 | Out-String }
-  else { $o = & gh.exe @A 2>&1 | Out-String }
-  [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
 }
 
 # Guarda un secreto en el environment revisor pasandolo por stdin, byte a byte
@@ -103,7 +96,7 @@ function Convertir([string]$Codigo) {
   $env:OP_VAULT = $Boveda
   $env:REPO = $Repo
   Push-Location $Fabrica
-  try { $o = & node 'apps\convertir.mjs' $Codigo 2>&1 | Out-String; $c = $LASTEXITCODE }
+  try { $o = & node 'apps\convertir.mjs' $Codigo 2>&1 | Plano | Out-String; $c = $LASTEXITCODE }
   finally { Pop-Location }
   Write-Host $o.Trim()
   if ($c -ne 0) { throw 'convertir.mjs fallo (mira el mensaje de arriba).' }
@@ -135,12 +128,32 @@ function Rescatar-Pem([string]$Salida, [string]$Destino, [string]$ClientId) {
 
 function Json($r) { try { return ($r.Out | ConvertFrom-Json) } catch { return $null } }
 
-# Datos publicos de una App por su nombre. Existe=$false si GitHub dice 404; si no se puede leer, corta.
+# Client ID de una App (empieza por Iv; no es secreto). Si la API no lo da, se pide una vez por App.
+$script:ClientIds = @{}
+function Pedir-ClientId([string]$Slug) {
+  if ($script:ClientIds.ContainsKey($Slug)) { return $script:ClientIds[$Slug] }
+  Info "GitHub no me da el Client ID de '$Slug' (es una App privada). Lo ves en https://github.com/settings/apps/$Slug : empieza por Iv (no es el App ID numerico)."
+  while ($true) {
+    $t = (Read-Host '  Escribe el Client ID (empieza por Iv; vacio para cancelar)').Trim()
+    if (-not $t) { throw "Sin el Client ID de '$Slug' no sigo." }
+    if ($t -match '^Iv[A-Za-z0-9.]{10,}$') { $script:ClientIds[$Slug] = $t; return $t }
+    Aviso 'Eso no parece un Client ID (Iv23...). No es el App ID numerico.'
+  }
+}
+
+# Datos de una App por su nombre. Una App privada da 404 en /apps/<nombre> aunque exista y sea tuya,
+# asi que un 404 NO basta: se mira tambien entre tus instalaciones. Existe=$false solo si ninguna la ve;
+# si no se puede leer, corta.
 function Info-App([string]$Nombre) {
   $r = Gh @('api', "apps/$Nombre")
   if ($r.Code -ne 0) {
-    if ($r.Out -match 'Not Found|404') { return [pscustomobject]@{ Existe = $false; Dueno = $null; ClientId = $null; Slug = $Nombre } }
-    throw "No pude consultar la App '$Nombre' en GitHub: $($r.Out)"
+    if ($r.Out -notmatch 'Not Found|404') { throw "No pude consultar la App '$Nombre' en GitHub: $($r.Out)" }
+    $b = Buscar-App-Instalada $Nombre
+    if ($b.Estado -eq 'dudosa') { throw "No pude consultar la App '$Nombre' en GitHub (404 en /apps y no pude leer tus instalaciones)." }
+    if ($b.Estado -eq 'ninguna') { return [pscustomobject]@{ Existe = $false; Dueno = $null; ClientId = $null; Slug = $Nombre } }
+    $cid = $b.ClientId
+    if (-not $cid) { $cid = Pedir-ClientId $Nombre }
+    return [pscustomobject]@{ Existe = $true; Dueno = $b.Cuenta; ClientId = $cid; Slug = $Nombre }
   }
   $j = Json $r
   if (-not $j -or -not $j.slug) { throw "No entiendo la respuesta de GitHub para la App '$Nombre'." }
@@ -149,7 +162,7 @@ function Info-App([string]$Nombre) {
 
 function Tiene-Clave([string]$Rol) {
   if ($Rol -eq 'constructor') {
-    $l = & op item list --vault $Boveda --format json 2>&1 | Out-String
+    $l = & op item list --vault $Boveda --format json 2>&1 | Plano | Out-String
     return ($l -match [regex]::Escape($PemConstructor))
   }
   $s = Secretos-Del-Entorno
@@ -192,7 +205,15 @@ function Obtener-App([string]$Rol, [string]$Nombre) {
     return $i.Slug
   }
   if (Tiene-Clave $Rol) {
-    throw "Hay una clave de $Rol guardada pero no encuentro ninguna App llamada '$Nombre'. Relanza con el nombre real ($param <nombre>) para no crear otra."
+    # Una App privada aun sin instalar no sale en ninguna lista: se pregunta antes de darla por perdida.
+    Aviso "Hay una clave de $Rol guardada pero GitHub no me ensena ninguna App llamada '$Nombre' (una App privada sin instalar no se ve por API)."
+    Aviso "Mira https://github.com/settings/apps/$Nombre : si existe y es tuya, no hay que crearla otra vez."
+    $r = Read-Host "  Existe y es tuya? (s/n)"
+    if ($r -notmatch '^[sSyY]') { throw "Hay una clave de $Rol guardada pero no encuentro ninguna App llamada '$Nombre'. Relanza con el nombre real ($param <nombre>) para no crear otra." }
+    $cidManual = Pedir-ClientId $Nombre
+    if ($Rol -eq 'constructor') { $script:ClientIdConstructor = $cidManual }
+    elseif ((Secretos-Del-Entorno) -notcontains 'REVISOR_CLIENT_ID') { if (-not (Set-Secreto 'REVISOR_CLIENT_ID' $cidManual)) { throw 'No pude guardar REVISOR_CLIENT_ID.' } }
+    return $Nombre
   }
   # No existe: hay que crearla con el boton.
   if (-not $script:HtmlAbierto) {
@@ -254,22 +275,6 @@ function Cierra-Sesion {
   & gh.exe auth status 2>&1 | Out-Null
   if ($LASTEXITCODE -eq 0) { Aviso 'gh sigue con sesion abierta: ejecuta  gh auth logout  a mano.' }
   else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
-}
-
-# ---- llavero de Windows (mismo mecanismo que MenuPlan: PasswordVault, via powershell.exe 5.1) ----
-$CargarVault = '[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; $v = New-Object Windows.Security.Credentials.PasswordVault;'
-function Llavero-Existe {
-  $o = & powershell.exe -NoProfile -NonInteractive -Command ($CargarVault + " `$c = `$v.Retrieve('$LlaveroRecurso', '$LlaveroUsuario'); Write-Output 'SI'") 2>$null | Out-String
-  return ($o.Trim() -eq 'SI')
-}
-# Guarda por stdin (el token no va en argumentos) y relee a ciegas: devuelve $true si coincide.
-function Llavero-Guardar([string]$Token) {
-  $g = $CargarVault + " `$t = [Console]::In.ReadToEnd().Trim(); `$v.Add((New-Object Windows.Security.Credentials.PasswordCredential('$LlaveroRecurso', '$LlaveroUsuario', `$t)))"
-  $Token | & powershell.exe -NoProfile -NonInteractive -Command $g 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { return $false }
-  $l = $CargarVault + " `$c = `$v.Retrieve('$LlaveroRecurso', '$LlaveroUsuario'); `$c.RetrievePassword(); [Console]::Out.Write(`$c.Password)"
-  $leido = & powershell.exe -NoProfile -NonInteractive -Command $l 2>$null | Out-String
-  return ($leido.Trim() -ceq $Token.Trim())
 }
 
 # ---------- comprobaciones previas (no tocan nada) ----------
@@ -340,7 +345,7 @@ try {
   & op vault get $Boveda 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Titulo "Caja '$Boveda' de 1Password"
-    $c = & op vault create $Boveda 2>&1 | Out-String
+    $c = & op vault create $Boveda 2>&1 | Plano | Out-String
     if ($LASTEXITCODE -ne 0) {
       $Pasos['3 App fabrica-constructor'] = 'FALLO: no existe la caja y no pude crearla'
       throw "La caja '$Boveda' no existe y no he podido crearla (falta permiso, o op sin sesion): $($c.Trim()). Crea la caja a mano en 1Password y relanza."
@@ -351,11 +356,11 @@ try {
   # ---------- 3-bis. cuenta de servicio de solo lectura sobre la caja ----------
   # Las sesiones del PC solo tienen la cuenta de MenuPlan (no ve 'Fabrica'). Esta ve solo 'Fabrica'.
   Paso '3 Cuenta de servicio (llavero)' {
-    if (Llavero-Existe) {
+    if (Llavero-Existe $LlaveroRecurso $LlaveroUsuario) {
       Info "Ya hay un token de '$CuentaServicio' en el llavero ('$LlaveroRecurso'): no creo otra cuenta."; $script:Estado = 'ya hecho'
     } else {
       $existe = $false; $fiable = $true
-      $l = & op service-account list --format json 2>&1 | Out-String
+      $l = & op service-account list --format json 2>&1 | Plano | Out-String
       if ($LASTEXITCODE -eq 0) { if ($l -match [regex]::Escape("`"$CuentaServicio`"")) { $existe = $true } }
       else { $fiable = $false }
       $seguir = $true
@@ -372,11 +377,11 @@ try {
           $script:Estado = 'ya existe, sin token en el llavero'
         } else {
           Info "Creo la cuenta '$CuentaServicio' con lectura solo sobre '$Boveda' (el token no se muestra)."
-          $salida = & op service-account create $CuentaServicio --vault "${Boveda}:read_items" --raw 2>&1 | Out-String
+          $salida = & op service-account create $CuentaServicio --vault "${Boveda}:read_items" --raw 2>&1 | Plano | Out-String
           $codigo = $LASTEXITCODE
           $tok = ($salida -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^ops_\S{20,}$' } | Select-Object -First 1)
           if ($codigo -eq 0 -and $tok) {
-            $ok = Llavero-Guardar $tok
+            $ok = Llavero-Guardar $LlaveroRecurso $LlaveroUsuario $tok
             $tok = $null; $salida = $null
             if (-not $ok) { throw "Cree la cuenta '$CuentaServicio' pero no pude guardar su token en el llavero (o no coincide). Anula la cuenta en 1Password.com y relanza." }
             Bien "Cuenta '$CuentaServicio' creada; token en el llavero de Windows ('$LlaveroRecurso' / '$LlaveroUsuario'), COINCIDEN."

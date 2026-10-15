@@ -75,6 +75,28 @@ try {
   $paro = $false; try { [void](Subir-Main "$t\v0" 'x/y' "$t\remoto.git") } catch { $paro = $true }
   Prueba 'si el remoto tiene otro commit, para sin empujar' $paro
   Prueba 'la config global no ha guardado ningun helper' ((Huella "$t\global") -eq $hGlobal)
+  # Llavero: SOLO lectura de un recurso que seguro no existe. Con -Command una excepcion de Retrieve corta
+  # solo esa sentencia y el 'SI' de despues se escribia igual: Llavero-Existe daba siempre que si.
+  $inexistente = 'fabrica-test-inexistente-' + [guid]::NewGuid().ToString('N')
+  $viejo = '[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; $v = New-Object Windows.Security.Credentials.PasswordVault; $c = $v.Retrieve(''' + $inexistente + ''', ''service-account''); Write-Output ''SI'''
+  $oViejo = (& powershell.exe -NoProfile -NonInteractive -Command $viejo 2>$null | Out-String).Trim()
+  Prueba 'control: el bloque antiguo (sin Stop) daba SI con una entrada inexistente' ($oViejo -eq 'SI')
+  Prueba 'Llavero-Existe da no con una entrada inexistente' ((Llavero-Existe $inexistente 'service-account') -eq $false)
+  $leido = & powershell.exe -NoProfile -NonInteractive -Command (Llavero-Orden-Leer $inexistente 'service-account' $true) 2>$null | Out-String
+  Prueba 'leer el valor de una entrada inexistente sale con error y sin salida' ($LASTEXITCODE -ne 0 -and -not $leido.Trim())
+  # Captura de nativos: el error de stderr sale como texto plano, sin NativeCommandError, y con su codigo.
+  $n = Captura-Nativo 'cmd.exe' @('/c', 'echo boom 1>&2 & exit 3')
+  Prueba 'Captura-Nativo devuelve el codigo de salida' ($n.Code -eq 3)
+  Prueba 'Captura-Nativo trae el mensaje de stderr' ($n.Out -match 'boom')
+  Prueba 'Captura-Nativo no mete NativeCommandError ni CategoryInfo' ($n.Out -notmatch 'NativeCommandError|CategoryInfo')
+  # Apps privadas: el id sale de /user/installations (app_id y app_slug), no de /apps/<slug> (404).
+  function gh.exe { $global:LASTEXITCODE = 0; '{"installations":[{"id":9,"app_id":1234567,"app_slug":"fabrica-revisor","account":{"login":"pabloam89"}},{"id":8,"app_id":42,"app_slug":"otra","account":{"login":"x"}}]}' }
+  $b = Buscar-App-Instalada 'fabrica-revisor'
+  Prueba 'Buscar-App-Instalada saca el app_id de la lista de instalaciones' ($b.Estado -eq 'ok' -and $b.Id -eq 1234567 -and $b.Cuenta -eq 'pabloam89')
+  Prueba 'Buscar-App-Instalada dice ninguna si la App no esta en la lista' ((Buscar-App-Instalada 'no-esta').Estado -eq 'ninguna')
+  function gh.exe { cmd /c "echo HTTP 403 1>&2 & exit 1" }
+  Prueba 'Buscar-App-Instalada dice dudosa si gh falla' ((Buscar-App-Instalada 'fabrica-revisor').Estado -eq 'dudosa')
+  Remove-Item Function:\gh.exe
 } finally {
   Remove-Item -Recurse -Force $t -ErrorAction SilentlyContinue
 }

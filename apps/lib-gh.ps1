@@ -75,3 +75,75 @@ function Subir-Main([string]$Carpeta, [string]$Repo, [string]$Url) {
   Bien "main subida a origin ($($local.Substring(0, 7)))."
   return 'ok'
 }
+
+# ---------- captura de programas nativos ----------
+# Cuando un programa nativo escribe por stderr, Windows PowerShell 5.1 con 2>&1 lo convierte en un
+# ErrorRecord y, al pasarlo a texto, sale un "NativeCommandError" con CategoryInfo que asusta y tapa el
+# mensaje real. Plano deja cada linea como texto puro (el mensaje de gh, sin envoltorio).
+function Plano {
+  process { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { "$_" } }
+}
+
+# Lanza un programa, captura salida y error ya como texto plano y devuelve Code y Out. Nunca pinta.
+# $Entrada (si se pasa) va por la entrada estandar, no por argumentos.
+function Captura-Nativo([string]$Exe, [string[]]$A, [string]$Entrada) {
+  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & $Exe @A 2>&1 | Plano | Out-String }
+  else { $o = & $Exe @A 2>&1 | Plano | Out-String }
+  [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
+}
+
+# gh con captura de salida y codigo (la salida no se pinta nunca sola).
+function Gh([string[]]$A, [string]$Entrada) {
+  if ($PSBoundParameters.ContainsKey('Entrada')) { return (Captura-Nativo 'gh.exe' $A $Entrada) }
+  return (Captura-Nativo 'gh.exe' $A)
+}
+
+# ---------- Apps privadas: se buscan por las instalaciones del usuario ----------
+# GET /apps/<slug> da 404 si la App es privada (aunque sea tuya), asi que un 404 NO prueba que no exista.
+# GET /user/installations (con la sesion de gh) lista las instalaciones con app_id y app_slug.
+# Devuelve Estado, Id, ClientId y Cuenta. Estado: ok | ninguna (la lista no la trae) | dudosa (no se pudo leer).
+function Buscar-App-Instalada([string]$Slug) {
+  $nada = [pscustomobject]@{ Estado = 'dudosa'; Id = $null; ClientId = $null; Cuenta = $null }
+  $r = Gh @('api', '/user/installations?per_page=100')
+  if ($r.Code -ne 0) { return $nada }
+  try { $j = $r.Out | ConvertFrom-Json } catch { $j = $null }
+  if (-not $j) { return $nada }
+  $m = @($j.installations | Where-Object { $_.app_slug -eq $Slug })
+  if ($m.Count -eq 0) { $nada.Estado = 'ninguna'; return $nada }
+  $cid = $null
+  if ($m[0].PSObject.Properties['client_id'] -and $m[0].client_id) { $cid = [string]$m[0].client_id }
+  return [pscustomobject]@{ Estado = 'ok'; Id = [int]$m[0].app_id; ClientId = $cid; Cuenta = [string]$m[0].account.login }
+}
+
+# ---------- llavero de Windows (PasswordVault, via powershell.exe 5.1) ----------
+# Con -Command, una excepcion de un metodo .NET solo corta esa sentencia: la siguiente corre y el
+# proceso sale con 0. Por eso todo bloque empieza con ErrorActionPreference Stop: la excepcion para el
+# bloque entero y el proceso sale con 1.
+function Llavero-Cargar {
+  return '$ErrorActionPreference = ''Stop''; [void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; $v = New-Object Windows.Security.Credentials.PasswordVault; '
+}
+
+# Orden de PowerShell que lee la entrada (y el valor, solo si $ConValor). Va aparte para poder probarla.
+function Llavero-Orden-Leer([string]$Recurso, [string]$Usuario, [bool]$ConValor) {
+  if ($ConValor) { return (Llavero-Cargar) + " `$c = `$v.Retrieve('$Recurso', '$Usuario'); `$c.RetrievePassword(); [Console]::Out.Write(`$c.Password)" }
+  return (Llavero-Cargar) + " `$c = `$v.Retrieve('$Recurso', '$Usuario'); Write-Output 'SI'"
+}
+
+# $true solo si la entrada existe de verdad (Retrieve no lanza). Solo lee.
+function Llavero-Existe([string]$Recurso, [string]$Usuario) {
+  $cmd = Llavero-Orden-Leer $Recurso $Usuario $false
+  $o = & powershell.exe -NoProfile -NonInteractive -Command $cmd 2>$null | Out-String
+  if ($LASTEXITCODE -ne 0) { return $false }
+  return ($o.Trim() -eq 'SI')
+}
+
+# Guarda por stdin (el token no va en argumentos) y relee a ciegas: devuelve $true si coincide.
+function Llavero-Guardar([string]$Recurso, [string]$Usuario, [string]$Token) {
+  $g = (Llavero-Cargar) + " `$t = [Console]::In.ReadToEnd().Trim(); `$v.Add((New-Object Windows.Security.Credentials.PasswordCredential('$Recurso', '$Usuario', `$t)))"
+  $Token | & powershell.exe -NoProfile -NonInteractive -Command $g 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $l = Llavero-Orden-Leer $Recurso $Usuario $true
+  $leido = & powershell.exe -NoProfile -NonInteractive -Command $l 2>$null | Out-String
+  if ($LASTEXITCODE -ne 0) { return $false }
+  return ($leido.Trim() -ceq $Token.Trim())
+}

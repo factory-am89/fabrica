@@ -16,12 +16,6 @@ $ErrorActionPreference = 'Continue'
 $Dueno = ($Repo -split '/')[0]
 $IdGitHubActions = 15368   # integracion de GitHub Actions: origen del check `tests`
 
-function Gh([string[]]$A, [string]$Entrada) {
-  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh.exe @A 2>&1 | Out-String }
-  else { $o = & gh.exe @A 2>&1 | Out-String }
-  [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
-}
-
 function Info($t)  { Write-Host "  $t" }
 function Aviso($t) { Write-Host "  [!] $t" -ForegroundColor Yellow }
 function Bien($t)  { Write-Host "  [ok] $t" -ForegroundColor Green }
@@ -62,19 +56,20 @@ try {
   if ($b.Code -ne 0) { throw "La rama main de $Repo no existe todavia: sube antes la v0 (git push -u origin main)." }
 
   # --- id de la App revisor, leido por API ---
-  $a = Gh @('api', "apps/$AppRevisor")
+  # GET /apps/<slug> da 404 si la App es privada, asi que se busca en las instalaciones de la sesion
+  # (/user/installations trae app_id y app_slug). Solo se fija con una App instalada en la cuenta de $Dueno.
   $idRevisor = $null
-  $ja = $null
-  if ($a.Code -eq 0) { try { $ja = $a.Out | ConvertFrom-Json } catch { $ja = $null } }
-  if ($ja -and $ja.id) {
-    if ([string]$ja.owner.login -ine $Dueno) { throw "La App '$AppRevisor' es de '$($ja.owner.login)', no de $Dueno. No fijo el ruleset con una App ajena: usa el nombre real de tu App con -AppRevisor." }
-    $idRevisor = [int]$ja.id
+  $b = Buscar-App-Instalada $AppRevisor
+  if ($b.Estado -eq 'ok') {
+    if ($b.Cuenta -ine $Dueno) { throw "La App '$AppRevisor' esta instalada en '$($b.Cuenta)', no en $Dueno. No fijo el ruleset con una App ajena: usa el nombre real de tu App con -AppRevisor." }
+    $idRevisor = $b.Id
   }
   else {
-    Write-Host "  [!] La API no me dio la App $AppRevisor ($($a.Out))." -ForegroundColor Yellow
-    Write-Host "      Lo ves en https://github.com/settings/apps/$AppRevisor (App ID, es un numero y no es secreto; comprueba que la App es tuya)."
-    $t = (Read-Host '  Escribe el App ID del revisor (vacio para cancelar)').Trim()
-    if ($t -notmatch '^\d+$') { throw 'Sin id de la App revisor no se puede fijar el origen del check.' }
+    if ($b.Estado -eq 'ninguna') { Write-Host "  [!] La App $AppRevisor no aparece entre tus instalaciones (esta instalada en el repo? Es el paso 4 de arranque.ps1)." -ForegroundColor Yellow }
+    else { Write-Host "  [!] No pude leer tus instalaciones de Apps en GitHub." -ForegroundColor Yellow }
+    Write-Host "      Lo ves en https://github.com/settings/apps/$AppRevisor (App ID: un numero de 7 cifras, no el Client ID que empieza por Iv23; no es secreto; comprueba que la App es tuya)."
+    $t = (Read-Host '  Escribe el App ID del revisor, solo numeros (vacio para cancelar)').Trim()
+    if ($t -notmatch '^\d+$') { throw 'Sin el App ID (un numero, no el Iv23...) no se puede fijar el origen del check.' }
     $idRevisor = [int]$t
   }
   Write-Host "  [ok] App $AppRevisor con id $idRevisor."
