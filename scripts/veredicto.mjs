@@ -27,7 +27,8 @@ function normalizar(r) {
 
 // Los cambios al árbitro (el workflow, este script, el estándar y la configuración de
 // Claude) no los aprueba una máquina que ellos mismos configuran: los aprueba Pablo.
-const ARBITRO = /^(\.github\/|scripts\/veredicto\.mjs$|estandares\/|\.claude\/)/;
+// También los CLAUDE.md (el de la raíz y los anidados): el revisor de CI los carga como instrucciones.
+const ARBITRO = /^(\.github\/|scripts\/veredicto\.mjs$|estandares\/|\.claude\/)|(^|\/)CLAUDE\.md$/;
 export const tocaArbitro = (ficheros) => ficheros.some((f) => ARBITRO.test(f));
 
 // salida: texto JSON {respuestas:[{id, respuesta, prueba}]}
@@ -43,13 +44,22 @@ export function decidir(salida, preguntas, ctx = {}) {
   } catch {
     return { ok: false, fallos: [...fallos, 'salida ilegible'], arbitro: false };
   }
+  // Solo se aceptan ids C<número> que existan en la lista de preguntas; el resto se cuenta sin
+  // escribirlo (lo que sale al check y al log nunca es texto del modelo).
+  const conocidos = new Set(preguntas.map((q) => q.id));
   const repetidos = new Set();
   const porId = new Map();
-  for (const r of datos?.respuestas ?? []) {
-    if (porId.has(r?.id)) repetidos.add(r.id);
-    porId.set(r?.id, r);
+  let desconocidos = 0;
+  for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
+    if (typeof r?.id !== 'string' || !/^C\d+$/.test(r.id) || !conocidos.has(r.id)) {
+      desconocidos += 1;
+      continue;
+    }
+    if (porId.has(r.id)) repetidos.add(r.id);
+    porId.set(r.id, r);
   }
   for (const id of repetidos) fallos.push(`${id}: id repetido`);
+  if (desconocidos) fallos.push(`${desconocidos} ids desconocidos`);
   for (const p of preguntas.filter((q) => q.quien === 'revisor')) {
     const r = porId.get(p.id);
     const resp = normalizar(r?.respuesta);

@@ -64,7 +64,7 @@ jobs:
             --model opus
             --max-turns 20
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr checks:*)"
-            --json-schema '{"type":"object","properties":{"respuestas":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"respuesta":{"type":"string","enum":["sí","no","no aplica"]},"prueba":{"type":"string"}},"required":["id","respuesta","prueba"]}}},"required":["respuestas"]}'
+            --json-schema '{"type":"object","properties":{"respuestas":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","pattern":"^C[0-9]+$"},"respuesta":{"type":"string","enum":["sí","no","no aplica"]},"prueba":{"type":"string"}},"required":["id","respuesta","prueba"]}}},"required":["respuestas"]}'
 
       # El token de la App se crea después de Claude, para que este nunca lo vea.
       - id: app

@@ -168,3 +168,31 @@ test('token.mjs: JWT RS256 con el client id, orden tras -- y sin escribir en dis
   assert.throws(() => orden(['gh']));
   assert.doesNotMatch(leer('scripts/token.mjs'), /writeFile|appendFile|console\.log\(.*token/);
 });
+
+test('CLAUDE.md y PASOS-PABLO.md no llevan caracteres de control', () => {
+  for (const f of ['CLAUDE.md', 'PASOS-PABLO.md']) assert.doesNotMatch(leer(f), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, f); // eslint-disable-line no-control-regex
+});
+
+test('veredicto: los CLAUDE.md (raíz o anidados) son configuración del árbitro', () => {
+  for (const f of ['CLAUDE.md', 'apps/x/CLAUDE.md', 'a/b/c/CLAUDE.md']) {
+    assert.equal(tocaArbitro([f]), true, f);
+    assert.equal(juzga(buenas(), ctx({ ficheros: [f] })).ok, false, f);
+  }
+  assert.equal(tocaArbitro(['NO-CLAUDE.md', 'docs/CLAUDE.md.bak']), false);
+});
+
+test('veredicto: ningún texto del modelo se publica, solo ids de la lista de preguntas', () => {
+  const clave = 'C1234567890-ghs_SECRETO';
+  const clave2 = 'ghs_SECRETO_SUELTO';
+  const r = buenas();
+  const v = juzga([...r, { id: clave, respuesta: 'no', prueba: 'x' }, { id: clave2, respuesta: 'sí', prueba: 'x' }, { id: clave, respuesta: 'no', prueba: 'y' }, { id: { a: 1 }, respuesta: 'sí', prueba: 'x' }]);
+  assert.equal(v.ok, false);
+  const publicado = JSON.stringify(v);
+  assert.doesNotMatch(publicado, /SECRETO/);
+  assert.match(v.fallos.join(), /\d+ ids desconocidos/);
+  for (const f of v.fallos) assert.match(f, /^(C\d+: [a-zá-ú ]+|\d+ ids desconocidos|la cabeza .*|no, requiere .*|salida ilegible)$/);
+});
+
+test('revisor.yml: el json-schema limita el id a C<número>', () => {
+  assert.match(leer('.github/workflows/revisor.yml'), /"id":\{"type":"string","pattern":"\^C\[0-9\]\+\$"\}/);
+});
