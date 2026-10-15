@@ -9,7 +9,7 @@
 # Los textos van sin tildes a proposito: Windows PowerShell 5.1 lee un .ps1 sin BOM
 # como ANSI y estropearia los acentos (y algunas comillas rompen el script).
 param(
-  [string]$Repo = 'pabloam89/fabrica',
+  [string]$Repo = 'factory-am89/fabrica',
   [string]$Fabrica = (Split-Path -Parent $PSScriptRoot),   # raiz del repo (carpeta de apps\ y scripts\); sale de donde esta este script, solo se lee
   [string]$CarpetaV0 = 'C:\dev\fabrica',   # el repo con la v0 en su main local (de ahi se sube)
   [string]$Boveda = 'Fabrica',

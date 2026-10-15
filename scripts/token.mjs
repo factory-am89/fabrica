@@ -3,16 +3,14 @@
 // Saca la clave privada de 1Password (bóveda Fabrica) en memoria, firma un JWT, canjea un
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen, no van por argumentos y no se guardan en disco: cada uso, un token.
-// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto), FABRICA_REPO (por defecto pabloam89/fabrica), OP_VAULT (por defecto Fabrica).
+// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
+// scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// Client id de fabrica-constructor. No es secreto (el secreto es la clave privada, en 1Password):
-// vive aquí para que ninguna sesión dependa de que alguien se lo pase.
-export const CLIENT_ID_CONSTRUCTOR = 'Iv23liur4l1hSrzmpd7h';
+import { REPO, CLIENT_ID_CONSTRUCTOR } from './lib/repo.mjs';
 
 export function clientId(env = process.env) {
   return (env.FABRICA_CONSTRUCTOR_CLIENT_ID ?? '').trim() || CLIENT_ID_CONSTRUCTOR;
@@ -118,7 +116,7 @@ function clavePrivada() {
 
 async function main() {
   const cmd = orden(process.argv.slice(2));
-  const repo = process.env.FABRICA_REPO ?? 'pabloam89/fabrica';
+  const repo = process.env.FABRICA_REPO ?? REPO;
   const firmado = jwt(clientId(), clavePrivada());
   const { id } = await api(firmado, 'GET', `/repos/${repo}/installation`);
   const { token } = await api(firmado, 'POST', `/app/installations/${id}/access_tokens`);

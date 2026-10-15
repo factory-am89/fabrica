@@ -12,3 +12,4 @@ Motivo `arbitro` (decisión del orquestador): un PR que toca el árbitro (`.gith
 
 
 2026-10-15 | decisión | Pablo decide que ningún cambio de la Factoría espera su aprobación: el revisor automático decide todo, también los cambios a su propio juez; este PR es el último que aprueba. Sustituye al motivo `arbitro` de la línea 11 | el árbitro humano frenaba cada PR que tocaba .github/, veredicto, estándar o .claude/ | repetida: no (https://github.com/pabloam89/fabrica/pull/2#issuecomment-6195673672)
+2026-10-15 | clic | Pablo traspasa las dos Apps y los repos fabrica y homenu-panel a la organización factory-am89 (clics de propietario) | solo el propietario de la cuenta puede traspasar Apps y repositorios a una organización | repetida: no (este PR, rama ops/mudanza-org)
