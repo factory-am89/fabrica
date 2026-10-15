@@ -34,9 +34,42 @@ async function api(jwtApp, metodo, ruta) {
   return res.json();
 }
 
+// Entrada del llavero de Windows donde el script de arranque de Pablo guarda el token.
+const LLAVERO_RECURSO = 'Fabrica 1Password';
+const LLAVERO_USUARIO = 'service-account';
+
+// Lee el token del llavero (PasswordVault) con powershell.exe 5.1. El valor vuelve por el
+// stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Si falla, devuelve ''.
+export function leerLlavero() {
+  const ps =
+    '[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; ' +
+    '$v = New-Object Windows.Security.Credentials.PasswordVault; ' +
+    `$c = $v.Retrieve('${LLAVERO_RECURSO}', '${LLAVERO_USUARIO}'); $c.RetrievePassword(); [Console]::Out.Write($c.Password)`;
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return r.status === 0 ? (r.stdout ?? '') : '';
+}
+
+// El entorno manda; si no, el llavero (inyectable para los tests). El error no lleva valores.
+export function tokenServicio(env = process.env, llavero = leerLlavero) {
+  const delEntorno = (env.OP_SERVICE_ACCOUNT_TOKEN ?? '').trim();
+  if (delEntorno) return delEntorno;
+  let delLlavero = '';
+  try {
+    delLlavero = (llavero() ?? '').trim();
+  } catch {
+    delLlavero = '';
+  }
+  if (delLlavero) return delLlavero;
+  throw new Error('Falta el token de la cuenta de servicio de 1Password (ni en el entorno ni en el llavero): lanza el script de arranque de Pablo.');
+}
+
 function clavePrivada() {
   const args = ['document', 'get', 'fabrica-constructor.pem', '--vault', process.env.OP_VAULT ?? 'Fabrica'];
-  const r = spawnSync('op', args, { encoding: 'utf8' });
+  const token = tokenServicio();
+  const r = spawnSync('op', args, { encoding: 'utf8', env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: token } });
   if (r.status !== 0 || !r.stdout.includes('PRIVATE KEY')) {
     throw new Error('No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). ¿Sesión de `op` abierta?');
   }
