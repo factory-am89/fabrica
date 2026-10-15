@@ -25,9 +25,15 @@ test('tokenServicio: sin ninguna vía, error en una frase y sin valores', () => 
   }
 });
 
-test('token.mjs: el recurso del llavero coincide con el script de arranque y el token no va en argumentos', () => {
-  const src = readFileSync(new URL('../scripts/token.mjs', import.meta.url), 'utf8');
-  assert.match(src, /Fabrica 1Password/);
-  assert.match(src, /service-account/);
-  assert.match(src, /OP_SERVICE_ACCOUNT_TOKEN: token/);
+test('llavero: token.mjs y arranque.ps1 leen el mismo apps/llavero.json y ninguno repite los nombres', () => {
+  const leer = (r) => readFileSync(new URL(r, import.meta.url), 'utf8');
+  const { recurso, usuario } = JSON.parse(leer('../apps/llavero.json'));
+  assert.ok(recurso && usuario);
+  for (const f of ['../scripts/token.mjs', '../apps/arranque.ps1']) {
+    const src = leer(f);
+    assert.match(src, /llavero\.json/, f + ' debe leer apps/llavero.json');
+    assert.ok(!src.includes(`'${recurso}'`), f + ' repite el recurso del llavero');
+    assert.ok(!src.includes(`'${usuario}'`), f + ' repite el usuario del llavero');
+  }
+  assert.match(leer('../scripts/token.mjs'), /_TOKEN: token/);
 });

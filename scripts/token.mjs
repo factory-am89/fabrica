@@ -7,6 +7,7 @@
 // convertir.mjs), FABRICA_REPO (por defecto pabloam89/fabrica), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
@@ -35,8 +36,10 @@ async function api(jwtApp, metodo, ruta) {
 }
 
 // Entrada del llavero de Windows donde el script de arranque de Pablo guarda el token.
-const LLAVERO_RECURSO = 'Fabrica 1Password';
-const LLAVERO_USUARIO = 'service-account';
+// Su nombre vive solo en apps/llavero.json, que también lee apps/arranque.ps1.
+const { recurso: LLAVERO_RECURSO, usuario: LLAVERO_USUARIO } = JSON.parse(
+  readFileSync(new URL('../apps/llavero.json', import.meta.url), 'utf8'),
+);
 
 // Lee el token del llavero (PasswordVault) con powershell.exe 5.1. El valor vuelve por el
 // stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Si falla, devuelve ''.
@@ -48,6 +51,7 @@ export function leerLlavero() {
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 15000,
   });
   return r.status === 0 ? (r.stdout ?? '') : '';
 }
@@ -71,7 +75,7 @@ function clavePrivada() {
   const token = tokenServicio();
   const r = spawnSync('op', args, { encoding: 'utf8', env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: token } });
   if (r.status !== 0 || !r.stdout.includes('PRIVATE KEY')) {
-    throw new Error('No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). ¿Sesión de `op` abierta?');
+    throw new Error('No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.');
   }
   return r.stdout;
 }

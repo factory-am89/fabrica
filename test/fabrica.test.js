@@ -74,12 +74,19 @@ test('convertir.mjs guarda los secretos del revisor en su environment', () => {
   assert.doesNotMatch(leer('apps/convertir.mjs'), /REVISOR_APP_ID/);
 });
 
-test('PASOS-PABLO: el environment se crea antes de guardar secretos y el ruleset no restringe updates', () => {
+test('PASOS-PABLO manda a los scripts; el environment va antes de los secretos y el ruleset no restringe updates', () => {
   const pasos = leer('PASOS-PABLO.md');
-  assert.ok(pasos.indexOf('environments/revisor') < pasos.indexOf('node apps/convertir.mjs'));
-  assert.match(pasos, /\*\*No\*\* actives «Restrict updates»/);
-  assert.match(pasos, /Block force pushes/);
+  assert.match(pasos, /apps.arranque.ps1/);
+  assert.match(pasos, /apps.ruleset.ps1/);
   assert.match(pasos, /Ningún constructor trabaja antes de que exista el ruleset/);
+  const arranque = leer('apps/arranque.ps1');
+  assert.ok(arranque.indexOf("'2 Environment revisor (main)'") < arranque.indexOf("'3 App fabrica-revisor'"));
+  assert.ok(arranque.indexOf('environments/revisor') < arranque.indexOf("Paso '3 App fabrica-revisor'"));
+  const ruleset = leer('apps/ruleset.ps1');
+  assert.match(ruleset, /type = 'non_fast_forward'/);
+  assert.match(ruleset, /type = 'deletion'/);
+  assert.doesNotMatch(ruleset, /type = 'update'/);
+  assert.match(ruleset, /bypass_actors = @\(\)/);
 });
 
 function manifests() {
