@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
@@ -167,8 +169,24 @@ test('veredicto: si la cabeza del PR ya no es el SHA juzgado, es no', () => {
   assert.equal(decidir(JSON.stringify({ respuestas: buenas() }), preguntas, {}).ok, false);
 });
 
-test('veredicto: con todo sí y el SHA correcto es sí, sea cual sea el diff; sin una respuesta sigue siendo no', () => {
-  assert.equal(juzga(buenas()).ok, true);
+// Recorre el script entero como lo corre el workflow (variables de entorno y llamadas a la API),
+// con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
+// de Pablo y con todas las respuestas en «sí». VEREDICTO_RUTA permite apuntarlo a otra copia del script.
+test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo, con todo sí, da sí y publica la aprobación', () => {
+  const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
+  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
+  const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }) },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'success', r.stdout);
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE', 'falta la aprobación de la App');
+  assert.match(r.stdout, /^veredicto: sí/);
+});
+
+test('veredicto: sin una respuesta del revisor sigue siendo no', () => {
   assert.equal(juzga(buenas().slice(1)).ok, false);
 });
 
