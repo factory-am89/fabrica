@@ -22,8 +22,8 @@ comprobado: 2026-10-15
 - **`revisor.yml` usa `pull_request_target`**: corre la versión de `main`, tiene secretos y **nunca
   ejecuta código del PR** (ese lo ejecuta `tests.yml`, sin secretos). Sus secretos viven en el environment
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
-- **Cambios al árbitro** (`.github/`, `scripts/veredicto.mjs`, `estandares/`, `.claude/`): el check
-  `revisor` sale rojo hasta que Pablo pulsa Approve y relanza el job; se anota en `intervenciones.md`.
+- **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
+  la pregunta C13 está en `estandares/codigo.md` (única fuente).
 
 ## Identidad del constructor
 

@@ -10,3 +10,5 @@ Tipos: `permiso`, `decisión`, `clic`, `arreglo`.
 
 Motivo `arbitro` (decisión del orquestador): un PR que toca el árbitro (`.github/`, `scripts/veredicto.mjs`, `estandares/`, `.claude/`) no lo aprueba el revisor automático: lo aprueba Pablo con **Approve** y un **Re-run** del job `revisor`. Cada vez es una línea (tipo `clic`, por qué `arbitro`, repetida: sí). Es el diseño y no se automatiza: quien cambia al árbitro no puede aprobarse a sí mismo.
 
+
+2026-10-15 | decisión | Pablo decide que ningún cambio de la Factoría espera su aprobación: el revisor automático decide todo, también los cambios a su propio juez; este PR es el último que aprueba. Sustituye al motivo `arbitro` de la línea 11 | el árbitro humano frenaba cada PR que tocaba .github/, veredicto, estándar o .claude/ | repetida: no (https://github.com/pabloam89/fabrica/pull/2#issuecomment-6195673672)

@@ -25,15 +25,8 @@ function normalizar(r) {
   return t === 'si' ? 'sí' : t;
 }
 
-// Los cambios al árbitro (el workflow, este script, el estándar y la configuración de
-// Claude) no los aprueba una máquina que ellos mismos configuran: los aprueba Pablo.
-// También los CLAUDE.md (el de la raíz y los anidados): el revisor de CI los carga como instrucciones.
-const ARBITRO = /^(\.github\/|scripts\/veredicto\.mjs$|estandares\/|\.claude\/)|(^|\/)CLAUDE\.md$/;
-export const tocaArbitro = (ficheros) => ficheros.some((f) => ARBITRO.test(f));
-
 // salida: texto JSON {respuestas:[{id, respuesta, prueba}]}
-// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR), ficheros (rutas del diff,
-// con las anteriores si hubo renombrado), pablo (¿review aprobada de Pablo sobre ese SHA?) }
+// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR) }
 // Solo ids, respuestas y veredicto salen de aquí: ningún texto libre del modelo.
 export function decidir(salida, preguntas, ctx = {}) {
   const fallos = [];
@@ -42,7 +35,7 @@ export function decidir(salida, preguntas, ctx = {}) {
   try {
     datos = JSON.parse(salida);
   } catch {
-    return { ok: false, fallos: [...fallos, 'salida ilegible'], arbitro: false };
+    return { ok: false, fallos: [...fallos, 'salida ilegible'] };
   }
   // Solo se aceptan ids C<número> que existan en la lista de preguntas; el resto se cuenta sin
   // escribirlo (lo que sale al check y al log nunca es texto del modelo).
@@ -68,11 +61,7 @@ export function decidir(salida, preguntas, ctx = {}) {
     else if (resp === 'no') fallos.push(`${p.id}: no`);
     else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
   }
-  const arbitro = tocaArbitro(ctx.ficheros ?? []);
-  if (arbitro && !ctx.pablo) {
-    fallos.push('no, requiere aprobación de Pablo: el diff toca el árbitro (.github/, scripts/veredicto.mjs, estandares/ o .claude/)');
-  }
-  return { ok: fallos.length === 0, fallos, arbitro };
+  return { ok: fallos.length === 0, fallos };
 }
 
 async function api(token, metodo, ruta, cuerpo) {
@@ -89,38 +78,13 @@ async function api(token, metodo, ruta, cuerpo) {
   return res.json();
 }
 
-async function todas(token, ruta) {
-  const salida = [];
-  for (let pagina = 1; ; pagina++) {
-    const lote = await api(token, 'GET', `${ruta}?per_page=100&page=${pagina}`);
-    salida.push(...lote);
-    if (lote.length < 100) return salida;
-  }
-}
-
-// ¿La última review de Pablo es una aprobación sobre este SHA? Una aprobación de otro commit no vale.
-export function aprobadoPorPablo(reviews, sha) {
-  const suyas = reviews.filter((r) => r.user?.login === 'pabloam89' && r.state !== 'COMMENTED' && r.state !== 'PENDING');
-  const ultima = suyas.at(-1);
-  return ultima?.state === 'APPROVED' && ultima.commit_id === sha;
-}
-
 async function leerContexto({ repo, pr, sha, token }) {
-  const [datosPr, ficheros, reviews] = await Promise.all([
-    api(token, 'GET', `/repos/${repo}/pulls/${pr}`),
-    todas(token, `/repos/${repo}/pulls/${pr}/files`),
-    todas(token, `/repos/${repo}/pulls/${pr}/reviews`),
-  ]);
-  return {
-    sha,
-    cabeza: datosPr.head.sha,
-    ficheros: ficheros.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean)),
-    pablo: aprobadoPorPablo(reviews, sha),
-  };
+  const datosPr = await api(token, 'GET', `/repos/${repo}/pulls/${pr}`);
+  return { sha, cabeza: datosPr.head.sha };
 }
 
 async function publicar({ repo, pr, sha, token, veredicto, ctx }) {
-  const titulo = veredicto.ok ? (veredicto.arbitro ? 'Veredicto: sí, aprobado por Pablo' : 'Veredicto: sí') : 'Veredicto: no';
+  const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
   await api(token, 'POST', `/repos/${repo}/check-runs`, {
     name: 'revisor',
@@ -129,9 +93,8 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx }) {
     conclusion: veredicto.ok ? 'success' : 'failure',
     output: { title: titulo, summary: texto },
   });
-  // La aprobación de la App solo si el PR sigue en el SHA juzgado y no es un cambio al árbitro
-  // (ahí la aprobación es la de Pablo, que ya existe).
-  if (veredicto.ok && !veredicto.arbitro && ctx.sha === ctx.cabeza) {
+  // La aprobación de la App solo si el PR sigue en el SHA juzgado.
+  if (veredicto.ok && ctx.sha === ctx.cabeza) {
     await api(token, 'POST', `/repos/${repo}/pulls/${pr}/reviews`, { commit_id: sha, event: 'APPROVE', body: 'Veredicto: sí.' });
   }
 }
