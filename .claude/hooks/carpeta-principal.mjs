@@ -179,7 +179,8 @@ export function decidir(entrada, carpetas) {
   }
   if (TERMINAL.has(herramienta) && typeof datos.command === 'string') {
     const donde = carpetaDeCommit(datos.command, cwd);
-    return donde && (donde === DESCONOCIDA || enPrincipal(donde, carpetas)) ? `${MOTIVO} (esa orden de git iba a la principal)` : null;
+    if (donde === DESCONOCIDA) return `${MOTIVO} (no sé a qué carpeta va esa orden de git: un cd con variable o subshell, popd o cd -; usa una ruta literal o git -C <ruta>)`;
+    return donde && enPrincipal(donde, carpetas) ? `${MOTIVO} (esa orden de git iba a la principal)` : null;
   }
   return null;
 }

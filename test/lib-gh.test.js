@@ -1,0 +1,25 @@
+// Los .ps1 se validan con el parser de Windows PowerShell 5.1 y lib-gh.ps1 se prueba contra
+// un git de mentira (remoto local, config global en un fichero temporal). Solo en Windows.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const ruta = (r) => fileURLToPath(new URL(`../${r}`, import.meta.url));
+const ps = (args) => spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', ...args], { encoding: 'utf8' });
+const hayPs = process.platform === 'win32';
+
+test('arranque.ps1, ruleset.ps1 y lib-gh.ps1 pasan el parser de PowerShell 5.1', { skip: !hayPs }, () => {
+  for (const f of ['arranque', 'ruleset', 'lib-gh']) {
+    const cmd = `$e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${ruta(`apps/${f}.ps1`)}',[ref]$null,[ref]$e); if ($e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }`;
+    const r = ps(['-Command', cmd]);
+    assert.equal(r.status, 0, `${f}.ps1: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test('lib-gh.ps1: login sin rastro en git, comillas del helper y subida de main', { skip: !hayPs }, () => {
+  const r = ps(['-ExecutionPolicy', 'Bypass', '-File', ruta('test/lib-gh.prueba.ps1'), '-Lib', ruta('apps/lib-gh.ps1')]);
+  const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
+  assert.ok(lineas.length >= 7, `salida inesperada: ${r.stdout}${r.stderr}`);
+  assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
+});

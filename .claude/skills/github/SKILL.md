@@ -49,6 +49,11 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 
 - **2026-10-09 · un PR abierto con `GITHUB_TOKEN` no lanzó `tests.yml`.** Causa: GitHub no dispara
   workflows con ese token. Arreglo: abrir los PR con el token de la App (`scripts/token.mjs`), o lanzarlo con `gh workflow run`.
+- **2026-10-09 · ruleset con la integración de Actions como excepción: 422 «Actor GitHub Actions
+  integration must be part of the ruleset source or owner organization».** Causa: en un repo personal no se
+  puede eximir a Actions ni a `OrganizationAdmin`. Arreglo: quien deba empujar a la rama protegida usa una
+  deploy key y el ruleset exime a `DeployKey` (`actor_id: null`, `bypass_mode: always`). Aquí no hay ninguna: no se crea sin OK de Pablo.
+  Por eso el ruleset de `main` va con `bypass_actors = @()`: nadie se salta el PR.
 - **2026-10-09 · exigir checks con la protección clásica: 404 «Required status checks not enabled».**
   Causa: el PATCH solo edita checks que ya existen; activarlos pide reescribir la protección con PUT. Arreglo: usar un ruleset.
 - **2026-10-15 · una rama que cambia un workflow era rechazada entera al empujarla.** Causa: a la App le

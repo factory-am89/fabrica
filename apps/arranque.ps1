@@ -4,12 +4,14 @@
 # - Ningun secreto sale por pantalla, a ficheros ni al historial (los valores
 #   viajan por la entrada estandar de gh/op, nunca por argumentos).
 # - Se puede relanzar: lo que ya existe se salta.
+# - Sube main de la v0 y, al final, crea el ruleset de main (todo con la misma sesion de gh).
 # - Al final, siempre (tambien si algo falla), cierra la sesion de gh.
 # Los textos van sin tildes a proposito: Windows PowerShell 5.1 lee un .ps1 sin BOM
 # como ANSI y estropearia los acentos (y algunas comillas rompen el script).
 param(
   [string]$Repo = 'pabloam89/fabrica',
   [string]$Fabrica = (Split-Path -Parent $PSScriptRoot),   # raiz del repo (carpeta de apps\ y scripts\); sale de donde esta este script, solo se lee
+  [string]$CarpetaV0 = 'C:\dev\fabrica',   # el repo con la v0 en su main local (de ahi se sube)
   [string]$Boveda = 'Fabrica',
   [string]$NombreConstructor = 'fabrica-constructor',  # solo si cambiaste el nombre en crear-apps.html
   [string]$NombreRevisor = 'fabrica-revisor'
@@ -32,6 +34,8 @@ $Pasos = [ordered]@{
   '4 Apps instaladas en el repo'    = 'pendiente'
   '5 Token de Claude'               = 'pendiente'
   '6 Allow auto-merge'              = 'pendiente'
+  '7 Subir main (v0)'               = 'pendiente'
+  '8 Ruleset de main'               = 'pendiente'
 }
 $script:Estado = 'ok'
 $script:ClientIdConstructor = $null
@@ -47,6 +51,7 @@ function Titulo($t) { Write-Host ''; Write-Host "=== $t ===" -ForegroundColor Cy
 function Info($t)   { Write-Host "  $t" }
 function Bien($t)   { Write-Host "  [ok] $t" -ForegroundColor Green }
 function Aviso($t)  { Write-Host "  [!] $t" -ForegroundColor Yellow }
+. (Join-Path $PSScriptRoot 'lib-gh.ps1')   # Gh-Login y Subir-Main (usan Info, Aviso y Bien)
 
 # Ejecuta un paso: registra ok / ya hecho / FALLO y, si falla, corta todo.
 function Paso([string]$Nombre, [scriptblock]$Cuerpo) {
@@ -224,19 +229,9 @@ function Obtener-App([string]$Rol, [string]$Nombre) {
   throw 'No se creo la App. Relanza el script y pulsa de nuevo el boton.'
 }
 
+# Las dos Apps se miran igual, por /user/installations con la sesion de gh: no se saca ninguna clave de 1Password.
 # Estado de la instalacion de una App en el repo: ok (solo fabrica) | ninguna | ancha (mas repos) | dudosa (no se puede leer).
 function Estado-Instalacion([string]$Rol, [string]$Nombre) {
-  if ($Rol -eq 'constructor') {
-    # Se comprueba con el propio token de instalacion (la clave sale de 1Password en memoria).
-    $env:FABRICA_CONSTRUCTOR_CLIENT_ID = $script:ClientIdConstructor
-    Push-Location $Fabrica
-    try { $o = & node 'scripts\token.mjs' '--' 'gh' 'api' '/installation/repositories' '--jq' '.repositories[].full_name' 2>&1 | Out-String; $c = $LASTEXITCODE }
-    finally { Pop-Location }
-    if ($c -ne 0) { return 'ninguna' }
-    $l = @($o -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($l.Count -eq 1 -and $l[0] -ieq $Repo) { return 'ok' }
-    return 'ancha'
-  }
   $r = Gh @('api', '/user/installations?per_page=100')
   if ($r.Code -ne 0) { return 'dudosa' }
   $j = Json $r
@@ -282,7 +277,7 @@ Titulo 'Comprobaciones previas'
 foreach ($c in 'gh', 'node', 'op', 'claude') {
   if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { Write-Host "  Falta el programa '$c'. Instalalo y vuelve a lanzar." -ForegroundColor Red; exit 1 }
 }
-foreach ($f in 'apps\crear-apps.html', 'apps\convertir.mjs', 'scripts\token.mjs') {
+foreach ($f in 'apps\crear-apps.html', 'apps\convertir.mjs', 'apps\ruleset.ps1') {
   if (-not (Test-Path (Join-Path $Fabrica $f))) { Write-Host "  No encuentro $Fabrica\$f" -ForegroundColor Red; exit 1 }
 }
 if ($env:GH_TOKEN -or $env:GITHUB_TOKEN) {
@@ -311,13 +306,13 @@ try {
     if ($LASTEXITCODE -eq 0) { Info 'Ya hay sesion de gh; la uso (se cerrara al final).'; $script:Estado = 'ya hecho' }
     else {
       Info 'Se abrira el navegador: copia el codigo que te da gh, pegalo en la pagina y autoriza.'
-      & gh auth login --hostname github.com --git-protocol https --web --scopes repo --skip-ssh-key
+      Gh-Login
       if ($LASTEXITCODE -ne 0) { throw 'gh auth login no termino bien.' }
     }
     $u = Gh @('api', 'user', '--jq', '.login')
     if ($u.Code -ne 0 -or $u.Out -ne $Dueno) { throw "La sesion es de '$($u.Out)' y deberia ser '$Dueno'." }
     $v = Gh @('api', "repos/$Repo", '--jq', '.permissions.admin')
-    if ($v.Code -ne 0) { throw "No veo el repo $Repo. Creado y subido (paso 1 de PASOS-PABLO.md)?" }
+    if ($v.Code -ne 0) { throw "No veo el repo $Repo. Esta creado el repo vacio en GitHub (https://github.com/new)?" }
     if ($v.Out -ne 'true') { throw "No eres administrador de $Repo." }
     Bien "Sesion de $Dueno con permisos de administracion en $Repo."
   }
@@ -420,10 +415,6 @@ try {
 
   # ---------- 4. instalar las Apps en el repo (solo en fabrica) ----------
   Paso '4 Apps instaladas en el repo' {
-    if (-not $script:ClientIdConstructor) { throw 'No tengo el client id del constructor (no salio de convertir ni de la API).' }
-    $env:FABRICA_CONSTRUCTOR_CLIENT_ID = $script:ClientIdConstructor
-    $env:FABRICA_REPO = $Repo
-    $env:OP_VAULT = $Boveda
     $todoYa = $true
     foreach ($rol in 'constructor', 'revisor') {
       if ($rol -eq 'constructor') { $slug = $script:NombreConstructor } else { $slug = $script:NombreRevisor }
@@ -498,6 +489,19 @@ try {
     }
     Bien 'Allow auto-merge activado.'
   }
+
+  # ---------- 7. subir main (la v0) ----------
+  # Va antes del ruleset: con el ruleset puesto, main ya no admite empujes directos.
+  Paso '7 Subir main (v0)' {
+    if ((Subir-Main $CarpetaV0 $Repo) -eq 'ya hecho') { $script:Estado = 'ya hecho' }
+  }
+
+  # ---------- 8. ruleset de main (al final) ----------
+  # Exige el check revisor con el id de la App aunque aun no haya corrido (solo corre en PR).
+  Paso '8 Ruleset de main' {
+    & (Join-Path $PSScriptRoot 'ruleset.ps1') -Repo $Repo -AppRevisor $script:NombreRevisor -SesionAbierta
+    if ($LASTEXITCODE -ne 0) { throw 'ruleset.ps1 fallo (mira el mensaje de arriba). Se puede relanzar suelto: apps\ruleset.ps1' }
+  }
 }
 catch {
   $script:Fallo = $true
@@ -517,9 +521,7 @@ finally {
     Write-Host ("  {0,-34} {1}" -f $k, $txt) -ForegroundColor $col
   }
   Write-Host ''
-  Write-Host '  Paso 7 (ruleset de main): NO se hace aqui. Tras subir la v0 y que exista el check revisor, lanza apps\ruleset.ps1.'
-  Write-Host ''
-  Write-Host "  Apps: constructor = $($script:NombreConstructor), revisor = $($script:NombreRevisor)  (si el revisor no es fabrica-revisor, pasalo a apps\ruleset.ps1 con -AppRevisor)" -ForegroundColor Cyan
+  Write-Host "  Apps: constructor = $($script:NombreConstructor), revisor = $($script:NombreRevisor)" -ForegroundColor Cyan
   if ($script:ClientIdConstructor) {
     Write-Host ''
     Write-Host "  FABRICA_CONSTRUCTOR_CLIENT_ID = $($script:ClientIdConstructor)   (no es secreto; hace falta para scripts/token.mjs)" -ForegroundColor Cyan

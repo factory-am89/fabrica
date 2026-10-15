@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { decidir, leerPreguntas, tocaArbitro, aprobadoPorPablo } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
@@ -74,15 +74,37 @@ test('convertir.mjs guarda los secretos del revisor en su environment', () => {
   assert.doesNotMatch(leer('apps/convertir.mjs'), /REVISOR_APP_ID/);
 });
 
-test('PASOS-PABLO manda a los scripts; el environment va antes de los secretos y el ruleset no restringe updates', () => {
+test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subida y ruleset en ese orden', () => {
   const pasos = leer('PASOS-PABLO.md');
-  assert.match(pasos, /apps.arranque.ps1/);
-  assert.match(pasos, /apps.ruleset.ps1/);
+  // La ruta exacta que se pega en PowerShell, y que el fichero existe en el repo.
+  const orden1 = 'powershell -ExecutionPolicy Bypass -File C:\\dev\\fabrica-v0-revisor\\apps\\arranque.ps1';
+  assert.ok(pasos.includes(orden1), 'PASOS-PABLO no trae la orden exacta del paso 1');
+  assert.ok(existsSync(new URL('../apps/arranque.ps1', import.meta.url)));
   assert.match(pasos, /Ningún constructor trabaja antes de que exista el ruleset/);
+  assert.ok(pasos.includes('C:\\dev\\fabrica\\apps\\'), 'falta dónde vive el script tras fusionar');
   const arranque = leer('apps/arranque.ps1');
-  assert.ok(arranque.indexOf("'2 Environment revisor (main)'") < arranque.indexOf("'3 App fabrica-revisor'"));
+  // Orden de EJECUCIÓN: las llamadas `Paso '…'` del cuerpo, no la tabla de estado de arriba.
+  const ejecutados = [...arranque.matchAll(/^\s*Paso '([^']+)'/gm)].map((m) => m[1]);
+  assert.deepEqual(ejecutados, [
+    '1 Sesion de gh',
+    '2 Environment revisor (main)',
+    '3 Cuenta de servicio (llavero)',
+    '3 App fabrica-constructor',
+    '3 App fabrica-revisor',
+    '4 Apps instaladas en el repo',
+    '5 Token de Claude',
+    '6 Allow auto-merge',
+    '7 Subir main (v0)',
+    '8 Ruleset de main',
+  ]);
   assert.ok(arranque.indexOf('environments/revisor') < arranque.indexOf("Paso '3 App fabrica-revisor'"));
+  assert.match(arranque, /ruleset\.ps1'\) -Repo .* -SesionAbierta/);
+  assert.doesNotMatch(arranque, /node\s+'scripts/, 'el script de admin no saca la clave de 1Password');
+  assert.doesNotMatch(arranque, /&\s*gh auth login/, 'el login va por Gh-Login, que no deja helper en git');
+  assert.match(leer('apps/lib-gh.ps1'), /auth login/);
   const ruleset = leer('apps/ruleset.ps1');
+  assert.doesNotMatch(ruleset, /check-runs/, 'el check revisor no debe haber corrido antes: solo corre en PR');
+  assert.match(ruleset, /context = 'revisor'; integration_id = \$idRevisor/);
   assert.match(ruleset, /type = 'non_fast_forward'/);
   assert.match(ruleset, /type = 'deletion'/);
   assert.doesNotMatch(ruleset, /type = 'update'/);

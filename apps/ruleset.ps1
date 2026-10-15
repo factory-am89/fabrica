@@ -1,13 +1,15 @@
 # Crea el ruleset de main en fabrica (uso unico).
-# Lanzar DESPUES de subir la v0 y de que el check `revisor` haya corrido al menos una vez.
-# Lo lanza Pablo:  powershell -ExecutionPolicy Bypass -File <esta ruta>
-# Hace login y, siempre (tambien si falla), logout de gh. Se puede relanzar: si el
-# ruleset existe, no lo toca. Textos sin tildes a proposito (Windows PowerShell 5.1
+# Normalmente lo llama appsrranque.ps1 al final (con -SesionAbierta). Suelto sirve para relanzarlo:
+#   powershell -ExecutionPolicy Bypass -File <esta ruta>
+# Suelto hace login y, siempre (tambien si falla), logout de gh; con -SesionAbierta usa la sesion del
+# que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el
+# id de la App aunque aun no haya corrido (solo corre en PR). Se puede relanzar: si el ruleset existe, no lo toca. Textos sin tildes a proposito (Windows PowerShell 5.1
 # lee un .ps1 sin BOM como ANSI).
 param(
   [string]$Repo = 'pabloam89/fabrica',
   [string]$AppRevisor = 'fabrica-revisor',
-  [string]$NombreRuleset = 'main'
+  [string]$NombreRuleset = 'main',
+  [switch]$SesionAbierta   # la sesion de gh es del script que me llama: ni login ni logout
 )
 
 $ErrorActionPreference = 'Continue'
@@ -19,6 +21,11 @@ function Gh([string[]]$A, [string]$Entrada) {
   else { $o = & gh @A 2>&1 | Out-String }
   [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
 }
+
+function Info($t)  { Write-Host "  $t" }
+function Aviso($t) { Write-Host "  [!] $t" -ForegroundColor Yellow }
+function Bien($t)  { Write-Host "  [ok] $t" -ForegroundColor Green }
+. (Join-Path $PSScriptRoot 'lib-gh.ps1')
 
 $resultado = 'no llego a ejecutarse'
 $fallo = $false
@@ -43,7 +50,7 @@ try {
   & gh auth status --hostname github.com 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  Se abrira el navegador: copia el codigo que te da gh, pegalo y autoriza.'
-    & gh auth login --hostname github.com --git-protocol https --web --scopes repo --skip-ssh-key
+    Gh-Login
     if ($LASTEXITCODE -ne 0) { throw 'gh auth login no termino bien.' }
   }
   $u = Gh @('api', 'user', '--jq', '.login')
@@ -71,12 +78,6 @@ try {
     $idRevisor = [int]$t
   }
   Write-Host "  [ok] App $AppRevisor con id $idRevisor."
-
-  # Aviso (no bloquea): el check revisor deberia haber corrido ya en algun commit.
-  $cr = Gh @('api', "repos/$Repo/commits/main/check-runs", '--jq', '.check_runs[].name')
-  if ($cr.Code -eq 0 -and (@($cr.Out -split "`n" | ForEach-Object { $_.Trim() }) -notcontains 'revisor')) {
-    Write-Host '  [!] En el ultimo commit de main aun no veo el check revisor. Si el ruleset lo exige y nunca corre, bloquea los PR.' -ForegroundColor Yellow
-  }
 
   # --- ruleset (idempotente) ---
   Write-Host '=== Ruleset ===' -ForegroundColor Cyan
@@ -127,10 +128,14 @@ catch {
 }
 finally {
   Write-Host '=== Cierre ===' -ForegroundColor Cyan
-  & gh auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
-  & gh auth status 2>&1 | Out-Null
-  if ($LASTEXITCODE -eq 0) { Write-Host '  [!] gh sigue con sesion: ejecuta  gh auth logout  a mano.' -ForegroundColor Yellow }
-  else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
+  if ($SesionAbierta) { Write-Host '  La sesion de gh es de quien me llamo: no la cierro aqui.' }
+  else {
+    & gh auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
+    & gh auth status 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Host '  [!] gh sigue con sesion: ejecuta  gh auth logout  a mano.' -ForegroundColor Yellow }
+    else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
+  }
   Write-Host "Resumen: ruleset de main -> $resultado"
 }
 if ($fallo) { exit 1 }
+exit 0
