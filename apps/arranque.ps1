@@ -284,7 +284,7 @@ if ($env:GH_TOKEN -or $env:GITHUB_TOKEN) {
   Aviso 'Habia GH_TOKEN/GITHUB_TOKEN en este terminal: lo quito solo para este script (impediria el login).'
   Remove-Item Env:GH_TOKEN, Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
 }
-& op whoami 2>&1 | Out-Null
+& op vault list --format json 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
   Write-Host '  1Password (op) no tiene sesion. Abre la app de 1Password, desbloqueala (con la integracion con CLI activa) o ejecuta  op signin  y vuelve a lanzar.' -ForegroundColor Red
   exit 1
