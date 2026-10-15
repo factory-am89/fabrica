@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ruta = (r) => fileURLToPath(new URL(`../${r}`, import.meta.url));
@@ -22,4 +23,21 @@ test('lib-gh.ps1: login aislado del git y del llavero, permisos del token, comil
   const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
   assert.ok(lineas.length >= 17, `salida inesperada: ${r.stdout}${r.stderr}`);
   assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
+});
+
+// En PowerShell las funciones van antes que los ejecutables y no distinguen mayusculas: una funcion
+// Gh con `& gh` dentro se llama a si misma sin fin. Los .ps1 de apps/ se cargan unos desde otros,
+// asi que se mira el conjunto: ninguna funcion puede llamarse como un ejecutable que se llama con `&`
+// (por eso se escribe `& gh.exe`).
+test('apps/*.ps1: ninguna funcion tapa a un ejecutable que se llama con &', () => {
+  const dir = ruta('apps');
+  const funciones = [];
+  const llamados = new Set();
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.ps1'))) {
+    const t = readFileSync(`${dir}/${f}`, 'utf8');
+    for (const m of t.matchAll(/^\s*function\s+([\w.-]+)/gim)) funciones.push({ f, nombre: m[1] });
+    for (const m of t.matchAll(/&\s+(gh|op|git|node|claude)(?![\w.-])/gi)) llamados.add(m[1].toLowerCase());
+  }
+  const choques = funciones.filter((x) => llamados.has(x.nombre.toLowerCase()));
+  assert.deepEqual(choques, [], 'funcion con el nombre de un ejecutable: llama al .exe (& gh.exe) o renombra la funcion');
 });

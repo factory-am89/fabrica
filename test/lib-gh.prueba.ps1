@@ -21,11 +21,11 @@ function Pasa([scriptblock]$b) { try { & $b; $true } catch { $false } }
 function Huella([string]$f) { (Get-FileHash $f -Algorithm SHA256).Hash }
 try {
   . $Lib
-  if ($SinAislamiento) { function Gh-Login { & gh auth login --scopes 'repo,workflow'; $global:LASTEXITCODE = 0 } }
+  if ($SinAislamiento) { function Gh-Login { & gh.exe auth login --scopes 'repo,workflow'; $global:LASTEXITCODE = 0 } }
   $hGlobal = Huella "$t\global"; $hSistema = Huella "$t\sistema"
   # gh falso: hace lo que hace el real. Si ve un helper (contando el de sistema), NO lo ejecuta:
   # anota la llamada a "git credential approve" en un fichero. Si no ve ninguno, escribe en la global.
-  function gh {
+  function gh.exe {
     if ($args[0] -eq 'auth' -and $args[1] -eq 'login') {
       $ve = @(git config --get-all credential.helper 2>$null)
       Anota "scopes=$($args -join ' ')"
@@ -48,17 +48,17 @@ try {
   $c = @(git config --get-all credential.helper)
   Prueba 'fuera del login el helper de sistema si se ve' ($c.Count -eq 1 -and $c[0] -eq 'manager')
   # Si gh falla, tambien se restauran las variables.
-  function gh { cmd /c exit 3 }
+  function gh.exe { cmd /c exit 3 }
   Gh-Login
   Prueba 'si gh falla, devuelve su codigo y restaura las variables' ($LASTEXITCODE -eq 3 -and $env:GIT_CONFIG_GLOBAL -eq "$t\global" -and -not $env:GIT_CONFIG_NOSYSTEM)
   # Permisos del token (cabecera X-OAuth-Scopes).
-  function gh { "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo`r`n`r`n{}" }
+  function gh.exe { "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo`r`n`r`n{}" }
   Prueba 'Exigir-Workflow para si falta workflow' (-not (Pasa { Exigir-Workflow }))
-  function gh { "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo, workflow`r`n`r`n{}" }
+  function gh.exe { "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo, workflow`r`n`r`n{}" }
   Prueba 'Exigir-Workflow deja pasar con workflow' (Pasa { Exigir-Workflow })
-  function gh { "HTTP/2.0 200 OK`r`n`r`n{}" }
+  function gh.exe { "HTTP/2.0 200 OK`r`n`r`n{}" }
   Prueba 'Exigir-Workflow para si no puede leer los permisos' (-not (Pasa { Exigir-Workflow }))
-  Remove-Item Function:\gh
+  Remove-Item Function:\gh.exe
   # El push de main no pasa por el llavero: tras el helper de sistema viene el vacio, que lo borra, y
   # solo despues el de gh. Con -c, git ve los tres en este orden.
   $h = Args-Helper-Gh

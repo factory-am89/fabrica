@@ -68,8 +68,8 @@ function Paso([string]$Nombre, [scriptblock]$Cuerpo) {
 
 # gh con captura de salida y codigo (la salida no se pinta nunca sola).
 function Gh([string[]]$A, [string]$Entrada) {
-  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh @A 2>&1 | Out-String }
-  else { $o = & gh @A 2>&1 | Out-String }
+  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh.exe @A 2>&1 | Out-String }
+  else { $o = & gh.exe @A 2>&1 | Out-String }
   [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
 }
 
@@ -250,8 +250,8 @@ function Estado-Instalacion([string]$Rol, [string]$Nombre) {
 
 function Cierra-Sesion {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return }
-  & gh auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
-  & gh auth status 2>&1 | Out-Null
+  & gh.exe auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
+  & gh.exe auth status 2>&1 | Out-Null
   if ($LASTEXITCODE -eq 0) { Aviso 'gh sigue con sesion abierta: ejecuta  gh auth logout  a mano.' }
   else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
 }
@@ -290,9 +290,9 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 Bien 'gh, node, op (con sesion) y claude encontrados.'
-& gh auth status --hostname github.com 2>&1 | Out-Null
+& gh.exe auth status --hostname github.com 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
-  $q = (& gh api user --jq .login 2>$null | Out-String).Trim()
+  $q = (& gh.exe api user --jq .login 2>$null | Out-String).Trim()
   if ($q -ne $Dueno) {
     Write-Host "  Ya hay una sesion de gh abierta como '$q' (no como '$Dueno'). No la toco: cierrala tu (gh auth logout) o usa otro terminal, y vuelve a lanzar." -ForegroundColor Red
     exit 1
@@ -302,7 +302,7 @@ if ($LASTEXITCODE -eq 0) {
 try {
   # ---------- 1. gh auth login ----------
   Paso '1 Sesion de gh' {
-    & gh auth status --hostname github.com 2>&1 | Out-Null
+    & gh.exe auth status --hostname github.com 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { Exigir-Workflow; Info 'Ya hay sesion de gh; la uso (se cerrara al final).'; $script:Estado = 'ya hecho' }
     else {
       Info 'Se abrira el navegador: copia el codigo que te da gh, pegalo en la pagina y autoriza.'

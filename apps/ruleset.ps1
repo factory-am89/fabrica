@@ -17,8 +17,8 @@ $Dueno = ($Repo -split '/')[0]
 $IdGitHubActions = 15368   # integracion de GitHub Actions: origen del check `tests`
 
 function Gh([string[]]$A, [string]$Entrada) {
-  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh @A 2>&1 | Out-String }
-  else { $o = & gh @A 2>&1 | Out-String }
+  if ($PSBoundParameters.ContainsKey('Entrada')) { $o = $Entrada | & gh.exe @A 2>&1 | Out-String }
+  else { $o = & gh.exe @A 2>&1 | Out-String }
   [pscustomobject]@{ Code = $LASTEXITCODE; Out = $o.Trim() }
 }
 
@@ -35,9 +35,9 @@ if ($env:GH_TOKEN -or $env:GITHUB_TOKEN) {
   Remove-Item Env:GH_TOKEN, Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
 }
 
-& gh auth status --hostname github.com 2>&1 | Out-Null
+& gh.exe auth status --hostname github.com 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
-  $q = (& gh api user --jq .login 2>$null | Out-String).Trim()
+  $q = (& gh.exe api user --jq .login 2>$null | Out-String).Trim()
   if ($q -ne $Dueno) {
     Write-Host "  Ya hay una sesion de gh abierta como '$q' (no como '$Dueno'). No la toco: cierrala tu (gh auth logout) o usa otro terminal, y vuelve a lanzar." -ForegroundColor Red
     exit 1
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -eq 0) {
 try {
   # --- login ---
   Write-Host '=== Sesion de gh ===' -ForegroundColor Cyan
-  & gh auth status --hostname github.com 2>&1 | Out-Null
+  & gh.exe auth status --hostname github.com 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  Se abrira el navegador: copia el codigo que te da gh, pegalo y autoriza.'
     Gh-Login
@@ -130,8 +130,8 @@ finally {
   Write-Host '=== Cierre ===' -ForegroundColor Cyan
   if ($SesionAbierta) { Write-Host '  La sesion de gh es de quien me llamo: no la cierro aqui.' }
   else {
-    & gh auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
-    & gh auth status 2>&1 | Out-Null
+    & gh.exe auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
+    & gh.exe auth status 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { Write-Host '  [!] gh sigue con sesion: ejecuta  gh auth logout  a mano.' -ForegroundColor Yellow }
     else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
   }

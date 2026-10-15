@@ -22,7 +22,7 @@ function Gh-Login {
   try {
     $env:GIT_CONFIG_NOSYSTEM = '1'
     $env:GIT_CONFIG_GLOBAL = $temporal
-    & gh auth login --hostname github.com --git-protocol https --web --scopes 'repo,workflow' --skip-ssh-key
+    & gh.exe auth login --hostname github.com --git-protocol https --web --scopes 'repo,workflow' --skip-ssh-key
     $codigo = $LASTEXITCODE
   } finally {
     if ($null -eq $antesNoSistema) { Remove-Item Env:GIT_CONFIG_NOSYSTEM -ErrorAction SilentlyContinue } else { $env:GIT_CONFIG_NOSYSTEM = $antesNoSistema }
@@ -35,7 +35,7 @@ function Gh-Login {
 # Permisos del token de la sesion de gh abierta (cabecera X-OAuth-Scopes). Devuelve la lista;
 # vacia si no se puede leer. No cambia nada.
 function Gh-Permisos {
-  $o = (& gh api -i user 2>&1 | Out-String)
+  $o = (& gh.exe api -i user 2>&1 | Out-String)
   if ($o -notmatch '(?im)^X-OAuth-Scopes:[ 	]*(.*?)\s*$') { return @() }
   return @($Matches[1] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
