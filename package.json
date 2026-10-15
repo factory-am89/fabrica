@@ -6,6 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "tarea": "node scripts/tarea.mjs",
+    "retirar": "node scripts/retirar.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test"
   },

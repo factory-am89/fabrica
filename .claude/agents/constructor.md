@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
 
-Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre en castellano), desde `origin/main`.
+Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre en castellano), desde `origin/main`, en su propia carpeta (`npm run tarea -- <rama>`; al fusionar, `npm run retirar -- <nombre>`).
 
 1. Antes de escribir, mira lo que ya existe: reutiliza antes de crear.
 2. Un test nuevo se ve fallar antes de creerlo; el PR cuenta cómo (comando y salida).

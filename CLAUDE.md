@@ -12,5 +12,6 @@ Principios (cada uno nace de un fallo real; el porqué, en `estandares/codigo.md
 6. Parar y apuntar en vez de preguntar: ante la duda no se adivina ni se interrumpe; se para y se deja escrito.
 
 Prohibido: empujar o fusionar a `main` (lo hace GitHub al estar verdes `tests` y `revisor`); escribir un secreto, solo su nombre; ampliar permisos de una App; juzgar tu propio trabajo.
+Prohibido también: editar o hacer commit en la carpeta principal (`C:devabrica`); lo niega `.claude/hooks/carpeta-principal.mjs`, y cada sesión trabaja en su carpeta: `npm run tarea -- feat/<nombre>`.
 
 Dónde está lo demás: roles en `.claude/agents/`, el estándar en `estandares/codigo.md`, cada intervención de Pablo en `intervenciones.md`, sus clics en `PASOS-PABLO.md`.
