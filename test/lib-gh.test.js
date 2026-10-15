@@ -17,9 +17,9 @@ test('arranque.ps1, ruleset.ps1 y lib-gh.ps1 pasan el parser de PowerShell 5.1',
   }
 });
 
-test('lib-gh.ps1: login sin rastro en git, comillas del helper y subida de main', { skip: !hayPs }, () => {
+test('lib-gh.ps1: login aislado del git y del llavero, permisos del token, comillas del helper y subida de main', { skip: !hayPs }, () => {
   const r = ps(['-ExecutionPolicy', 'Bypass', '-File', ruta('test/lib-gh.prueba.ps1'), '-Lib', ruta('apps/lib-gh.ps1')]);
   const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
-  assert.ok(lineas.length >= 7, `salida inesperada: ${r.stdout}${r.stderr}`);
+  assert.ok(lineas.length >= 17, `salida inesperada: ${r.stdout}${r.stderr}`);
   assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
 });

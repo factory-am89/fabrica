@@ -198,8 +198,10 @@ test('token.mjs: JWT RS256 con el client id, orden tras -- y sin escribir en dis
   assert.doesNotMatch(leer('scripts/token.mjs'), /writeFile|appendFile|console\.log\(.*token/);
 });
 
-test('CLAUDE.md y PASOS-PABLO.md no llevan caracteres de control', () => {
-  for (const f of ['CLAUDE.md', 'PASOS-PABLO.md']) assert.doesNotMatch(leer(f), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, f); // eslint-disable-line no-control-regex
+test('CLAUDE.md, PASOS-PABLO.md y apps/*.ps1 no llevan caracteres de control', () => {
+  const ps1 = readdirSync(new URL('../apps/', import.meta.url)).filter((f) => f.endsWith('.ps1')).map((f) => `apps/${f}`);
+  assert.ok(ps1.length >= 3, 'no encuentro los .ps1 de apps/');
+  for (const f of ['CLAUDE.md', 'PASOS-PABLO.md', ...ps1]) assert.doesNotMatch(leer(f), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, f); // eslint-disable-line no-control-regex
 });
 
 test('veredicto: los CLAUDE.md (raíz o anidados) son configuración del árbitro', () => {

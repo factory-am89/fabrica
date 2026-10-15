@@ -1,5 +1,5 @@
 # Crea el ruleset de main en fabrica (uso unico).
-# Normalmente lo llama appsrranque.ps1 al final (con -SesionAbierta). Suelto sirve para relanzarlo:
+# Normalmente lo llama apps\arranque.ps1 al final (con -SesionAbierta). Suelto sirve para relanzarlo:
 #   powershell -ExecutionPolicy Bypass -File <esta ruta>
 # Suelto hace login y, siempre (tambien si falla), logout de gh; con -SesionAbierta usa la sesion del
 # que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el

@@ -303,7 +303,7 @@ try {
   # ---------- 1. gh auth login ----------
   Paso '1 Sesion de gh' {
     & gh auth status --hostname github.com 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) { Info 'Ya hay sesion de gh; la uso (se cerrara al final).'; $script:Estado = 'ya hecho' }
+    if ($LASTEXITCODE -eq 0) { Exigir-Workflow; Info 'Ya hay sesion de gh; la uso (se cerrara al final).'; $script:Estado = 'ya hecho' }
     else {
       Info 'Se abrira el navegador: copia el codigo que te da gh, pegalo en la pagina y autoriza.'
       Gh-Login
