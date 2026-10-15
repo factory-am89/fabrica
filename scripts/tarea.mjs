@@ -4,6 +4,7 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { instalarHooks } from './instalar-hooks.mjs';
 import { gitOk, principal, nombreDeRama, carpetaDe, tieneOrigin } from './lib/carpetas.mjs';
 
 export function crearTarea(rama, { cwd = process.cwd(), instalar = true } = {}) {
@@ -17,6 +18,7 @@ export function crearTarea(rama, { cwd = process.cwd(), instalar = true } = {}) 
     base = 'origin/main';
   }
   gitOk(['worktree', 'add', '--no-track', '-b', rama, carpeta, base], raiz);
+  instalarHooks(raiz); // los hooks de git que niegan commit, merge y cherry-pick en la principal
   if (instalar) {
     const r = spawnSync('npm', ['ci'], { cwd: carpeta, stdio: 'inherit', shell: process.platform === 'win32' });
     if (r.status !== 0) throw new Error(`npm ci falló en ${carpeta}; la carpeta y la rama existen, arréglalo ahí.`);

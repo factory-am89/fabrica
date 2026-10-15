@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { decidir, leerPreguntas, tocaArbitro, aprobadoPorPablo } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
@@ -74,12 +74,41 @@ test('convertir.mjs guarda los secretos del revisor en su environment', () => {
   assert.doesNotMatch(leer('apps/convertir.mjs'), /REVISOR_APP_ID/);
 });
 
-test('PASOS-PABLO: el environment se crea antes de guardar secretos y el ruleset no restringe updates', () => {
+test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subida y ruleset en ese orden', () => {
   const pasos = leer('PASOS-PABLO.md');
-  assert.ok(pasos.indexOf('environments/revisor') < pasos.indexOf('node apps/convertir.mjs'));
-  assert.match(pasos, /\*\*No\*\* actives «Restrict updates»/);
-  assert.match(pasos, /Block force pushes/);
+  // La ruta exacta que se pega en PowerShell, y que el fichero existe en el repo.
+  const orden1 = 'powershell -ExecutionPolicy Bypass -File C:\\dev\\fabrica-v0-revisor\\apps\\arranque.ps1';
+  assert.ok(pasos.includes(orden1), 'PASOS-PABLO no trae la orden exacta del paso 1');
+  assert.ok(existsSync(new URL('../apps/arranque.ps1', import.meta.url)));
   assert.match(pasos, /Ningún constructor trabaja antes de que exista el ruleset/);
+  assert.ok(pasos.includes('C:\\dev\\fabrica\\apps\\'), 'falta dónde vive el script tras fusionar');
+  const arranque = leer('apps/arranque.ps1');
+  // Orden de EJECUCIÓN: las llamadas `Paso '…'` del cuerpo, no la tabla de estado de arriba.
+  const ejecutados = [...arranque.matchAll(/^\s*Paso '([^']+)'/gm)].map((m) => m[1]);
+  assert.deepEqual(ejecutados, [
+    '1 Sesion de gh',
+    '2 Environment revisor (main)',
+    '3 Cuenta de servicio (llavero)',
+    '3 App fabrica-constructor',
+    '3 App fabrica-revisor',
+    '4 Apps instaladas en el repo',
+    '5 Token de Claude',
+    '6 Allow auto-merge',
+    '7 Subir main (v0)',
+    '8 Ruleset de main',
+  ]);
+  assert.ok(arranque.indexOf('environments/revisor') < arranque.indexOf("Paso '3 App fabrica-revisor'"));
+  assert.match(arranque, /ruleset\.ps1'\) -Repo .* -SesionAbierta/);
+  assert.doesNotMatch(arranque, /node\s+'scripts/, 'el script de admin no saca la clave de 1Password');
+  assert.doesNotMatch(arranque, /&\s*gh auth login/, 'el login va por Gh-Login, que no deja helper en git');
+  assert.match(leer('apps/lib-gh.ps1'), /auth login/);
+  const ruleset = leer('apps/ruleset.ps1');
+  assert.doesNotMatch(ruleset, /check-runs/, 'el check revisor no debe haber corrido antes: solo corre en PR');
+  assert.match(ruleset, /context = 'revisor'; integration_id = \$idRevisor/);
+  assert.match(ruleset, /type = 'non_fast_forward'/);
+  assert.match(ruleset, /type = 'deletion'/);
+  assert.doesNotMatch(ruleset, /type = 'update'/);
+  assert.match(ruleset, /bypass_actors = @\(\)/);
 });
 
 function manifests() {
@@ -167,4 +196,34 @@ test('token.mjs: JWT RS256 con el client id, orden tras -- y sin escribir en dis
   assert.deepEqual(orden(['--', 'gh', 'pr', 'list']), ['gh', 'pr', 'list']);
   assert.throws(() => orden(['gh']));
   assert.doesNotMatch(leer('scripts/token.mjs'), /writeFile|appendFile|console\.log\(.*token/);
+});
+
+test('CLAUDE.md, PASOS-PABLO.md y apps/*.ps1 no llevan caracteres de control', () => {
+  const ps1 = readdirSync(new URL('../apps/', import.meta.url)).filter((f) => f.endsWith('.ps1')).map((f) => `apps/${f}`);
+  assert.ok(ps1.length >= 3, 'no encuentro los .ps1 de apps/');
+  for (const f of ['CLAUDE.md', 'PASOS-PABLO.md', ...ps1]) assert.doesNotMatch(leer(f), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, f); // eslint-disable-line no-control-regex
+});
+
+test('veredicto: los CLAUDE.md (raíz o anidados) son configuración del árbitro', () => {
+  for (const f of ['CLAUDE.md', 'apps/x/CLAUDE.md', 'a/b/c/CLAUDE.md']) {
+    assert.equal(tocaArbitro([f]), true, f);
+    assert.equal(juzga(buenas(), ctx({ ficheros: [f] })).ok, false, f);
+  }
+  assert.equal(tocaArbitro(['NO-CLAUDE.md', 'docs/CLAUDE.md.bak']), false);
+});
+
+test('veredicto: ningún texto del modelo se publica, solo ids de la lista de preguntas', () => {
+  const clave = 'C1234567890-ghs_SECRETO';
+  const clave2 = 'ghs_SECRETO_SUELTO';
+  const r = buenas();
+  const v = juzga([...r, { id: clave, respuesta: 'no', prueba: 'x' }, { id: clave2, respuesta: 'sí', prueba: 'x' }, { id: clave, respuesta: 'no', prueba: 'y' }, { id: { a: 1 }, respuesta: 'sí', prueba: 'x' }]);
+  assert.equal(v.ok, false);
+  const publicado = JSON.stringify(v);
+  assert.doesNotMatch(publicado, /SECRETO/);
+  assert.match(v.fallos.join(), /\d+ ids desconocidos/);
+  for (const f of v.fallos) assert.match(f, /^(C\d+: [a-zá-ú ]+|\d+ ids desconocidos|la cabeza .*|no, requiere .*|salida ilegible)$/);
+});
+
+test('revisor.yml: el json-schema limita el id a C<número>', () => {
+  assert.match(leer('.github/workflows/revisor.yml'), /"id":\{"type":"string","pattern":"\^C\[0-9\]\+\$"\}/);
 });

@@ -35,7 +35,8 @@ jobs:
       # El diff exacto del SHA que se juzga, bajado antes de Claude: Claude lo lee de un
       # fichero y no tiene `gh pr diff` (que seguiría a la cabeza si el PR cambia).
       - name: Bajar el diff del SHA
-        run: gh api "repos/$REPO/compare/$BASE...$SHA" -H "Accept: application/vnd.github.diff" > "$RUNNER_TEMP/pr.diff"
+        run: |
+          gh api "repos/$REPO/compare/$BASE...$SHA" -H "Accept: application/vnd.github.diff" > "$RUNNER_TEMP/pr.diff"
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -64,7 +65,7 @@ jobs:
             --model opus
             --max-turns 20
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr checks:*)"
-            --json-schema '{"type":"object","properties":{"respuestas":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"respuesta":{"type":"string","enum":["sí","no","no aplica"]},"prueba":{"type":"string"}},"required":["id","respuesta","prueba"]}}},"required":["respuestas"]}'
+            --json-schema '{"type":"object","properties":{"respuestas":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","pattern":"^C[0-9]+$"},"respuesta":{"type":"string","enum":["sí","no","no aplica"]},"prueba":{"type":"string"}},"required":["id","respuesta","prueba"]}}},"required":["respuestas"]}'
 
       # El token de la App se crea después de Claude, para que este nunca lo vea.
       - id: app
