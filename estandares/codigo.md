@@ -1,6 +1,6 @@
 # Estándar de código
 
-Doce preguntas de sí o no. Cada una dice quién la comprueba: la **máquina** (el CI, workflow `tests`) o el **revisor**. Todas deben ser `sí` (o `no aplica`) para fusionar.
+Trece preguntas de sí o no. Cada una dice quién la comprueba: la **máquina** (el CI, workflow `tests`) o el **revisor**. Todas deben ser `sí` (o `no aplica`) para fusionar.
 
 ## De dónde sale
 
@@ -23,7 +23,7 @@ Solo 30 de los 118 llevan etiqueta `causa:`, así que no cuenta la etiqueta: agr
 | Secreto o dato sensible expuesto | 8 | C10 |
 | Regla solo en texto, sin check | 7 | principio 5 y C4 |
 
-C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños.
+C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) y C13 (no rebajar comprobaciones, la contrapartida de que ningún cambio pase por una persona) no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños.
 
 ## Preguntas
 
@@ -86,3 +86,8 @@ Mal: un arreglo, un renombrado y una función nueva mezclados.
 Quién: revisor.
 Bien: la función nueva la llama algo, o el PR dice quién la usará en el siguiente trozo.
 Mal: una dependencia o un fichero «por si hace falta», o ficheros ajenos al encargo.
+
+### C13 — Si el cambio toca workflows, el veredicto, el estándar, `.claude/` o `CLAUDE.md`, ¿deja cada comprobación igual o más estricta (ninguna se quita, se salta ni se rebaja)?
+Quién: revisor.
+Bien: una pregunta nueva, o un test que antes no existía; ninguna comprobación desaparece.
+Mal: quitar un check obligatorio, convertir un «no» en aviso o ampliar lo que el veredicto da por bueno sin que nada lo compense.
