@@ -35,7 +35,8 @@ jobs:
       # El diff exacto del SHA que se juzga, bajado antes de Claude: Claude lo lee de un
       # fichero y no tiene `gh pr diff` (que seguiría a la cabeza si el PR cambia).
       - name: Bajar el diff del SHA
-        run: gh api "repos/$REPO/compare/$BASE...$SHA" -H "Accept: application/vnd.github.diff" > "$RUNNER_TEMP/pr.diff"
+        run: |
+          gh api "repos/$REPO/compare/$BASE...$SHA" -H "Accept: application/vnd.github.diff" > "$RUNNER_TEMP/pr.diff"
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}

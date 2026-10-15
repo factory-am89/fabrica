@@ -127,12 +127,14 @@ test('retirar: no se lanza desde dentro de la carpeta que borra', () => {
 });
 
 test('hook: enPrincipal elige la carpeta más profunda que contiene la ruta', () => {
-  const carpetas = ['C:\\dev\\fabrica', 'C:\\dev\\fabrica\\anidada', 'C:\\dev\\fabrica-x'];
-  assert.equal(enPrincipal('C:\\dev\\fabrica\\src\\a.js', carpetas), true);
-  assert.equal(enPrincipal('C:\\dev\\fabrica', carpetas), true);
-  assert.equal(enPrincipal('C:\\dev\\fabrica\\anidada\\a.js', carpetas), false);
-  assert.equal(enPrincipal('C:\\dev\\fabrica-x\\a.js', carpetas), false, 'fabrica-x no es la principal');
-  assert.equal(enPrincipal('C:\\otra\\a.js', carpetas), false);
+  // Rutas con path.resolve: en Windows salen C:..., en Linux /...; las de Windows a pelo no existen en Linux.
+  const r = (...p) => path.resolve('/dev', ...p);
+  const carpetas = [r('fabrica'), r('fabrica', 'anidada'), r('fabrica-x')];
+  assert.equal(enPrincipal(r('fabrica', 'src', 'a.js'), carpetas), true);
+  assert.equal(enPrincipal(r('fabrica'), carpetas), true);
+  assert.equal(enPrincipal(r('fabrica', 'anidada', 'a.js'), carpetas), false);
+  assert.equal(enPrincipal(r('fabrica-x', 'a.js'), carpetas), false, 'fabrica-x no es la principal');
+  assert.equal(enPrincipal(r('otra', 'a.js'), carpetas), false);
 });
 
 test('hook: carpetaDeCommit sigue cd y git -C y no se deja engañar por otras órdenes de git', () => {

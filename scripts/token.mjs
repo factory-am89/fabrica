@@ -8,7 +8,7 @@
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
@@ -88,7 +88,7 @@ export function tokenServicio(env = process.env, llavero = leerLlavero) {
 export const HELPER_GIT = '!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f';
 export function entornoHijo(cmd, token, env = process.env) {
   const hijo = { ...env, GH_TOKEN: token };
-  if (!/^git(.exe)?$/i.test(basename(cmd[0]))) return hijo;
+  if (!/^git(.exe)?$/i.test(win32.basename(cmd[0]))) return hijo;
   const n = Number.parseInt(env.GIT_CONFIG_COUNT ?? '0', 10) || 0;
   hijo[`GIT_CONFIG_KEY_${n}`] = 'credential.helper';
   hijo[`GIT_CONFIG_VALUE_${n}`] = '';
