@@ -30,8 +30,9 @@ test('los tres roles tienen su modelo y el revisor no escribe', () => {
   }
 });
 
-test('el estándar tiene de 10 a 13 preguntas, cada una con bien y mal', () => {
-  assert.ok(preguntas.length >= 10 && preguntas.length <= 13, `hay ${preguntas.length}`);
+test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bien y mal', () => {
+  assert.ok(preguntas.length >= 10, `hay ${preguntas.length}`);
+  assert.deepEqual(preguntas.map((p) => p.id), preguntas.map((_, i) => `C${i + 1}`));
   const bloques = leer('estandares/codigo.md').split(/^### /m).slice(1);
   for (const b of bloques) {
     assert.match(b, /^Bien: /m, b.split('\n')[0]);
@@ -168,7 +169,8 @@ test('veredicto: si la cabeza del PR ya no es el SHA juzgado, es no', () => {
 
 test('veredicto: un diff que toca workflows, veredicto, estándar o .claude/ no exige aprobación humana', () => {
   for (const f of ['.github/workflows/revisor.yml', 'scripts/veredicto.mjs', 'estandares/codigo.md', '.claude/agents/revisor.md', 'CLAUDE.md']) {
-    assert.equal(juzga(buenas(), ctx({ ficheros: [f] })).ok, true, f);
+    const v = juzga(buenas(), ctx({ ficheros: [f], pablo: false }));
+    assert.equal(v.ok, true, `${f}: ${v.fallos.join()}`);
   }
   assert.equal(juzga(buenas().slice(1), ctx({ ficheros: ['.github/workflows/revisor.yml'] })).ok, false);
 });

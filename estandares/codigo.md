@@ -1,6 +1,6 @@
 # Estándar de código
 
-Trece preguntas de sí o no. Cada una dice quién la comprueba: la **máquina** (el CI, workflow `tests`) o el **revisor**. Todas deben ser `sí` (o `no aplica`) para fusionar.
+Preguntas de sí o no (la lista es la de «Preguntas», más abajo; nadie guarda el número). Cada una dice quién la comprueba: la **máquina** (el CI, workflow `tests`) o el **revisor**. Todas deben ser `sí` (o `no aplica`) para fusionar.
 
 ## De dónde sale
 
