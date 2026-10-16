@@ -3,19 +3,9 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { gitOk, norm } from './carpetas.mjs';
 import { REPO } from './repo.mjs';
-
-export const TOKEN = fileURLToPath(new URL('../token.mjs', import.meta.url));
-const SIN_CREDENCIAL = fileURLToPath(new URL('./gh-publico.mjs', import.meta.url));
-
-// Quién lanza las órdenes de GitHub según la identidad de la ficha (lib/ficha.mjs). Una desconocida lanza.
-export function lanzadorDe(identidad) {
-  if (identidad === 'fabrica-constructor') return TOKEN;
-  if (identidad === 'ninguna') return SIN_CREDENCIAL;
-  throw new Error(`Identidad desconocida: ${identidad}`);
-}
+import { TOKEN } from './identidades.mjs';
 
 // Lanza una orden con token de App (token.mjs es la única puerta; gh a pelo no tiene sesión en este PC).
 // `repo` (si se da) le dice a token.mjs para qué repo canjear el token (FABRICA_REPO).

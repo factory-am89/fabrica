@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { git, gitOk, worktrees } from './lib/carpetas.mjs';
 import { quitarUnion } from './retirar.mjs';
 import { leerFicha } from './lib/ficha.mjs';
-import { conToken, lanzadorDe, motivoDeQuedarse, prsFusionados } from './lib/puede-borrarse.mjs';
+import { identidadDe } from './lib/identidades.mjs';
+import { conToken, motivoDeQuedarse, prsFusionados } from './lib/puede-borrarse.mjs';
 
 // Por qué una carpeta se queda, o null si se puede borrar: la regla común, con solo PR fusionado como prueba.
 const motivoDe = (w, todas, fusionados, cwd) => motivoDeQuedarse(w, { todas, cwd, fusionada: (punta) => fusionados.has(punta) });
@@ -53,12 +54,13 @@ export function limpiar({ cwd = process.cwd(), repoDir = cwd, ensayo = false, to
   const todas = worktrees(repoDir);
   const principal = todas[0].ruta;
   const ficha = leerFicha(principal, fichero);
-  const lanzador = token ?? lanzadorDe(ficha.identidad);
+  const identidad = identidadDe(ficha.identidad);
+  const lanzador = token ?? identidad.lanzador;
   const repo = ficha.repo;
   const fusionados = prsFusionados(repo, lanzador, principal, ficha.base);
   // Sin credencial no se puede borrar en GitHub: las ramas remotas se dejan (las borra GitHub al fusionar si está activado).
-  const remotas = ficha.identidad === 'ninguna' ? new Set() : ramasRemotas(principal);
-  const salida = { ensayo, identidad: ficha.identidad, repo, borradas: [], quedan: [], fallos: 0 };
+  const remotas = identidad.borraRemotas ? ramasRemotas(principal) : new Set();
+  const salida = { ensayo, borraRemotas: identidad.borraRemotas, repo, borradas: [], quedan: [], fallos: 0 };
   for (const w of todas.slice(1)) {
     const quedan = (motivo, fallo = false) => {
       salida.quedan.push({ carpeta: w.ruta, rama: w.rama, motivo });
@@ -87,7 +89,7 @@ export function imprimir(s, escribir = console.log) {
     for (const a of b.avisos) escribir(`limpiar AVISO: ${b.carpeta}: ${a}`);
   }
   for (const q of s.quedan) escribir(`limpiar se queda: ${q.carpeta} (${q.rama ?? 'sin rama'}): ${q.motivo}`);
-  if (s.identidad === 'ninguna') escribir(`limpiar nota: ${s.repo} no tiene identidad de escritura (ficha): las ramas remotas no se tocan.`);
+  if (!s.borraRemotas) escribir(`limpiar nota: ${s.repo} no tiene identidad de escritura (ficha): las ramas remotas no se tocan.`);
   escribir(`limpiar resumen: ${s.borradas.length} ${s.ensayo ? 'a borrar' : 'borradas'}, ${s.quedan.length} se quedan, ${s.fallos} fallos`);
 }
 

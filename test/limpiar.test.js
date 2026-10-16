@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { limpiar, opciones, imprimir } from '../scripts/limpiar.mjs';
 import { leerFicha } from '../scripts/lib/ficha.mjs';
-import { lanzadorDe } from '../scripts/lib/puede-borrarse.mjs';
+import { IDENTIDADES, identidadDe } from '../scripts/lib/identidades.mjs';
 import { consultar, rutaDe } from '../scripts/lib/gh-publico.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
@@ -22,7 +22,10 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 
-const FICHA = { repo: 'factory-am89/r', base: 'main', identidad: 'fabrica-constructor' };
+// Los nombres de identidad salen del mapa, no se escriben a mano.
+const CON_ESCRITURA = Object.keys(IDENTIDADES).find((n) => IDENTIDADES[n].borraRemotas);
+const SIN_ESCRITURA = Object.keys(IDENTIDADES).find((n) => !IDENTIDADES[n].borraRemotas);
+const FICHA = { repo: 'factory-am89/r', base: 'main', identidad: CON_ESCRITURA };
 
 // <tmp>/fabrica con origin local y una carpeta por rama, cada una con un commit ya subido.
 // `ficha`: lo que se escribe en .fabrica.json (null: sin ficha). `conStaging`: origin también tiene la rama staging.
@@ -205,7 +208,7 @@ test('limpiar: sucia y además sin PR fusionado → el motivo que se dice es el 
 const identidadGit = (cwd) => { for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(cwd, 'config', k, v); };
 
 test('limpiar: dos repos distintos (merge a base staging, squash a main) → borra lo fusionado en los dos', () => {
-  const a = mundo(['feat/aa'], { ficha: { repo: 'factory-am89/staging', base: 'staging', identidad: 'fabrica-constructor' }, conStaging: true });
+  const a = mundo(['feat/aa'], { ficha: { repo: 'factory-am89/staging', base: 'staging', identidad: CON_ESCRITURA }, conStaging: true });
   const b = mundo(['feat/bb']);
   // a: fusión con merge de verdad en origin/staging; b: squash en origin/main (la rama NO queda contenida).
   const clonA = path.join(a.padre, 'clon');
@@ -264,18 +267,22 @@ test('ficha: incompleta, con claves de más, identidad desconocida o no JSON →
   assert.throws(con({ ...FICHA, identidad: 'pablo' }), /«identidad» debe ser una de/);
   assert.throws(con('{no es json'), /no es JSON legible/);
   assert.throws(con('[]'), /debe ser un objeto/);
-  assert.throws(con({ repo: 'otro-dueno/r', base: 'main', identidad: 'fabrica-constructor' }), /solo está instalada en/);
-  assert.deepEqual(con({ repo: 'otro-dueno/r', base: 'staging', identidad: 'ninguna' })(), { repo: 'otro-dueno/r', base: 'staging', identidad: 'ninguna' });
+  // Cada identidad del mapa: con dueño fijo, otro dueño se rechaza; sin dueño fijo, vale cualquiera.
+  for (const [nombre, { dueno }] of Object.entries(IDENTIDADES)) {
+    const otra = { repo: 'otro-dueno/r', base: 'main', identidad: nombre };
+    if (dueno) assert.throws(con(otra), /solo vale en repos de/, nombre);
+    else assert.deepEqual(con(otra)(), otra, nombre);
+  }
 });
 
 test('ficha: la de esta Fábrica existe, es válida y dice el mismo repo que scripts/lib/repo.mjs', () => {
   const f = leerFicha(path.join(AQUI, '..'));
   assert.equal(f.repo, REPO);
-  assert.equal(f.identidad, 'fabrica-constructor');
+  assert.equal(f.identidad, CON_ESCRITURA);
 });
 
 test('identidad «ninguna»: borra carpeta y rama local, NO toca la rama remota y lo dice', () => {
-  const m = mundo(['feat/ee'], { ficha: { repo: 'o/publico', base: 'main', identidad: 'ninguna' } });
+  const m = mundo(['feat/ee'], { ficha: { repo: 'o/publico', base: 'main', identidad: SIN_ESCRITURA } });
   const { carpeta, punta } = m.carpetas['feat/ee'];
   const { salida } = correr(m, [pr(5, 'feat/ee', punta)]);
   assert.ok(!existsSync(carpeta));
@@ -310,10 +317,15 @@ test('opciones: --repo y --ficha piden valor y un argumento desconocido es un er
   assert.throws(() => opciones(['--borra']), /argumento desconocido/);
 });
 
-test('identidad: cada una tiene su lanzador y una desconocida lanza', () => {
-  assert.match(lanzadorDe('fabrica-constructor'), /token\.mjs$/);
-  assert.match(lanzadorDe('ninguna'), /gh-publico\.mjs$/);
-  assert.throws(() => lanzadorDe('pablo'), /desconocida/);
+test('identidad: cada una del mapa tiene un lanzador que existe y dice si borra ramas remotas; una desconocida lanza', () => {
+  assert.ok(CON_ESCRITURA && SIN_ESCRITURA, 'el mapa tiene una con escritura y una sin ella');
+  for (const nombre of Object.keys(IDENTIDADES)) {
+    const { lanzador, borraRemotas } = identidadDe(nombre);
+    assert.ok(existsSync(lanzador), `${nombre}: ${lanzador} existe`);
+    assert.equal(typeof borraRemotas, 'boolean', nombre);
+  }
+  assert.throws(() => identidadDe('pablo'), /desconocida/);
+  assert.throws(() => identidadDe('toString'), /desconocida/);
 });
 
 test('gh-publico: pide la URL pública sin cabecera de autorización, solo acepta «gh api <ruta>» y falla en alto', async () => {
