@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { GATE_FILES } from '../scripts/lib/gate.mjs';
+import { GATE_FILES, ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORKFLOWS = ['.github/workflows/revisor.yml', '.github/workflows/tests.yml'];
@@ -59,11 +59,13 @@ function expected() {
 test('every GATE_FILES path exists and there are no duplicates', () => {
   assert.ok(GATE_FILES.length > 0);
   assert.equal(new Set(GATE_FILES).size, GATE_FILES.length, 'duplicates in GATE_FILES');
-  for (const f of GATE_FILES) assert.ok(existsSync(path.join(ROOT, f)), `${f} does not exist`);
+  // The administrator files are listed before they exist (guard first, workflow later): exempt by name, no one else.
+  for (const f of GATE_FILES.filter((x) => !ADMIN_GATE_FILES.includes(x))) assert.ok(existsSync(path.join(ROOT, f)), `${f} does not exist`);
 });
 
 test('GATE_FILES is exactly what the workflows use, with imports', () => {
   const needed = expected();
+  for (const f of ADMIN_GATE_FILES) needed.add(f); // not derivable from the two workflows
   for (const f of needed) assert.ok(GATE_FILES.includes(f), `${f} is used by the gate but not in GATE_FILES`);
   for (const f of GATE_FILES) assert.ok(needed.has(f), `${f} is in GATE_FILES but nothing in the gate uses it`);
 });
