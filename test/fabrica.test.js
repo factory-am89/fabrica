@@ -23,7 +23,7 @@ test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
   const texto = leer('CLAUDE.md');
   const lineas = texto.split('\n').filter((l) => l.trim());
   assert.ok(lineas.length <= 20, `tiene ${lineas.length} líneas con texto`);
-  const claves = ['Verdad', 'Evidencia', 'Fallar en alto', 'Una idea, un sitio', 'Lo que comprueba una máquina', 'Parar y apuntar'];
+  const claves = ['Verdad', 'Evidencia', 'Fallar en alto', 'Una idea, un sitio', 'Lo que comprueba una máquina', 'Preguntar antes de un atajo'];
   claves.forEach((clave, i) => {
     assert.match(texto, new RegExp(`^${i + 1}\\. ${clave}`, 'm'), `falta el principio ${i + 1}: ${clave}`);
   });
