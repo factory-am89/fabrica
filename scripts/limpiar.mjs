@@ -76,15 +76,25 @@ function motivoDeQuedarse(w, principal, todas, fusionados, cwd) {
   return null;
 }
 
+// Borra una carpeta paso a paso y cuenta lo que pasó de verdad. Lanza solo si NO llegó a borrar la carpeta
+// (con el texto de lo que ya se había hecho); después de borrarla, un paso que falla es un aviso, no «se queda».
 function borrar(w, principal, remotas, token) {
   const hecho = { carpeta: w.ruta, rama: w.rama, union: false, remota: false, avisos: [] };
-  hecho.union = quitarUnion(path.join(w.ruta, 'node_modules'));
-  gitOk(['worktree', 'remove', w.ruta], principal);
-  gitOk(['branch', '-D', w.rama], principal);
+  try {
+    hecho.union = quitarUnion(path.join(w.ruta, 'node_modules'));
+    gitOk(['worktree', 'remove', w.ruta], principal);
+  } catch (e) {
+    throw new Error(`${e.message}${hecho.union ? ' (la unión de node_modules ya estaba quitada)' : ''}`);
+  }
+  try {
+    gitOk(['branch', '-D', w.rama], principal);
+  } catch (e) {
+    hecho.avisos.push(`la carpeta se borró, pero no pude borrar la rama local ${w.rama}: ${e.message}`);
+  }
   if (remotas.has(w.rama)) {
     const r = conToken(token, ['git', 'push', 'origin', '--delete', w.rama], principal);
     if (r.status === 0) hecho.remota = true;
-    else hecho.avisos.push(`no pude borrar la rama remota ${w.rama}: ${(r.error?.message ?? r.stderr).trim()}`);
+    else hecho.avisos.push(`la carpeta se borró, pero no pude borrar la rama remota ${w.rama}: ${(r.error?.message ?? r.stderr).trim()}`);
   }
   return hecho;
 }

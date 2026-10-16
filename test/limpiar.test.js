@@ -168,3 +168,18 @@ test('limpiar: lo que no pudo borrar se dice y cuenta como fallo, sin parar con 
   assert.ok(!existsSync(m.carpetas['feat/once'].carpeta));
   assert.match(salida.quedan.find((q) => q.rama === 'feat/diez').motivo, /no pude/);
 });
+
+test('limpiar: si git branch -D falla tras borrar la carpeta, el informe dice lo que pasó (borrada, con aviso), no «se queda»', () => {
+  const m = mundo(['feat/doce']);
+  const { carpeta, punta } = m.carpetas['feat/doce'];
+  // Un .lock en la rama hace fallar git branch -D después de que worktree remove haya borrado la carpeta.
+  const lock = path.join(git(m.principal, 'rev-parse', '--git-common-dir'), 'refs', 'heads', 'feat', 'doce.lock');
+  writeFileSync(path.resolve(m.principal, lock), '');
+  const { salida } = correr(m, [pr(15, 'feat/doce', punta)]);
+  assert.ok(!existsSync(carpeta));
+  assert.equal(salida.quedan.length, 0);
+  assert.equal(salida.borradas.length, 1);
+  assert.match(salida.borradas[0].avisos.join('\n'), /rama local/);
+  assert.equal(salida.fallos, 1);
+  assert.ok(!ramasRemotas(m).includes('feat/doce'), 'la rama remota se borra igualmente');
+});
