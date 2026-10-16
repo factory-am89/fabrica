@@ -13,7 +13,12 @@ const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');
 
 const nuevoHome = () => mkdtempSync(path.join(tmpdir(), 'instalar-pc-'));
-const pc = (home, orden) => spawnSync('node', [SCRIPT, orden], { env: { ...process.env, FABRICA_HOME: home }, encoding: 'utf8' });
+// Estos tests prueban la mecánica con un usuario/ que solo tiene el CLAUDE.md de verdad; el settings.json de verdad
+// (plantilla con huecos) se prueba en usuario-settings.test.js, con valores inventados.
+const SOLO_CLAUDE = mkdtempSync(path.join(tmpdir(), 'usuario-'));
+cpSync(path.join(ORIGEN, 'CLAUDE.md'), path.join(SOLO_CLAUDE, 'CLAUDE.md'));
+const pc = (home, orden) =>
+  spawnSync('node', [SCRIPT, orden], { env: { ...process.env, FABRICA_HOME: home, FABRICA_USUARIO: SOLO_CLAUDE }, encoding: 'utf8' });
 const claude = (home, ...r) => path.join(home, '.claude', ...r);
 
 test('instalar copia CLAUDE.md y apunta la huella', () => {
@@ -87,7 +92,7 @@ const tecleando = (palabra) => confirmarEnTerminal({ tty: true, leerLinea: () =>
 // Un usuario/ temporal con el settings.json (y, si se pide, otro CLAUDE.md) que se indique.
 function origenCon(settings, claudeMd) {
   const o = mkdtempSync(path.join(tmpdir(), 'usuario-'));
-  cpSync(ORIGEN, o, { recursive: true });
+  cpSync(SOLO_CLAUDE, o, { recursive: true });
   writeFileSync(path.join(o, 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`);
   if (claudeMd) writeFileSync(path.join(o, 'CLAUDE.md'), claudeMd);
   return o;
