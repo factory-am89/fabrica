@@ -9,6 +9,7 @@ import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
 import { accionFijada } from '../scripts/lib/acciones.mjs';
+import { readQuestions } from '../scripts/lib/questions.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
 const leer = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8');
@@ -37,10 +38,9 @@ test('los tres roles tienen su modelo y el revisor no escribe', () => {
 test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bien y mal', () => {
   assert.ok(preguntas.length >= 10, `hay ${preguntas.length}`);
   assert.deepEqual(preguntas.map((p) => p.id), preguntas.map((_, i) => `C${i + 1}`));
-  const bloques = leer('standards/code.md').split(/^### /m).slice(1);
-  for (const b of bloques) {
-    assert.match(b, /^Bien: /m, b.split('\n')[0]);
-    assert.match(b, /^Mal: /m, b.split('\n')[0]);
+  for (const q of readQuestions(leer('standards/code.md'))) {
+    assert.ok(q.good, `${q.id} sin Bien`);
+    assert.ok(q.bad, `${q.id} sin Mal`);
   }
 });
 
@@ -284,4 +284,10 @@ test('veredicto: ningún texto del modelo se publica, solo ids de la lista de pr
 
 test('revisor.yml: el json-schema limita el id a C<número>', () => {
   assert.match(leer('.github/workflows/revisor.yml'), /"id":\{"type":"string","pattern":"\^C\[0-9\]\+\$"\}/);
+});
+
+test('leerPreguntas da {id, pregunta, quien} y respeta quién comprueba cada una (C1 máquina, C5 revisor)', () => {
+  assert.deepEqual(Object.keys(preguntas[0]), ['id', 'pregunta', 'quien']);
+  assert.equal(preguntas.find((p) => p.id === 'C1').quien, 'máquina');
+  assert.equal(preguntas.find((p) => p.id === 'C5').quien, 'revisor');
 });
