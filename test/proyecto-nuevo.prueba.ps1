@@ -86,7 +86,7 @@ function gh.exe {
 function Lanza([hashtable]$Estado, [hashtable]$Extra = @{}) {
   $global:E = $Estado
   $global:ArgsLog.Clear()
-  $salida = (& $Script -Repo $RP @Extra *>&1 | Out-String -Width 4096)   # ancho fijo: sin saltos que partan una frase segun el ancho de la consola
+  $salida = (& $Script -Repo $RP @Extra *>&1 | Out-String)
   [pscustomobject]@{ Code = $LASTEXITCODE; Out = $salida; Muta = @($global:ArgsLog | Where-Object { $_ -match '-X (PATCH|PUT|POST)' }) }
 }
 function Prueba([string]$n, [bool]$ok) { if ($ok) { "OK: $n" } else { "FALLO: $n" } }
