@@ -1,7 +1,6 @@
 // One command that says "you can open the PR": runs lint and then the tests, never asks anything.
 //   npm run done
-// Exit 0 only if both pass. The last line of stdout is fixed and machine-readable:
-//   done: ok  |  done: fail lint  |  done: fail test
+// Exit 0 only if both pass. The last line of stdout is fixed and machine-readable (DONE_LINE below).
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EXIT, finish } from './lib/exit.mjs';
