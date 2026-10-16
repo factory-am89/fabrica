@@ -6,6 +6,8 @@ export const SECTIONS = [
   { name: 'Not verified', needs: 'always', hint: 'What you could not check. Write "Nothing" if there is nothing.' },
 ];
 
+export const COMPARE_LIMIT = 300; // the compare endpoint truncates at 300 files
+
 const TEST_PREFIX = 'test/';
 
 function parseSections(body) {

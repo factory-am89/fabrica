@@ -54,6 +54,18 @@ test('tests.yml re-runs on PR edits and checks the PR body in the Factory only, 
   assert.equal(pasos[iBody].env.PR_BODY, '${{ github.event.pull_request.body }}');
 });
 
+test('tests.yml checks the plan PR shape in the Factory only, after the .fabrica checkout, with everything passed through env', () => {
+  const iFabrica = pasos.findIndex((p) => p.with?.path === '.fabrica');
+  const iPlan = pasos.findIndex((p) => typeof p.run === 'string' && p.run.includes('.fabrica/scripts/check-plan.mjs'));
+  assert.ok(iPlan > iFabrica && iFabrica > 0, 'the plan check must exist and come after the .fabrica checkout');
+  const iBody = pasos.findIndex((p) => typeof p.run === 'string' && p.run.includes('.fabrica/scripts/pr-body.mjs'));
+  assert.ok(iPlan > iBody, 'the plan check comes after the PR body check');
+  assert.equal(pasos[iPlan].if, pasos[iBody].if, 'same scope as the PR body check');
+  assert.ok(!pasos[iPlan].run.includes('${{'), 'run must not interpolate expressions; use env');
+  assert.deepEqual(Object.keys(pasos[iPlan].env).sort(), ['BASE', 'GH_TOKEN', 'REPO', 'SHA']);
+  assert.match(pasos[iPlan].run, /--compare-file "\$RUNNER_TEMP\/[\w.-]+"/);
+});
+
 function workflowsDeLlamador(ficheros, variable) {
   const carpeta = mkdtempSync(path.join(tmpdir(), 'llamador-wf-'));
   try {

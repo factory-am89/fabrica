@@ -73,3 +73,17 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
+
+      # Plan PR check, same scope as the step above (Factory only, pull_request only). A PR that touches
+      # plans/ must change exactly one plans/<slug>.md and nothing else, and that plan must pass check-plan.
+      # It downloads its own compare.json so the two steps stay independent. Form only, not content.
+      - name: A PR that touches plans/ changes exactly one valid plan
+        if: github.event_name == 'pull_request' && github.repository == 'factory-am89/fabrica'
+        run: |
+          gh api "repos/$REPO/compare/$BASE...$SHA" > "$RUNNER_TEMP/plan-compare.json"
+          node .fabrica/scripts/check-plan.mjs --compare-file "$RUNNER_TEMP/plan-compare.json"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          SHA: ${{ github.event.pull_request.head.sha }}

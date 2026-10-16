@@ -2,6 +2,7 @@
 // This module reads it: parseClosedPaths fails loudly when the block is missing or malformed,
 // and touchesClosedList says whether a changed file meets it.
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const FENCE = /^```closed-paths[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm;
 const GLOB = /^[A-Za-z0-9_.\-/*]+$/;
@@ -28,6 +29,7 @@ export function touchesClosedList(file, globs) {
   return globs.some((g) => toRegExp(g).test(file));
 }
 
-export function loadClosedPaths(root = new URL('../../', import.meta.url)) {
-  return parseClosedPaths(readFileSync(new URL(INTERVENTION_FILE, root), 'utf8'));
+// The root is built from a path, not from a URL relative to this file: test/gate-files.test.js reads that as an import.
+export function loadClosedPaths(root = path.resolve(import.meta.dirname, '..', '..')) {
+  return parseClosedPaths(readFileSync(path.join(root, INTERVENTION_FILE), 'utf8'));
 }
