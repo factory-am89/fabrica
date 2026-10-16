@@ -200,3 +200,46 @@ test('cerrar fails loud when the check-runs page is full (the revisor could be o
   assert.match(r.err, /one page is not enough/);
   assert.deepEqual(full.armed(), []);
 }));
+
+test('abrir fails loud when a pull of the list has no auto_merge field (it would read as not armed)', () => withState((path) => {
+  for (const rawList of [[{ number: 5 }], [{ auto_merge: null }], ['x'], [null]]) {
+    const sim = makeGithub({ prs: [{ number: 5, armed: true }] });
+    sim.rawList = rawList;
+    const r = go(['abrir'], sim, path);
+    assert.equal(r.code, EXIT.github, JSON.stringify(rawList));
+    assert.match(r.err, /unexpected answer of GitHub/);
+    assert.ok(!r.out.includes('armed: 0'));
+  }
+}));
+
+test('cerrar fails loud on a ruleset without name or enforcement, and on a pull without state, merged or head.sha', () => withState((path) => {
+  const cases = [
+    ['rawRulesets', [{ name: 'main' }]],
+    ['rawRulesets', [{ enforcement: 'active' }]],
+    ['rawPull', {}],
+    ['rawPull', { state: 'open', head: { sha: 'sha5' } }],
+    ['rawPull', { state: 'open', merged: false }],
+    ['rawPull', { merged: false, head: { sha: 'sha5' } }],
+  ];
+  for (const [where, raw] of cases) {
+    const sim = makeGithub({ prs: [{ number: 5, armed: true, revisor: 'success' }] });
+    go(['abrir'], sim, path);
+    if (where === 'rawPull') sim.prs.get(5).rawPull = raw;
+    else sim.rawRulesets = raw;
+    const r = go(['cerrar'], sim, path);
+    assert.equal(r.code, EXIT.github, JSON.stringify(raw));
+    assert.deepEqual(sim.armed(), [], 'nothing re-armed');
+    rmSync(path);
+  }
+}));
+
+test('cerrar fails loud on a revisor check without id or conclusion field (it would read as not red)', () => withState((path) => {
+  for (const revisorRaw of [{ id: 1, name: 'revisor' }, { name: 'revisor', conclusion: 'success' }]) {
+    const sim = makeGithub({ prs: [{ number: 5, armed: true, revisorRaw }] });
+    go(['abrir'], sim, path);
+    const r = go(['cerrar'], sim, path);
+    assert.equal(r.code, EXIT.github, JSON.stringify(revisorRaw));
+    assert.deepEqual(sim.armed(), []);
+    rmSync(path);
+  }
+}));

@@ -17,18 +17,21 @@ export function makeGithub({ prs = [], enforcement = 'active', onCall = () => {}
     onCall(line, sim);
     const base = `api repos/${REPO}/`;
     if (line === `${base}pulls?state=open&per_page=100`) {
+      if (sim.rawList !== undefined) return ok(sim.rawList);
       return ok([...sim.prs].filter(([, p]) => p.state === 'open').map(([number, p]) => ({ number, auto_merge: p.armed ? { merge_method: 'squash' } : null })));
     }
-    if (line === `${base}rulesets`) return ok([{ id: 1, name: 'main', enforcement: sim.enforcement }]);
+    if (line === `${base}rulesets`) return ok(sim.rawRulesets ?? [{ id: 1, name: 'main', enforcement: sim.enforcement }]);
     let m = line.startsWith(`${base}pulls/`) ? line.slice(`${base}pulls/`.length).match(/^(\d+)$/) : null;
     if (m) {
       const p = sim.prs.get(Number(m[1]));
+      if (p?.rawPull !== undefined) return ok(p.rawPull);
       return p ? ok({ state: p.state, merged: p.merged, head: { sha: p.sha } }) : fail('404');
     }
     m = line.match(/\/commits\/sha(\d+)\/check-runs/);
     if (m) {
       const p = sim.prs.get(Number(m[1]));
       if (p.rawChecks !== undefined) return ok(p.rawChecks);
+      if (p.revisorRaw) return ok({ check_runs: [p.revisorRaw] });
       const filler = Array.from({ length: p.fillerChecks ?? 0 }, (_, i) => ({ id: 100 + i, name: `other-${i}`, conclusion: 'success' }));
       return ok({ check_runs: p.revisor ? [...filler, { id: 1, name: 'revisor', conclusion: p.revisor }, { id: 2, name: 'tests', conclusion: 'success' }] : filler });
     }

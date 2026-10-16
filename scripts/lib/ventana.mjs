@@ -38,6 +38,13 @@ function call(run, args) {
   return r.stdout;
 }
 
+// An answer of GitHub missing a field we rely on is an error, never «false» or «none»: a PR without `auto_merge` read as
+// not armed would print «armed: 0» (the failure of #20 and #52). Every field read below is checked first.
+function expect(ok, what) {
+  if (!ok) throw new VentanaError('github', `unexpected answer of GitHub: ${what}`);
+}
+const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
 function getJson(run, route) {
   const text = call(run, ['api', route]);
   try {
@@ -52,6 +59,7 @@ export function listArmed(run, repo) {
   const pulls = getJson(run, `repos/${repo}/pulls?state=open&per_page=${PAGE}`);
   if (!Array.isArray(pulls)) throw new VentanaError('github', 'the list of pull requests is not an array');
   if (pulls.length >= PAGE) throw new VentanaError('github', `${pulls.length} open PRs: one page is not enough to be sure none is armed; paginate before trusting this`);
+  pulls.forEach((p) => expect(isObject(p) && Number.isInteger(p.number) && 'auto_merge' in p, 'a pull of the open list has no number or no auto_merge field'));
   return pulls.filter((p) => p.auto_merge).map((p) => p.number).sort((a, b) => a - b);
 }
 
@@ -104,6 +112,7 @@ export function abrir({ run, repo, path = statePath(), fs = fsReal, clock = () =
 function assertRulesetActive(run, repo) {
   const list = getJson(run, `repos/${repo}/rulesets`);
   if (!Array.isArray(list)) throw new VentanaError('github', 'the list of rulesets is not an array');
+  list.forEach((r) => expect(isObject(r) && typeof r.name === 'string' && typeof r.enforcement === 'string', 'a ruleset has no name or no enforcement'));
   const main = list.find((r) => r.name === 'main');
   if (!main) throw new VentanaError('ruleset-not-active', `no ruleset named «main» in ${repo}: nothing was re-armed`);
   if (main.enforcement !== 'active') throw new VentanaError('ruleset-not-active', `the ruleset «main» is «${main.enforcement}», not «active»: nothing was re-armed. Ask Pablo to restore it`);
@@ -113,17 +122,21 @@ function assertRulesetActive(run, repo) {
 // that may hide more checks, throws: it must never read as «not red».
 function latestRevisor(answer, n) {
   const runs = answer?.check_runs;
-  if (!Array.isArray(runs) || !runs.every((c) => c && typeof c.name === 'string')) throw new VentanaError('github', `check-runs of #${n}: unexpected shape`);
+  expect(Array.isArray(runs) && runs.every((c) => isObject(c) && typeof c.name === 'string'), `check-runs of #${n}: unexpected shape`);
   if (runs.length >= PAGE) throw new VentanaError('github', `#${n} has ${runs.length} check-runs: one page is not enough to find the revisor; paginate before trusting this`);
-  return runs.filter((c) => c.name === 'revisor').sort((x, y) => y.id - x.id)[0];
+  const revisors = runs.filter((c) => c.name === 'revisor');
+  expect(revisors.every((c) => Number.isInteger(c.id) && 'conclusion' in c && (c.conclusion === null || typeof c.conclusion === 'string')), `the revisor check of #${n} has no id or no conclusion field`);
+  return revisors.sort((x, y) => y.id - x.id)[0];
 }
 
 // Why a saved PR must not be re-armed, or null when it can be.
 function reasonToSkip(run, repo, n) {
   const pr = getJson(run, `repos/${repo}/pulls/${n}`);
-  if (pr.merged || pr.merged_at) return 'already merged';
+  expect(isObject(pr) && typeof pr.state === 'string' && typeof pr.merged === 'boolean', `pull #${n} has no state or no merged field`);
+  if (pr.merged) return 'already merged';
   if (pr.state !== 'open') return 'closed';
-  const revisor = latestRevisor(getJson(run, `repos/${repo}/commits/${pr.head?.sha}/check-runs?per_page=${PAGE}`), n);
+  expect(typeof pr.head?.sha === 'string', `pull #${n} has no head.sha`);
+  const revisor = latestRevisor(getJson(run, `repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=${PAGE}`), n);
   if (!revisor) return 'no verdict from the revisor';
   if (RED.has(revisor.conclusion)) return `check revisor is red (${revisor.conclusion})`;
   return null;
