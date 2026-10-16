@@ -103,16 +103,40 @@ export function entornoHijo(cmd, token, env = process.env) {
   return hijo;
 }
 
-// Reads the .pem from 1Password (unchanged).
-function clavePrivada() {
-  const args = ['document', 'get', 'fabrica-constructor.pem', '--vault', process.env.OP_VAULT ?? 'Fabrica'];
-  const token = tokenServicio();
-  const r = spawnSync('op', args, { encoding: 'utf8', env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: token } });
+// Closed list of failure reasons with a distinct exit code each; any other failure exits 1.
+// This is the only place that lists them.
+export const MOTIVOS = { 'sin-clave': 2, 'limite-de-1password': 3, 'bloqueo-ocupado': 4 };
+
+export class ErrorToken extends Error {
+  constructor(motivo, mensaje) {
+    super(mensaje);
+    if (!(motivo in MOTIVOS)) throw new Error(`reason outside the vocabulary: ${motivo}`);
+    this.motivo = motivo;
+  }
+}
+
+const LIMITE_OP = /too many requests/i;
+
+function ejecutarOp(args, env) {
+  const r = spawnSync('op', args, { encoding: 'utf8', env });
+  return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+}
+
+// Reads the .pem from 1Password once. The error never carries op's output (it could hold values).
+// Rate limited ("Too many requests") is its own reason and is NOT retried nor tried in another vault.
+export function clavePrivada(env = process.env, ejecutar = ejecutarOp) {
+  const args = ['document', 'get', 'fabrica-constructor.pem', '--vault', env.OP_VAULT ?? 'Fabrica'];
+  const r = ejecutar(args, { ...env, OP_SERVICE_ACCOUNT_TOKEN: tokenServicio(env) });
+  if (r.status !== 0 && LIMITE_OP.test(r.stderr)) {
+    throw new ErrorToken('limite-de-1password', '1Password is rate limiting this account (Too many requests); not retrying.');
+  }
   if (r.status !== 0 || !r.stdout.includes('PRIVATE KEY')) {
-    throw new Error('No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.');
+    throw new ErrorToken('sin-clave', 'No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.');
   }
   return r.stdout;
 }
+
+const minutos = (ms) => Math.floor(ms / 60000);
 
 // Signs the JWT and exchanges it for an installation token. Returns { token, expiraEn }.
 async function canjear({ clientId, repo, pem, fetchFn, ahora }) {
@@ -131,7 +155,8 @@ export function avisoCache(motivo) {
 // The token for one call: the saved one while it has more than MARGEN_MS left, else one exchange under
 // a lock (the .pem is read only there). A cache problem never breaks the call (it exchanges as before)
 // but it is always reported through `avisar`. `cache` injects ruta, fs, proteger, permisosBien, dormir and avisar.
-export async function obtenerToken({ env = process.env, leer = () => clavePrivada(), fetchFn = fetch, reloj = Date.now, cache = {} } = {}) {
+// Returns { token, aviso? }; throws ErrorToken for the reasons in MOTIVOS.
+export async function obtenerToken({ env = process.env, leer = (e) => clavePrivada(e), fetchFn = fetch, reloj = Date.now, cache = {} } = {}) {
   const clientId = env.FABRICA_CONSTRUCTOR_CLIENT_ID;
   if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
   const repo = env.FABRICA_REPO ?? REPO;
@@ -157,19 +182,25 @@ export async function obtenerToken({ env = process.env, leer = () => clavePrivad
       // Another session may have exchanged while this one waited for the lock
       const previa = leerGuardado();
       if (previa.motivo === MOTIVO.ok && previa.restanteMs > MARGEN_MS) return { token: previa.entrada.token };
-      if (!bloqueado && razon === 'ocupado') throw new Error('bloqueo-ocupado: another session is getting the token and did not finish in time.');
+      if (!bloqueado && razon === 'ocupado') throw new ErrorToken('bloqueo-ocupado', 'Another session is getting the token and did not finish in time.');
       if (!bloqueado) avisar(MOTIVO.disco); // the lock could not even be created
-      const t = await canje();
-      const guardada = escribirCache({ ruta, fs, proteger: cache.proteger ?? protegerFichero, datos: { token: t.token, expiraEn: t.expiraEn, appId: clientId } });
-      if (guardada !== MOTIVO.ok) avisar(guardada);
-      return { token: t.token };
+      try {
+        const t = await canje();
+        const guardada = escribirCache({ ruta, fs, proteger: cache.proteger ?? protegerFichero, datos: { token: t.token, expiraEn: t.expiraEn, appId: clientId } });
+        if (guardada !== MOTIVO.ok) avisar(guardada);
+        return { token: t.token };
+      } catch (e) {
+        if (!(e instanceof ErrorToken && e.motivo === 'limite-de-1password' && previa.motivo === MOTIVO.ok)) throw e;
+        return { token: previa.entrada.token, aviso: `limite-de-1password: using the saved token (${minutos(previa.restanteMs)} min left).` };
+      }
     },
   });
 }
 
 async function main() {
   const cmd = orden(process.argv.slice(2));
-  const { token } = await obtenerToken();
+  const { token, aviso } = await obtenerToken();
+  if (aviso) console.error(aviso);
   const r = spawnSync(cmd[0], cmd.slice(1), { stdio: 'inherit', env: entornoHijo(cmd, token) });
   if (r.error) throw new Error(`No pude lanzar «${cmd[0]}»: ${r.error.message}`);
   process.exit(r.status ?? 1);
@@ -177,7 +208,7 @@ async function main() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
-    console.error(e.message);
-    process.exit(1);
+    console.error(e instanceof ErrorToken ? `${e.motivo}: ${e.message}` : e.message);
+    process.exit(e instanceof ErrorToken ? MOTIVOS[e.motivo] : 1);
   });
 }

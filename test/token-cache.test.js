@@ -9,9 +9,10 @@ import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BLOQUEO_VIEJO_MS, conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
-import { avisoCache, obtenerToken } from '../scripts/token.mjs';
+import { avisoCache, clavePrivada, ErrorToken, MOTIVOS, obtenerToken } from '../scripts/token.mjs';
 
 const TOKEN = `ghs_${'a1B2c3D4'.repeat(5)}`;
+const OTRO = `ghs_${'Z9y8X7w6'.repeat(5)}`;
 const CLIENT = 'Iv_test_client';
 const HORA = 60 * 60 * 1000;
 const { privateKey: PEM } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
@@ -219,7 +220,7 @@ test('obtenerToken: lock busy -> bloqueo-ocupado, no .pem read', async () => {
   try {
     await conBloqueo({ ruta: e.ruta, fn: async () => {} });
     writeFileSync(`${e.ruta}.lock`, '1');
-    await assert.rejects(e.pedir(), /^Error: bloqueo-ocupado: /);
+    await assert.rejects(e.pedir(), (x) => x instanceof ErrorToken && x.motivo === 'bloqueo-ocupado');
     assert.equal(e.lecturas, 0);
   } finally { e.limpiar(); }
 });
@@ -291,6 +292,56 @@ test('avisoCache: one stderr line with the reason; a reason outside the vocabula
   avisoCache(MOTIVO.permisos);
   assert.deepEqual(lineas, ['cache: permisos']);
   assert.throws(() => avisoCache('inventado'), /outside the vocabulary/);
+});
+
+// op fake: one result per call, counting calls.
+const opFalso = (resultado) => { const f = () => { f.llamadas++; return resultado; }; f.llamadas = 0; return f; };
+const LIMITE = { status: 1, stdout: '', stderr: '[ERROR] 2026/10/16 Too many requests. Try again in 3 hours. op_SECRETO_VALOR' };
+
+test('clavePrivada: "Too many requests" -> limite-de-1password, one op call, no retry, no op output in the message', () => {
+  const op = opFalso(LIMITE);
+  assert.throws(
+    () => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op),
+    (x) => x instanceof ErrorToken && x.motivo === 'limite-de-1password' && !x.message.includes('SECRETO') && !x.message.includes('\n'),
+  );
+  assert.equal(op.llamadas, 1);
+});
+
+test('clavePrivada: another failure is sin-clave; success returns the key; the vault is the configured one only', () => {
+  assert.throws(() => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, opFalso({ status: 1, stdout: '', stderr: 'no access' })), (x) => x.motivo === 'sin-clave');
+  const argsDeOp = [];
+  const op = (args) => { argsDeOp.push(args); return { status: 0, stdout: PEM, stderr: '' }; };
+  assert.equal(clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', OP_VAULT: 'V' }, op), PEM);
+  assert.deepEqual(argsDeOp, [['document', 'get', 'fabrica-constructor.pem', '--vault', 'V']]);
+});
+
+test('obtenerToken: rate limited with no saved token -> limite-de-1password, one read, no second attempt', async () => {
+  const e = entorno();
+  const op = opFalso(LIMITE);
+  try {
+    await assert.rejects(e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op) }), (x) => x.motivo === 'limite-de-1password');
+    assert.equal(op.llamadas, 1);
+  } finally { e.limpiar(); }
+});
+
+test('obtenerToken: rate limited with a saved token still alive (but under MARGEN_MS) -> uses it and says why', async () => {
+  const e = entorno();
+  const op = opFalso(LIMITE);
+  try {
+    guardado(e, { restante: MARGEN_MS / 3, token: OTRO });
+    const r = await e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op) });
+    assert.equal(r.token, OTRO);
+    assert.match(r.aviso, /^limite-de-1password: /);
+    assert.ok(!r.aviso.includes('\n'));
+    assert.equal(op.llamadas, 1);
+  } finally { e.limpiar(); }
+});
+
+test('MOTIVOS: a closed list with a distinct non-zero exit code for each reason', () => {
+  const codigos = Object.values(MOTIVOS);
+  assert.equal(new Set(codigos).size, codigos.length);
+  assert.ok(codigos.every((c) => Number.isInteger(c) && c > 1));
+  assert.throws(() => new ErrorToken('inventado', 'x'));
 });
 
 test('MOTIVOS_CACHE: one case per reason of the vocabulary, run here, each producing exactly that reason', async () => {
