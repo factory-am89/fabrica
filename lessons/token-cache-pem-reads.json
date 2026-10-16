@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "class": "none",
+  "source": "intervenciones.md:18",
+  "mechanism": "test/token-cache.test.js",
+  "origin": "constructor"
+}

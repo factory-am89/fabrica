@@ -173,6 +173,7 @@ test('conBloqueo: a lock older than BLOQUEO_VIEJO_MS is an orphan and is taken o
   } finally { e.limpiar(); }
 });
 
+// lesson: token-cache-pem-reads
 test('obtenerToken: many calls in the same hour read the .pem once and exchange once', async () => {
   const e = entorno();
   try {
