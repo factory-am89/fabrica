@@ -15,7 +15,7 @@ import { identidadDe } from './lib/identidades.mjs';
 import { conToken, motivoDeQuedarse, prsFusionados } from './lib/puede-borrarse.mjs';
 
 // Por qué una carpeta se queda, o null si se puede borrar: la regla común, con solo PR fusionado como prueba.
-const motivoDe = (w, todas, fusionados, cwd) => motivoDeQuedarse(w, { todas, cwd, fusionada: (punta) => fusionados.has(punta) });
+const motivoDe = (w, todas, fusionados, cwd) => motivoDeQuedarse(w, { todas, cwd, fusionada: (punta) => fusionados.has(punta) })?.text ?? null;
 
 
 // Ramas que existen hoy en origin (una sola pregunta). Sin esto no se sabe qué hay que borrar allí.
