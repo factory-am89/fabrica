@@ -9,8 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { readQuestions } from './lib/questions.mjs';
 import { ANSWERS, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
-const RESPUESTAS = ['sí', 'no', 'no aplica'];
-
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
   return readQuestions(md).map((q) => ({ id: q.id, pregunta: q.text, quien: q.checkedBy }));
@@ -81,7 +79,7 @@ export function decidir(salida, preguntas, ctx = {}) {
     const r = porId.get(p.id);
     const resp = normalizar(r?.respuesta);
     if (!r) fallos.push(`${p.id}: sin respuesta`);
-    else if (!RESPUESTAS.includes(resp)) fallos.push(`${p.id}: respuesta no válida`);
+    else if (!ANSWERS.includes(resp)) fallos.push(`${p.id}: respuesta no válida`);
     else if (resp === 'no') fallos.push(`${p.id}: no`);
     else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
   }
