@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
-import { accionFijada, accionesDe } from '../scripts/lib/acciones.mjs';
+import { accionFijada } from '../scripts/lib/acciones.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
 const leer = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8');
@@ -44,20 +44,8 @@ test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bi
   }
 });
 
-const workflows = readdirSync(new URL('../.github/workflows/', import.meta.url));
-
-test('los workflows declaran permisos y fijan cada acción por SHA (C4)', () => {
-  assert.ok(workflows.length > 0);
-  for (const f of workflows) {
-    const texto = leer(`.github/workflows/${f}`);
-    assert.match(texto, /^permissions:/m, `${f} sin permissions`);
-    assert.doesNotMatch(texto, /permissions:\s*write-all/, `${f} con write-all`);
-    for (const accion of accionesDe(texto)) {
-      assert.ok(accionFijada(accion), `${f}: ${accion} sin SHA`);
-    }
-  }
-});
-
+// Los workflows se comprueban (permisos y SHA, C4) en test/workflows.test.js, que también sirve
+// para el repo que llama a tests.yml; aquí solo la regla de la excepción.
 test('C4: la única excepción al SHA es un workflow de la Fábrica con @main, y nada más', () => {
   const sha = 'a'.repeat(40);
   for (const bien of [`actions/checkout@${sha}`, `${REPO}/.github/workflows/tests.yml@main`, `${REPO}/.github/workflows/revisor.yml@main`]) {

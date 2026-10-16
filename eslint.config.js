@@ -2,7 +2,8 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/'] },
+  // .fabrica/: la Fábrica bajada dentro del repo que llama a tests.yml; no es código suyo.
+  { ignores: ['node_modules/', '.fabrica/'] },
   js.configs.recommended,
   {
     languageOptions: { globals: { ...globals.node } },
