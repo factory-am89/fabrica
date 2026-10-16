@@ -12,5 +12,5 @@ Estándar del plan:
 2. Cada trozo dice qué no se hace, y lo que el encargo no cubre se apunta, no se asume.
 3. Cada trozo cabe en un PR: una idea, revisable de una sentada; si no cabe, se parte.
 
-Si falta un dato para decidir, no preguntes: apunta la duda en el plan y marca el trozo como bloqueado.
+Si falta un dato para decidir, decide y apúntalo en el plan; solo si cae en la lista cerrada de `standards/intervention.md`, apunta la duda y marca el trozo como bloqueado.
 Informe: veredicto en una línea, el plan numerado y las dudas.
