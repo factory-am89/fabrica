@@ -4,20 +4,13 @@
 // hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA y TOKEN (token de la App).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { readQuestions } from './lib/questions.mjs';
 
 const RESPUESTAS = ['sí', 'no', 'no aplica'];
 
-// Las preguntas salen de standards/code.md: es su única fuente.
+// Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
-  const preguntas = [];
-  const bloques = md.split(/^### /m).slice(1);
-  for (const b of bloques) {
-    const id = b.match(/^(C\d+) — (.+)$/m);
-    const quien = b.match(/^Quién: (máquina|revisor)/m);
-    if (!id || !quien) throw new Error(`pregunta mal formada: ${b.split('\n')[0]}`);
-    preguntas.push({ id: id[1], pregunta: id[2], quien: quien[1] });
-  }
-  return preguntas;
+  return readQuestions(md).map((q) => ({ id: q.id, pregunta: q.text, quien: q.checkedBy }));
 }
 
 function normalizar(r) {
