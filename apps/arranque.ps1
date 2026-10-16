@@ -529,7 +529,8 @@ finally {
   Write-Host "  Apps: constructor = $($script:NombreConstructor), revisor = $($script:NombreRevisor)" -ForegroundColor Cyan
   if ($script:ClientIdConstructor) {
     Write-Host ''
-    Write-Host "  FABRICA_CONSTRUCTOR_CLIENT_ID = $($script:ClientIdConstructor)   (no es secreto; hace falta para scripts/token.mjs)" -ForegroundColor Cyan
+    Write-Host "  Client id of the constructor now: $($script:ClientIdConstructor)   (not secret; information only)" -ForegroundColor Cyan
+    Write-Host "  Compare it with CLIENT_ID_CONSTRUCTOR in scripts/lib/repo.mjs; if they differ, update that constant (the only place)." -ForegroundColor Cyan
   }
 }
 if ($script:Fallo) { exit 1 }
