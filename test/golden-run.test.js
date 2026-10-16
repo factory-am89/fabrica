@@ -126,3 +126,48 @@ test('los espacios de trabajo se borran: el directorio temporal queda vacío', (
   const x = pasada(['--trials', '1', ...CHICO]);
   assert.deepEqual(x.sobras, []);
 });
+
+// El workflow golden.yml corre la pasada en dos tiempos: primero sin expected.json en disco (collect), luego puntúa (score).
+test('--phase collect no lee expected.json: con un corpus que no lo tiene llama al revisor y solo anuncia lo recogido', () => {
+  const sinEsperado = mkdtempSync(path.join(tmpdir(), 'golden-sin-esperado-'));
+  temporales.push(sinEsperado);
+  const dir = CHICO[1];
+  for (const id of readdirSync(dir).filter((f) => f !== 'expected.json')) cpSync(path.join(dir, id), path.join(sinEsperado, id), { recursive: true });
+  const x = pasada(['--phase', 'collect', '--trials', '1', '--corpus', sinEsperado]);
+  assert.equal(x.r.status, 0, x.r.stderr);
+  assert.equal(x.llamadas.length, 3);
+  assert.equal(readdirSync(path.join(x.out, 'caso-01')).length, 1);
+  assert.match(x.r.stdout, /collected 1 trials per case/);
+  assert.doesNotMatch(x.r.stdout, /detection|unstable/, 'sin esperados no hay informe');
+});
+
+test('--phase score puntúa las salidas que ya hay sin llamar al revisor, y falla si falta alguna', () => {
+  const recogida = pasada(['--phase', 'collect', '--trials', '2', ...CHICO]);
+  assert.equal(recogida.r.status, 0, recogida.r.stderr);
+  const base = mkdtempSync(path.join(tmpdir(), 'golden-score-'));
+  temporales.push(base);
+  const log = path.join(base, 'claude.log');
+  const score = (env = {}) => spawnSync(process.execPath, [SCRIPT, '--phase', 'score', '--trials', '2', '--out', recogida.out, ...CHICO], {
+    encoding: 'utf8',
+    cwd: RAIZ,
+    env: { ...process.env, GOLDEN_CLAUDE_BIN: FALSO, CLAUDE_FALSO_LOG: log, ...env },
+  });
+  const r = score();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(log), false, 'score no llama a claude');
+  assert.match(r.stdout, /unstable verdict: 0\/3 cases/);
+  rmSync(path.join(recogida.out, 'caso-02', '2.json'));
+  const falta = score();
+  assert.equal(falta.status, 1);
+  assert.match(falta.stderr, /missing outputs \(1\): caso-02\/2\.json/);
+});
+
+test('una fase desconocida, o score sin --out, se rechaza', () => {
+  const rara = pasada(['--phase', 'otra', '--trials', '1', ...CHICO]);
+  assert.equal(rara.r.status, 1);
+  assert.match(rara.r.stderr, /--phase must be one of all, collect, score/);
+  assert.equal(rara.llamadas.length, 0);
+  const sinOut = spawnSync(process.execPath, [SCRIPT, '--phase', 'score', ...CHICO], { encoding: 'utf8', cwd: RAIZ });
+  assert.equal(sinOut.status, 1);
+  assert.match(sinOut.stderr, /--phase score needs --out/);
+});
