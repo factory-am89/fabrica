@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readQuestions } from './lib/questions.mjs';
+import { ANSWERS, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 const RESPUESTAS = ['sí', 'no', 'no aplica'];
 
@@ -106,7 +107,39 @@ async function leerContexto({ repo, pr, sha, token }) {
   return { sha, cabeza: datosPr.head.sha };
 }
 
-async function publicar({ repo, pr, sha, token, veredicto, ctx }) {
+// The model's answers reduced to the record's closed vocabulary: { answers: {<id>: 'sí'|'no'|'no aplica'|null}, invalid }.
+// invalid = ids unknown to the question list plus repeated ones (a repeated id has no usable answer: null).
+// Returns null when the output is not JSON. Same reading of the output as decidir, which stays untouched.
+export function resumirRespuestas(salida, preguntas) {
+  let datos;
+  try {
+    datos = JSON.parse(salida);
+  } catch {
+    return null;
+  }
+  const ids = new Set(preguntas.filter((q) => q.quien === 'revisor').map((q) => q.id));
+  const answers = Object.fromEntries([...ids].map((id) => [id, null]));
+  const vistos = new Set();
+  let invalid = 0;
+  for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
+    if (typeof r?.id !== 'string' || !preguntas.some((q) => q.id === r.id)) {
+      invalid += 1;
+      continue;
+    }
+    if (vistos.has(r.id)) {
+      invalid += 1;
+      answers[r.id] = null;
+      continue;
+    }
+    vistos.add(r.id);
+    const resp = normalizar(r.respuesta);
+    if (ids.has(r.id)) answers[r.id] = ANSWERS.includes(resp) ? resp : null;
+  }
+  return { answers, invalid };
+}
+
+// The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
+async function publicar({ repo, pr, sha, token, veredicto, ctx, registro }) {
   const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
   await api(token, 'POST', `/repos/${repo}/check-runs`, {
@@ -114,7 +147,7 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx }) {
     head_sha: sha,
     status: 'completed',
     conclusion: veredicto.ok ? 'success' : 'failure',
-    output: { title: titulo, summary: texto },
+    output: { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) },
   });
   // La aprobación de la App solo si el PR sigue en el SHA juzgado.
   if (veredicto.ok && ctx.sha === ctx.cabeza) {
@@ -137,9 +170,25 @@ async function main() {
   }
   // Un estándar inválido es un no publicado (nunca un sí) y el script sale con error.
   const veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar'] } : decidir(SALIDA ?? '', preguntas, ctx);
-  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx });
+  // El registro nunca cambia el veredicto: si no se puede construir, el veredicto se publica igual (sin registro) y el script falla en alto.
+  let registro = null;
+  let errorRegistro = null;
+  try {
+    const resumen = errorEstandar ? { answers: {}, invalid: 0 } : resumirRespuestas(SALIDA ?? '', preguntas);
+    const estandar = (STANDARD ?? '').match(RUTA_ESTANDAR)?.[2] ?? null;
+    registro = buildRecord({
+      repo: REPO, pr: PR, sha: SHA, standard: estandar, veredicto,
+      respuestas: resumen ?? { answers: {}, invalid: 0 },
+      run: runFromEnv(process.env),
+      error: errorEstandar ? 'standard-unloadable' : resumen ? null : 'output-unreadable',
+    });
+  } catch (e) {
+    errorRegistro = e;
+  }
+  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx, registro });
   console.log(veredicto.ok ? 'veredicto: sí' : `veredicto: no\n${veredicto.fallos.join('\n')}`);
   if (errorEstandar) throw errorEstandar;
+  if (errorRegistro) throw errorRegistro;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

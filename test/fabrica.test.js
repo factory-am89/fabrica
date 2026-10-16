@@ -5,6 +5,7 @@ import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { extractRecord } from '../scripts/lib/record.mjs';
 import { decidir, leerPreguntas, rutaEstandar, cargarPreguntas } from '../scripts/veredicto.mjs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -253,6 +254,58 @@ test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo
   assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'success', r.stdout);
   assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE', 'falta la aprobación de la App');
   assert.match(r.stdout, /^veredicto: sí/);
+});
+
+const check = (publicado) => publicado.find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+const sinRegistro = (c) => ({ title: c.output.title, summary: c.output.summary });
+
+test('veredicto de punta a punta: el check lleva el registro, con las respuestas y sin la prueba del modelo; title y summary no cambian', () => {
+  const PRUEBA = 'PRUEBA_RECONOCIBLE_DEL_MODELO';
+  const respuestas = buenas().map((r, i) => (i === 0 ? { ...r, prueba: PRUEBA } : r));
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', SALIDA: JSON.stringify({ respuestas }), GITHUB_RUN_ID: '555', GITHUB_RUN_ATTEMPT: '2' });
+  assert.equal(r.status, 0, r.stderr);
+  const c = check(publicado);
+  const reg = extractRecord(c.output.text);
+  assert.deepEqual(reg.answers, Object.fromEntries(buenas().map((b) => [b.id, 'sí'])));
+  assert.deepEqual({ ok: reg.ok, pr: reg.pr, sha: reg.sha, standard: reg.standard, error: reg.error, invalid: reg.invalid, run: reg.run }, { ok: true, pr: 2, sha: SHA, standard: 'standards/code.md', error: null, invalid: 0, run: { id: 555, attempt: 2 } });
+  assert.ok(!c.output.text.includes(PRUEBA), 'la prueba del modelo no debe estar en el registro');
+  assert.deepEqual(sinRegistro(c), { title: 'Veredicto: sí', summary: 'Todas las respuestas del revisor son sí o no aplica, con prueba.' });
+});
+
+test('veredicto de punta a punta: un no deja title y summary de siempre y el registro dice qué pregunta fue no; sin variables de run, run es null', () => {
+  const rs = buenas();
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', SALIDA: JSON.stringify({ respuestas: [{ ...rs[0], respuesta: 'no' }, ...rs.slice(1), { id: 'C999', respuesta: 'sí', prueba: 'x' }] }) });
+  assert.equal(r.status, 0, r.stderr);
+  const c = check(publicado);
+  assert.deepEqual(sinRegistro(c), { title: 'Veredicto: no', summary: `- 1 ids desconocidos
+- ${rs[0].id}: no` });
+  const reg = extractRecord(c.output.text);
+  assert.equal(reg.answers[rs[0].id], 'no');
+  assert.equal(reg.invalid, 1);
+  assert.equal(reg.run, null);
+});
+
+test('veredicto de punta a punta: salida ilegible y estándar que no carga también dejan registro, con error', () => {
+  const ilegible = check(corre({ STANDARD: 'standards/code.md', SALIDA: '{no json' }).publicado);
+  assert.deepEqual(sinRegistro(ilegible), { title: 'Veredicto: no', summary: '- salida ilegible' });
+  const reg = extractRecord(ilegible.output.text);
+  assert.equal(reg.error, 'output-unreadable');
+  assert.equal(reg.ok, false);
+  const malo = corre({ STANDARD: 'standards/no-existe.md' });
+  assert.equal(malo.r.status, 1);
+  const reg2 = extractRecord(check(malo.publicado).output.text);
+  assert.equal(reg2.error, 'standard-unloadable');
+  assert.equal(reg2.standard, 'standards/no-existe.md');
+});
+
+test('veredicto de punta a punta: si el registro no se puede construir, el veredicto sale igual, sin registro, y el script falla en alto', () => {
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', GITHUB_RUN_ID: '555' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /GITHUB_RUN_ID/);
+  const c = check(publicado);
+  assert.equal(c.conclusion, 'success');
+  assert.equal(c.output.text, undefined);
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE');
 });
 
 test('veredicto de punta a punta: STANDARD con el prefijo .fabrica/ (como en el workflow) da lo mismo que sin él', () => {
