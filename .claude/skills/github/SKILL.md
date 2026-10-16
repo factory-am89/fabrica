@@ -25,7 +25,7 @@ comprobado: 2026-10-15
 - **Pausar el ruleset está prohibido desde el 16 oct 2026** (decisión de Pablo): sin «ventanas», tampoco para el
   juez. Si el revisor rechaza por error un cambio a la puerta (`GATE_FILES`) no hay salida automática: se para y se
   apunta para Pablo (issue o `intervenciones.md`); su mecanismo de anulación está por diseñar. `npm run ventana`
-  (PR #53, aún no en `main`) es solo para emergencias; la entrada del 2026-10-16 de abajo es historia, no receta.
+  (PR #53, aún no en `main`) es solo para emergencias.
 - **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
   la pregunta C13 está en `standards/code.md` (única fuente).
 
