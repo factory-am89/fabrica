@@ -248,7 +248,7 @@ apps/lib-proyecto.ps1
 apps/proyecto-nuevo.ps1
 apps/proyecto-nuevo/tests.yml
 apps/ruleset.ps1
-scripts/lib/pause-window.mjs
+scripts/lib/ventana.mjs
 scripts/ventana.mjs
 ```
 Not done: PR de humo, crear repos.
