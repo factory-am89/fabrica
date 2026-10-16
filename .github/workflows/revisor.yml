@@ -112,6 +112,7 @@ jobs:
         run: node .fabrica/scripts/veredicto.mjs
         env:
           SALIDA: ${{ steps.claude.outputs.structured_output }}
+          STANDARD: .fabrica/standards/code.md
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}

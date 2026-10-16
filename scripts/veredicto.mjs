@@ -1,8 +1,10 @@
 // Convierte la salida del revisor en un veredicto y lo publica como la App
 // fabrica-revisor: un check `revisor` y, si es sí, una aprobación.
 // El veredicto lo calcula este código, no el modelo: falla en alto (cualquier
-// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA y TOKEN (token de la App).
+// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA, TOKEN (token de la App) y STANDARD
+// (obligatoria, sin valor por defecto: la ruta del estándar, p. ej. .fabrica/standards/code.md).
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readQuestions } from './lib/questions.mjs';
 
@@ -11,6 +13,32 @@ const RESPUESTAS = ['sí', 'no', 'no aplica'];
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
   return readQuestions(md).map((q) => ({ id: q.id, pregunta: q.text, quien: q.checkedBy }));
+}
+
+// STANDARD es «standards/<nombre>.md», con o sin el prefijo «.fabrica/» del workflow; se resuelve
+// contra la raíz del repo que contiene este script (en CI, .fabrica/; en los tests, la carpeta de trabajo).
+const RUTA_ESTANDAR = /^(\.fabrica\/)?(standards\/[a-z0-9-]+\.md)$/;
+const RAIZ = path.resolve(import.meta.dirname, '..');
+
+export function rutaEstandar(valor, raiz = RAIZ) {
+  const m = typeof valor === 'string' ? valor.match(RUTA_ESTANDAR) : null;
+  if (!m) throw new Error('STANDARD debe ser standards/<nombre>.md (con o sin el prefijo .fabrica/); no tiene valor por defecto');
+  return path.join(raiz, ...m[2].split('/'));
+}
+
+// Lee el estándar y falla en alto si no tiene ninguna pregunta del revisor: sin ellas el juez no
+// preguntaría nada y daría un sí por vacío.
+export function cargarPreguntas(valor, raiz = RAIZ) {
+  const ruta = rutaEstandar(valor, raiz);
+  let md;
+  try {
+    md = readFileSync(ruta, 'utf8');
+  } catch {
+    throw new Error('STANDARD no apunta a un fichero que exista');
+  }
+  const preguntas = leerPreguntas(md);
+  if (!preguntas.some((q) => q.quien === 'revisor')) throw new Error('el estándar de STANDARD no tiene ninguna pregunta del revisor');
+  return preguntas;
 }
 
 function normalizar(r) {
@@ -46,7 +74,9 @@ export function decidir(salida, preguntas, ctx = {}) {
   }
   for (const id of repetidos) fallos.push(`${id}: id repetido`);
   if (desconocidos) fallos.push(`${desconocidos} ids desconocidos`);
-  for (const p of preguntas.filter((q) => q.quien === 'revisor')) {
+  const delRevisor = preguntas.filter((q) => q.quien === 'revisor');
+  if (delRevisor.length === 0) fallos.push('el estándar viene sin preguntas del revisor');
+  for (const p of delRevisor) {
     const r = porId.get(p.id);
     const resp = normalizar(r?.respuesta);
     if (!r) fallos.push(`${p.id}: sin respuesta`);
@@ -93,15 +123,23 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx }) {
 }
 
 async function main() {
-  const { SALIDA, REPO, PR, SHA, TOKEN } = process.env;
+  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD } = process.env;
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN })) {
     if (!v) throw new Error(`falta la variable ${k}`);
   }
-  const md = readFileSync(new URL('../standards/code.md', import.meta.url), 'utf8');
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
-  const veredicto = decidir(SALIDA ?? '', leerPreguntas(md), ctx);
+  let preguntas;
+  let errorEstandar = null;
+  try {
+    preguntas = cargarPreguntas(STANDARD);
+  } catch (e) {
+    errorEstandar = e;
+  }
+  // Un estándar inválido es un no publicado (nunca un sí) y el script sale con error.
+  const veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar'] } : decidir(SALIDA ?? '', preguntas, ctx);
   await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx });
   console.log(veredicto.ok ? 'veredicto: sí' : `veredicto: no\n${veredicto.fallos.join('\n')}`);
+  if (errorEstandar) throw errorEstandar;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
