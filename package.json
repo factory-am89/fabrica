@@ -21,6 +21,7 @@
     "instalar-pc": "node scripts/instalar-pc.mjs instalar",
     "comprobar-pc": "node scripts/instalar-pc.mjs comprobar",
     "contract": "node scripts/contract.mjs",
+    "done": "node scripts/done.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test"
   },

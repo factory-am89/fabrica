@@ -18,6 +18,8 @@ export const EXIT = Object.freeze({
   NOT_MERGED: 24, // retirar: the branch is not merged into main
   GH_FAILED: 25, // retirar: GitHub could not be asked about the merged PR
   NODE_MODULES_SHARED: 26, // retirar: another folder's node_modules junction points into this one
+  DONE_LINT_FAILED: 30, // done: npm run lint failed
+  DONE_TESTS_FAILED: 31, // done: npm test failed
 });
 
 // Result of `retirar --json`: either the folder was removed or the command refused (see `error`).
