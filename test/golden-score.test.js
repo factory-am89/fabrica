@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
 import { CLEAN, CORPUS, STANDARD, answersOf, belowFloor, loadCorpus, run } from '../scripts/golden.mjs';
 import { cargarPreguntas } from '../scripts/veredicto.mjs';
+import { SENSIBLE } from '../scripts/lib/skills.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'golden.mjs');
 const preguntas = cargarPreguntas(STANDARD);
@@ -142,7 +143,7 @@ test('un corpus roto falla en alto: carpeta sin expectativa, pregunta que no es 
 
 test('los ficheros de caso no nombran el corpus ni llevan nada que parezca un secreto', () => {
   const nombra = /golden|dorado|expected|seeded/i;
-  const secreto = [/[0-9a-f]{40}/i, /-----BEGIN [A-Z ]*PRIVATE KEY/, /\b(?:ghp_|github_pat_|ghs_|sk-ant-|ops_ey)[A-Za-z0-9_]{8,}/, /\b\d{1,3}(?:\.\d{1,3}){3}\b/, /\b[a-z]+:\/\/[^\s:@/]+:[^\s@/]+@/];
+  const secreto = [/[0-9a-f]{40}/i, ...SENSIBLE.map(([re]) => re)];
   for (const c of cases) {
     assert.deepEqual(readdirSync(path.join(CORPUS, c.id)).sort(), ['body.md', 'pr.diff'], c.id);
     assert.doesNotMatch(c.id, nombra);
