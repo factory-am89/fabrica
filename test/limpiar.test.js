@@ -183,3 +183,10 @@ test('limpiar: si git branch -D falla tras borrar la carpeta, el informe dice lo
   assert.equal(salida.fallos, 1);
   assert.ok(!ramasRemotas(m).includes('feat/doce'), 'la rama remota se borra igualmente');
 });
+
+test('limpiar: sucia y además sin PR fusionado → el motivo que se dice es el de cambios sin guardar (orden de la regla común)', () => {
+  const m = mundo(['feat/trece']);
+  writeFileSync(path.join(m.carpetas['feat/trece'].carpeta, 'sin-guardar.txt'), 'x\n');
+  const { salida } = correr(m, []);
+  assert.match(salida.quedan.find((q) => q.rama === 'feat/trece').motivo, /cambios sin guardar/);
+});
