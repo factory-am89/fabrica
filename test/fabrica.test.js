@@ -12,7 +12,7 @@ import { accionFijada } from '../scripts/lib/acciones.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
 const leer = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8');
-const preguntas = leerPreguntas(leer('estandares/codigo.md'));
+const preguntas = leerPreguntas(leer('standards/code.md'));
 
 test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
   const texto = leer('CLAUDE.md');
@@ -37,7 +37,7 @@ test('los tres roles tienen su modelo y el revisor no escribe', () => {
 test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bien y mal', () => {
   assert.ok(preguntas.length >= 10, `hay ${preguntas.length}`);
   assert.deepEqual(preguntas.map((p) => p.id), preguntas.map((_, i) => `C${i + 1}`));
-  const bloques = leer('estandares/codigo.md').split(/^### /m).slice(1);
+  const bloques = leer('standards/code.md').split(/^### /m).slice(1);
   for (const b of bloques) {
     assert.match(b, /^Bien: /m, b.split('\n')[0]);
     assert.match(b, /^Mal: /m, b.split('\n')[0]);
@@ -68,7 +68,7 @@ test('C4: la única excepción al SHA es un workflow de la Fábrica con @main, y
 });
 
 test('el estándar escribe la excepción de C4 con el repo de scripts/lib/repo.mjs', () => {
-  assert.ok(leer('estandares/codigo.md').includes(`${REPO}/.github/workflows/<fichero>.yml@main`), 'la excepción del estándar no coincide con REPO');
+  assert.ok(leer('standards/code.md').includes(`${REPO}/.github/workflows/<fichero>.yml@main`), 'la excepción del estándar no coincide con REPO');
 });
 
 test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio commit', () => {
@@ -80,7 +80,7 @@ test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio co
   assert.match(checkout, /ref: \$\{\{ job\.workflow_sha \}\}/, 'la Fábrica debe bajarse en el commit del workflow llamado');
   assert.match(texto, /node \.fabrica\/scripts\/veredicto\.mjs/);
   assert.match(texto, /\.fabrica\/\.claude\/agents\/revisor\.md/);
-  assert.match(texto, /\.fabrica\/estandares\/codigo\.md/);
+  assert.match(texto, /\.fabrica\/standards\/code\.md/);
   assert.doesNotMatch(texto, /node scripts\/veredicto/, 'la ruta sin .fabrica/ bajaría el repo que llama');
 });
 

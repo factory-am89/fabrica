@@ -1,4 +1,4 @@
-// Regla C4 de estandares/codigo.md: cada `uses:` de un workflow va fijado por SHA.
+// Regla C4 de standards/code.md: cada `uses:` de un workflow va fijado por SHA.
 // Única excepción, escrita aquí y probada en test/fabrica.test.js: los workflows reutilizables de la
 // propia Fábrica, llamados con `@main` (el repo que llama siempre usa el juez actual). Ningún otro
 // repo, ninguna otra ruta y ninguna otra referencia.

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const RESPUESTAS = ['sí', 'no', 'no aplica'];
 
-// Las preguntas salen de estandares/codigo.md: es su única fuente.
+// Las preguntas salen de standards/code.md: es su única fuente.
 export function leerPreguntas(md) {
   const preguntas = [];
   const bloques = md.split(/^### /m).slice(1);
@@ -104,7 +104,7 @@ async function main() {
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN })) {
     if (!v) throw new Error(`falta la variable ${k}`);
   }
-  const md = readFileSync(new URL('../estandares/codigo.md', import.meta.url), 'utf8');
+  const md = readFileSync(new URL('../standards/code.md', import.meta.url), 'utf8');
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
   const veredicto = decidir(SALIDA ?? '', leerPreguntas(md), ctx);
   await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx });
