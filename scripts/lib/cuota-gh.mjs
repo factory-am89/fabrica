@@ -1,6 +1,6 @@
 // Ratchet for the GitHub quota (test/gh-quota.test.js). Finds, in the repo's code and in the skill/agent
 // instructions, the two habits that spend the GraphQL quota without anyone counting (measured in MenuPlan on
-// 2026-10-10 and 2026-10-14, not verified in this repo): a `--watch` on a gh command (one query every 30 s per
+// 2026-10-10 and 2026-10-14, not verified in this repo): a `--watch` on a gh command (a GraphQL query repeated for as long as it runs, per
 // session) and `gh issue list` / `gh pr list` inside a loop (the cost is per requested item, every turn).
 // It is a ratchet, not a proof: it reads text, so a list built far from its loop is not seen. Paths use `/`.
 //

@@ -1,6 +1,6 @@
 // Ratchet for the GitHub quota: no code file and no skill/agent instruction uses `--watch` with gh, nor runs
 // `gh issue list` / `gh pr list` inside a loop. Why: in MenuPlan the GraphQL quota hit 0 twice (2026-10-10) because
-// each `gh pr checks --watch` queried every 30 s per session; the figures are MenuPlan's, not verified in this repo.
+// each `gh pr checks --watch` kept querying while it ran, per session; the figures are MenuPlan's, not verified in this repo.
 // A text that explains why not to do it passes: comments in code, and the sections of SECCIONES_EXPLICATIVAS in .md.
 // The fixtures are text in a temp directory: no real gh, no network.
 import { test } from 'node:test';
@@ -31,7 +31,7 @@ const reglasDe = (ruta, texto) => escanearTexto(ruta, texto).sort((x, y) => x.li
 
 // ---- good: must pass ----
 const BUENO_JS = [
-  "// never run gh pr checks --watch here: it queries GraphQL every 30 s",
+  "// never run gh pr checks --watch here: it keeps querying GraphQL",
   "/* for (const n of ns) { gh issue list } was the old way */",
   "import { spawnSync } from 'node:child_process';",
   "export const una = () => spawnSync('gh', ['pr', 'list', '--head', 'x']); // once, no loop",
@@ -71,7 +71,7 @@ const BUENO_MD = [
   '# gh pr checks 3 --watch   (a comment)',
   '```',
   '## La cuota de GitHub',
-  'No uses `gh pr checks --watch`: una consulta cada 30 s.',
+  'No uses `gh pr checks --watch`: repite la consulta mientras corre.',
   '## Lo que falló',
   '- **2026-10-10 · cuota a 0.** Causa: `gh pr checks --watch` en cada sesión; `for n in 1 2; do gh issue list; done`.',
   '```',
@@ -171,5 +171,5 @@ test('PROPIOS is closed and has no dead entries: each file exists, has a reason 
 
 test('the real repo passes: no --watch with gh and no gh issue/pr list inside a loop in code, skills or agents', () => {
   const hallazgos = escanear(RAIZ);
-  assert.deepEqual(hallazgos.map(formato), [], 'Wait for CI over REST with one call per 60 s (skill github, "La cuota de GitHub"); read one issue/PR with gh api repos/<repo>/issues/<n>.');
+  assert.deepEqual(hallazgos.map(formato), [], 'Check CI once, at the end, over REST (rules in the github skill, "La cuota de GitHub"); read one issue/PR with gh api repos/<repo>/issues/<n>.');
 });
