@@ -1,0 +1,16 @@
+{
+  "total_commits": 2,
+  "commits": [
+    {
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sha": "1234567890abcdef1234567890abcdef12345678"
+    }
+  ],
+  "files": [
+    {
+      "filename": "scripts/a.mjs"
+    }
+  ]
+}

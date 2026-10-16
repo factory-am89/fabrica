@@ -10,6 +10,24 @@ export const COMPARE_LIMIT = 300; // the compare endpoint truncates at 300 files
 
 const TEST_PREFIX = 'test/';
 
+// The line scripts/lib/evidence.mjs writes in the Evidence header; defined here once, evidence.mjs imports it.
+export const headMark = (sha) => `HEAD ${sha}`;
+const HEAD_PATTERN = /\bHEAD ([0-9a-f]{7,40})\b/g;
+
+// commits = { shas: [oldest..newest], total } from the compare JSON. The Evidence must name the newest one.
+function headFaults(content, commits) {
+  if (!Array.isArray(commits.shas) || commits.shas.length === 0) throw new Error('prBodyFaults: commits.shas must be a non-empty array');
+  if (commits.total !== commits.shas.length) {
+    return [`commit list truncated: ${commits.shas.length} listed of ${commits.total}; the head cannot be checked`];
+  }
+  const head = commits.shas[commits.shas.length - 1];
+  const named = [...content.matchAll(HEAD_PATTERN)].map((m) => m[1]);
+  if (named.length === 0) return ['## Evidence has no "HEAD <sha>" line; paste the output of `npm run evidence`'];
+  return named
+    .filter((n) => !head.startsWith(n))
+    .map((n) => `## Evidence is for ${n}, not for the PR head ${head.slice(0, 7)}; run \`npm run evidence\` again`);
+}
+
 function parseSections(body) {
   const text = body.replace(/<!--[\s\S]*?-->/g, '');
   const found = new Map();
@@ -36,7 +54,7 @@ function hasClosedCodeBlock(content) {
   return false;
 }
 
-export function prBodyFaults(body, files) {
+export function prBodyFaults(body, files, commits = null) {
   if (!Array.isArray(files)) throw new Error('prBodyFaults: files must be an array');
   if (body === null || body === undefined || body === '') return ['PR body is empty'];
   const found = parseSections(String(body));
@@ -58,6 +76,7 @@ export function prBodyFaults(body, files) {
     if (name === 'Evidence' && !hasClosedCodeBlock(content)) {
       faults.push('## Evidence needs a closed, non-empty code block');
     }
+    if (name === 'Evidence' && commits) faults.push(...headFaults(content, commits));
   }
   return faults;
 }
