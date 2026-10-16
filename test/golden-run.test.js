@@ -104,10 +104,13 @@ test('más de 27 llamadas se rechaza antes de llamar a nadie', () => {
 
 test('informe de varianza: un revisor inestable deja casos con veredicto inestable, uno estable ninguno; sin suelo', () => {
   const estable = pasada(['--trials', '2', ...CHICO]);
+  assert.match(estable.r.stdout, /unstable seeded verdict: 0\/3 cases/);
   assert.match(estable.r.stdout, /unstable verdict: 0\/3 cases/);
   const inestable = pasada(['--trials', '2', ...CHICO], { CLAUDE_FALSO_ALTERNA: '1' });
   assert.equal(inestable.r.status, 0, inestable.r.stderr);
   assert.match(inestable.r.stdout, /unstable verdict: 3\/3 cases/);
+  // caso-02 espera C6, que no cambia: su veredicto sembrado es estable aunque C5 baile
+  assert.match(inestable.r.stdout, /unstable seeded verdict: 2\/3 cases \(caso-01, caso-07\)/);
   assert.match(inestable.r.stdout, /unstable questions: C5 \(3 cases\)/);
   assert.doesNotMatch(inestable.r.stdout, /under the floor/);
 });

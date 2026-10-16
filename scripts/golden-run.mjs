@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { CORPUS, STANDARD, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
+import { CLEAN, CORPUS, STANDARD, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
+import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
@@ -140,23 +141,27 @@ function callClaude({ claude, reviewer, workspace }) {
   return { text: JSON.stringify(out.structured_output), cost: out.total_cost_usd };
 }
 
-// Variance: cases whose verdict (no if any answer is no) changes between trials, and the questions whose answer changes.
+// Variance: cases whose verdict (no if any answer is no) changes between trials; cases whose SEEDED verdict changes (the answer to the
+// expected question of a bad case, any no for a clean one: what the score counts); and the questions whose answer changes.
 export function variance(cases, answers) {
   const inestables = [];
+  const sembrados = [];
   const preguntas = {};
-  const veredicto = (a) => (Object.values(a).includes('no') ? 'no' : 'sí');
+  const veredicto = (a) => (Object.values(a).includes(ANSWER.no) ? ANSWER.no : ANSWER.yes);
   for (const c of cases) {
     const trials = answers[c.id];
     if (new Set(trials.map(veredicto)).size > 1) inestables.push(c.id);
+    if (new Set(trials.map((a) => (c.expect === CLEAN ? veredicto(a) : a[c.expect]))).size > 1) sembrados.push(c.id);
     for (const id of Object.keys(trials[0])) if (new Set(trials.map((a) => a[id])).size > 1) (preguntas[id] ??= []).push(c.id);
   }
-  return { casos: cases.length, inestables, preguntas };
+  return { casos: cases.length, inestables, sembrados, preguntas };
 }
 
 export function formatVariance(v, trials) {
   const qs = Object.entries(v.preguntas).map(([id, c]) => `${id} (${c.length} cases)`);
   return [
     `trials per case: ${trials}`,
+    `unstable seeded verdict: ${v.sembrados.length}/${v.casos} cases${v.sembrados.length ? ` (${v.sembrados.join(', ')})` : ''}`,
     `unstable verdict: ${v.inestables.length}/${v.casos} cases${v.inestables.length ? ` (${v.inestables.join(', ')})` : ''}`,
     `unstable questions: ${qs.length ? qs.join(', ') : 'none'}`,
   ].join('\n');
