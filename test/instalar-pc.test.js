@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HUELLA, instalar, comprobar } from '../scripts/instalar-pc.mjs';
+import { HUELLA, ORIGEN, instalar, comprobar } from '../scripts/instalar-pc.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');
@@ -20,7 +20,7 @@ test('instalar copia CLAUDE.md y apunta la huella', () => {
   const home = nuevoHome();
   const r = pc(home, 'instalar');
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(claude(home, 'CLAUDE.md'), 'utf8'), readFileSync(path.join(RAIZ, 'usuario', 'CLAUDE.md'), 'utf8'));
+  assert.equal(readFileSync(claude(home, 'CLAUDE.md'), 'utf8'), readFileSync(path.join(ORIGEN, 'CLAUDE.md'), 'utf8'));
   const huella = JSON.parse(readFileSync(claude(home, HUELLA), 'utf8'));
   assert.deepEqual(Object.keys(huella), ['CLAUDE.md']);
   assert.equal(pc(home, 'comprobar').status, 0);

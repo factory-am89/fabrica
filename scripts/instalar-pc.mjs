@@ -1,4 +1,4 @@
-// Capa de usuario versionada: usuario/ (CLAUDE.md global y hooks) <-> ~/.claude/.
+// Capa de usuario versionada: usuario/ (hoy solo CLAUDE.md global; admite subcarpetas) <-> ~/.claude/.
 //   node scripts/instalar-pc.mjs instalar    copia lo que falta o difiere y apunta la huella
 //   node scripts/instalar-pc.mjs comprobar   sale con 1 y nombra cada fichero que no coincide
 // HOME inyectable: variable FABRICA_HOME (o el parámetro `home`). Sin ella, el HOME real.
