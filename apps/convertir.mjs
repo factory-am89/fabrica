@@ -20,12 +20,10 @@ export const ENTORNO_ADMIN = 'administrador'; // solo lo lee administrar.yml (pl
 // Argumentos de `gh secret set` para un secreto: siempre en un environment, nunca en el repo.
 export const argsSecreto = (nombre, repo = REPO, entorno = ENTORNO) => ['secret', 'set', nombre, '--repo', repo, '--env', entorno];
 
-// Llamadas `gh api` que dejan el environment limitado a la rama main (crearlo es idempotente).
-export const argsEntorno = (repo, entorno) => [
-  ['api', '--method', 'PUT', `repos/${repo}/environments/${entorno}`,
-    '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true'],
-  ['api', '--method', 'POST', `repos/${repo}/environments/${entorno}/deployment-branch-policies`, '-f', 'name=main'],
-];
+// El environment limitado a main lo crea y COMPRUEBA apps/entorno.ps1 (misma función que usa el revisor, en lib-gh.ps1):
+// la regla vive en un solo sitio. Argumentos de PowerShell para llamarlo.
+export const argsEntornoPs = (repo, entorno) => ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+  fileURLToPath(new URL('./entorno.ps1', import.meta.url)), '-Repo', repo, '-Nombre', entorno];
 
 export function destino(slug) {
   if (slug.startsWith('fabrica-constructor')) return 'constructor';
@@ -49,12 +47,10 @@ function guardarEnFichero(slug, pem, motivo) {
 }
 
 function guardarAdmin(app) {
-  for (const args of argsEntorno(REPO, ENTORNO_ADMIN)) {
-    const r = spawnSync('gh', args, { encoding: 'utf8', shell: process.platform === 'win32' });
-    // 422 en la política de rama = ya existe (relanzado): no es un fallo.
-    if (r.status !== 0 && !/already exists|422/.test(r.stderr ?? '')) {
-      return guardarEnFichero(app.slug, app.pem, `no pude crear el environment ${ENTORNO_ADMIN} (${r.error?.message ?? r.stderr?.trim()})`);
-    }
+  // Sin environment comprobado y limitado a main no se escribe ningún secreto.
+  const r = spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', argsEntornoPs(REPO, ENTORNO_ADMIN), { encoding: 'utf8' });
+  if (r.status !== 0) {
+    return guardarEnFichero(app.slug, app.pem, `el environment ${ENTORNO_ADMIN} no quedó limitado a main, no escribo secretos (${r.error?.message ?? (r.stdout + r.stderr).trim()})`);
   }
   const clave = conStdin('gh', argsSecreto('ADMIN_APP_KEY', REPO, ENTORNO_ADMIN), app.pem);
   const id = conStdin('gh', argsSecreto('ADMIN_CLIENT_ID', REPO, ENTORNO_ADMIN), String(app.client_id));

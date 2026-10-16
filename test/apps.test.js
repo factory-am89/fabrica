@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { destino, argsSecreto, argsEntorno, ENTORNO_ADMIN } from '../apps/convertir.mjs';
+import { destino, argsSecreto, argsEntornoPs, ENTORNO_ADMIN } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
 import { leer } from './apoyo/fabrica.mjs';
 
@@ -49,9 +49,18 @@ test('fabrica-administrador pide exactamente la lista cerrada de permisos y ning
 test('convertir.mjs guarda la clave administradora en el environment administrador, limitado a main', () => {
   assert.equal(ENTORNO_ADMIN, 'administrador');
   assert.deepEqual(argsSecreto('ADMIN_APP_KEY', 'o/r', ENTORNO_ADMIN), ['secret', 'set', 'ADMIN_APP_KEY', '--repo', 'o/r', '--env', 'administrador']);
-  const [crea, rama] = argsEntorno('o/r', ENTORNO_ADMIN);
-  assert.ok(crea.join(' ').includes('repos/o/r/environments/administrador'));
-  assert.ok(rama.join(' ').includes('deployment-branch-policies') && rama.join(' ').includes('name=main'));
+  // Una sola fuente de «environment limitado a main»: convertir.mjs llama a entorno.ps1, que usa la función de lib-gh.ps1.
+  const ps = argsEntornoPs('o/r', ENTORNO_ADMIN);
+  assert.deepEqual(ps.slice(-4), ['-Repo', 'o/r', '-Nombre', 'administrador']);
+  assert.ok(ps.includes('-File') && ps[ps.indexOf('-File') + 1].endsWith('entorno.ps1'));
+  const conv = leer('apps/convertir.mjs');
+  assert.doesNotMatch(conv, /deployment[_-]branch[_-]polic/, 'convertir.mjs no repite la regla de lib-gh.ps1');
+  assert.doesNotMatch(conv, /422|already exists/, 'ningún error de la creación se traga');
+  assert.match(leer('apps/entorno.ps1'), /Asegurar-Environment-Limitado \$Repo \$Nombre/);
+  const lib = leer('apps/lib-gh.ps1');
+  assert.match(lib, /'name=main', '-f', 'type=branch'/);
+  assert.match(lib, /NO queda limitado a main/, 'la función lee de vuelta y lanza si no está limitado');
+  assert.match(lib, /function Asegurar-Environment-Revisor.*Asegurar-Environment-Limitado \$Repo 'revisor'/);
   assert.doesNotMatch(leer('apps/convertir.mjs'), /ADMIN_APP_ID/);
 });
 
