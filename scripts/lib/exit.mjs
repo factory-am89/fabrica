@@ -20,6 +20,7 @@ export const EXIT = Object.freeze({
   NODE_MODULES_SHARED: 26, // retirar: another folder's node_modules junction points into this one
   DONE_LINT_FAILED: 30, // done: npm run lint failed
   DONE_TESTS_FAILED: 31, // done: npm test failed
+  LESSON_FAULTS: 40, // lessons: the registry has at least one fault (the codes are in the output)
 });
 
 // Result of `retirar --json`: either the folder was removed or the command refused (see `error`).

@@ -19,7 +19,7 @@ test('contract: the committed file equals the EXIT and RETIRE_RESULT constants (
 
 // The agent role file must keep naming the commands and the contract file: it is the reader of --json and of exit-codes.json.
 const CONSTRUCTOR = new URL('../.claude/agents/constructor.md', import.meta.url);
-const REQUIRED_NAMES = ['npm run tarea -- --json', 'npm run retirar -- --json', 'scripts/lib/exit-codes.json', 'npm run done', 'DONE_LINE'];
+const REQUIRED_NAMES = ['npm run tarea -- --json', 'npm run retirar -- --json', 'scripts/lib/exit-codes.json', 'npm run done', 'DONE_LINE', 'npm run lessons'];
 const missingNames = (text) => REQUIRED_NAMES.filter((n) => !text.includes(n));
 
 // The section must point to the code for the output shape, not copy a field list that can go stale.

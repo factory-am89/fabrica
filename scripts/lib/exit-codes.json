@@ -15,7 +15,8 @@
     "GH_FAILED": 25,
     "NODE_MODULES_SHARED": 26,
     "DONE_LINT_FAILED": 30,
-    "DONE_TESTS_FAILED": 31
+    "DONE_TESTS_FAILED": 31,
+    "LESSON_FAULTS": 40
   },
   "RETIRE_RESULT": {
     "REMOVED": "removed",
