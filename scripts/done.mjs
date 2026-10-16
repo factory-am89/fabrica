@@ -20,17 +20,21 @@ export function runDone(run) {
   return { code: EXIT.OK, line: DONE_LINE.ok };
 }
 
-// A step that cannot even start counts as failed (status null), never as passed.
-const npm = (step) => {
-  const r = spawnSync('npm', ['run', step === 'test' ? 'test' : 'lint'], {
+// Runs `npm run <step>`; `launch` is injectable so tests can see the real step name and status.
+// A step that cannot start (r.error) or ends without a status (killed by a signal) counts as
+// failed, never as passed; the reason goes to stderr.
+export function npmStep(step, launch = spawnSync) {
+  const r = launch('npm', ['run', step], {
     stdio: ['ignore', 'inherit', 'inherit'],
     shell: process.platform === 'win32',
   });
-  return r.status ?? 1;
-};
+  if (r.error) console.error(`done: could not run «npm run ${step}»: ${r.error.message}`);
+  else if (r.status === null || r.status === undefined) console.error(`done: «npm run ${step}» ended without an exit status (signal: ${r.signal})`);
+  return r.error ? 1 : (r.status ?? 1);
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { code, line } = runDone(npm);
+  const { code, line } = runDone(npmStep);
   console.log(line);
   process.exit(code);
 }

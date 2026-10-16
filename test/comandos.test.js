@@ -2,41 +2,25 @@
 // Existing behaviour of tarea/retirar (messages, folders, branches) is covered by carpetas.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EXIT, RETIRE_RESULT } from '../scripts/lib/exit.mjs';
+import { EXIT, RETIRE_RESULT, ExitError, runCommand } from '../scripts/lib/exit.mjs';
 import { prFusionado, cliRetirar } from '../scripts/retirar.mjs';
+import { git as gitRaw } from '../scripts/lib/carpetas.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
-import { runDone, DONE_LINE } from '../scripts/done.mjs';
+import { git, repo as baseRepo } from '../test-support/repo.mjs';
+import { runDone, npmStep, DONE_LINE } from '../scripts/done.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const git = (cwd, ...args) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
-  assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
-  return r.stdout.trim();
+// The shared helper returns { padre, principal }; these tests read better with parent/main.
+const repo = (opts) => {
+  const { padre, principal } = baseRepo(opts);
+  return { parent: padre, main: principal };
 };
-
-// <tmp>/fabrica with one commit on main (and optionally an npm lockfile with no dependencies).
-function repo({ lockfile = false } = {}) {
-  const parent = realpathSync(mkdtempSync(path.join(tmpdir(), 'comandos-')));
-  const main = path.join(parent, 'fabrica');
-  mkdirSync(main);
-  git(main, 'init', '-q', '-b', 'main');
-  for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(main, 'config', k, v);
-  writeFileSync(path.join(main, 'a.txt'), 'a\n');
-  git(main, 'add', 'a.txt');
-  if (lockfile) {
-    writeFileSync(path.join(main, 'package.json'), '{"name":"x","version":"1.0.0"}\n');
-    writeFileSync(path.join(main, 'package-lock.json'), '{"name":"x","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"x","version":"1.0.0"}}}\n');
-    git(main, 'add', 'package.json', 'package-lock.json');
-  }
-  git(main, 'commit', '-q', '-m', 'initial');
-  return { parent, main };
-}
 
 const tarea = (main, branch, extra = {}) => cliTarea([...(extra.json ? ['--json'] : []), branch], { cwd: main, instalar: false });
 const retirar = (main, name, extra = {}) => cliRetirar([...(extra.json ? ['--json'] : []), name], { cwd: main, consultarPR: extra.consultarPR });
@@ -54,6 +38,9 @@ test('tarea: exit code per failure class, each with a good and a bad case', () =
   const { main } = repo();
   const good = tarea(main, 'feat/bueno');
   assert.equal(good.code, EXIT.OK, good.stderr);
+  // without --json the output stays human: on stdout, nothing on stderr
+  assert.match(good.stdout, /^tarea carpeta: .* rama: feat\/bueno base: main\n/);
+  assert.equal(good.stderr, '');
   // INVALID_BRANCH
   assert.equal(tarea(main, 'rama-rara').code, EXIT.INVALID_BRANCH);
   assert.equal(cliTarea([], { cwd: main, instalar: false }).code, EXIT.INVALID_BRANCH);
@@ -152,13 +139,6 @@ test('--json: stdout is exactly one JSON object, human text goes to stderr', () 
   assert.equal(res.union, false);
 });
 
-test('without --json the current output does not change (human on stdout, nothing on stderr)', () => {
-  const { main } = repo();
-  const t = tarea(main, 'feat/humano');
-  assert.match(t.stdout, /^tarea carpeta: .* rama: feat\/humano base: main\n/);
-  assert.equal(t.stderr, '');
-});
-
 test('the real scripts exit with the class code; --json leaves only JSON on stdout', () => {
   const run = (script, ...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', script), ...args], { encoding: 'utf8', cwd: noRepoDir() });
   const plain = run('tarea.mjs', 'rama-rara');
@@ -185,4 +165,53 @@ test('done: exit 0 and fixed last line only when lint and tests both pass', () =
   const tests = runDone(runner('test'));
   assert.deepEqual([tests.code, tests.line], [EXIT.DONE_TESTS_FAILED, 'done: fail test']);
   assert.equal(DONE_LINE.ok, 'done: ok');
+});
+
+test('done: npmStep runs the real step name, and a missing status or a launch error is a failure', () => {
+  const calls = [];
+  const launcher = (result) => (cmd, args) => { calls.push([cmd, ...args]); return result; };
+  assert.equal(npmStep('lint', launcher({ status: 0 })), 0);
+  assert.equal(npmStep('test', launcher({ status: 0 })), 0);
+  assert.deepEqual(calls, [['npm', 'run', 'lint'], ['npm', 'run', 'test']]);
+  assert.equal(npmStep('test', launcher({ status: 3 })), 3);
+  assert.equal(npmStep('test', launcher({ status: null, signal: 'SIGTERM' })), 1);
+  assert.equal(npmStep('test', launcher({ error: new Error('ENOENT'), status: null })), 1);
+  assert.equal(npmStep('test', launcher({ error: new Error('ENOENT'), status: 0 })), 1);
+  // both real steps wired the way the CLI does it
+  calls.length = 0;
+  assert.equal(runDone((s) => npmStep(s, launcher({ status: 0 }))).code, EXIT.OK);
+  assert.deepEqual(calls.map((x) => x[2]), ['lint', 'test']);
+});
+
+test('--json with a real npm ci: the whole stdout is one JSON object (npm output goes to stderr)', () => {
+  const { main } = repo({ lockfile: true });
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'tarea.mjs'), '--json', 'feat/con-npm'], { cwd: main, encoding: 'utf8' });
+  assert.equal(r.status, EXIT.OK, r.stderr);
+  const data = JSON.parse(r.stdout); // throws if npm wrote anything else to stdout
+  assert.equal(data.ok, true);
+  assert.equal(r.stdout.trim().split('\n').length, 1);
+  assert.match(r.stderr, /tarea carpeta:/);
+});
+
+test('UNEXPECTED: an unclassified error exits 1 with its message on stderr, in both modes', () => {
+  const run = () => { throw new TypeError('boom'); };
+  const plain = runCommand([], { run, human: String });
+  assert.deepEqual([plain.code, plain.stdout, plain.stderr], [EXIT.UNEXPECTED, '', 'boom\n']);
+  const json = runCommand(['--json'], { run, human: String });
+  assert.equal(json.code, EXIT.UNEXPECTED);
+  assert.deepEqual(JSON.parse(json.stdout), { ok: false, error: 'UNEXPECTED', exit: EXIT.UNEXPECTED });
+  assert.equal(json.stderr, 'boom\n');
+});
+
+test('GIT_FAILED when git cannot even start (bad working directory)', () => {
+  const missing = path.join(tmpdir(), 'no-existe-esta-carpeta-ni-de-broma');
+  assert.throws(() => gitRaw(['status'], missing), (e) => e instanceof ExitError && e.exit === EXIT.GIT_FAILED && /No pude lanzar git/.test(e.message));
+  assert.equal(gitRaw(['--version'], tmpdir()).status, 0);
+});
+
+test('ExitError: accepts only own failure classes of EXIT, never OK or inherited names', () => {
+  for (const key of ['INVALID_BRANCH', 'NOT_MERGED', 'GH_FAILED']) assert.equal(new ExitError(key, 'x').exit, EXIT[key]);
+  for (const bad of ['OK', 'toString', 'constructor', '__proto__', 'NOPE', undefined]) {
+    assert.throws(() => new ExitError(bad, 'x'), /unknown failure class/, String(bad));
+  }
 });

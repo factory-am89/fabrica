@@ -27,7 +27,7 @@ export const RETIRE_RESULT = Object.freeze({ REMOVED: 'removed', REFUSED: 'refus
 export class ExitError extends Error {
   constructor(key, message) {
     super(message);
-    if (!(key in EXIT) || EXIT[key] === EXIT.OK) throw new Error(`ExitError: unknown failure class «${key}»`);
+    if (!Object.hasOwn(EXIT, key) || EXIT[key] === EXIT.OK) throw new Error(`ExitError: unknown failure class «${key}»`);
     this.key = key;
     this.exit = EXIT[key];
   }
