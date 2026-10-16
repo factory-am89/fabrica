@@ -8,6 +8,8 @@ export class EvidenceError extends Error {}
 const KEPT_PREFIXES = ['ℹ tests', 'ℹ pass', 'ℹ fail', '✖'];
 const DURATION_AT_END = / \(\d+(?:\.\d+)?ms\)$/;
 const BASE = 'origin/main';
+// The spec reporter is the one that prints the "ℹ tests" lines; Node's default for piped output differs between versions (TAP on 22).
+const TEST_ARGS = ['--test', '--test-reporter=spec'];
 
 // Keeps the counter and failure lines of `node --test` and removes the duration at the end of each.
 export function filterTestOutput(text) {
@@ -32,18 +34,24 @@ function npmCli() {
 
 // Runs one command with an args array (no shell). Returns { code, output } with stdout then stderr.
 // A command that cannot start, or dies by a signal, throws.
-export function defaultRunner(cmd, args, cwd) {
+export function makeRunner(spawn) {
+  return (cmd, args, cwd) => runWith(spawn, cmd, args, cwd);
+}
+
+function runWith(spawn, cmd, args, cwd) {
   let file = cmd;
   let fileArgs = args;
   if (cmd === 'node') file = process.execPath;
   if (cmd === 'npm') { file = process.execPath; fileArgs = [npmCli(), ...args]; }
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT; // a nested `node --test` must act as a runner, not as a test file
-  const r = spawnSync(file, fileArgs, { cwd, env, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const r = spawn(file, fileArgs, { cwd, env, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   if (r.error) throw new EvidenceError(`cannot start ${cmd}: ${r.error.message}`, { cause: r.error });
   if (r.status === null) throw new EvidenceError(`${cmd} ended by signal ${r.signal}`);
   return { code: r.status, output: `${r.stdout}${r.stderr}` };
 }
+
+export const defaultRunner = makeRunner(spawnSync);
 
 const clean = (text) => text.replace(/\r\n/g, '\n').replace(/\n+$/, '');
 
@@ -66,7 +74,7 @@ function header(head, mergeBase) {
     '',
     `Produced by \`npm run evidence\`. HEAD ${head}; merge-base with ${BASE} ${mergeBase}.`,
     '',
-    `Filter, applied in code: for \`node --test\` only lines starting with ${KEPT_PREFIXES.map((p) => `\`${p}\``).join(', ').replace(/, (`✖`)$/, ' and $1')} are kept, and a duration at the end of a kept line, such as \` (12.3ms)\`, is removed so the block is reproducible; every other command is raw. Output is stdout followed by stderr.`,
+    `Filter, applied in code: for \`node --test\` (run with \`--test-reporter=spec\`) only lines starting with ${KEPT_PREFIXES.map((p) => `\`${p}\``).join(', ').replace(/, (`✖`)$/, ' and $1')} are kept, and a duration at the end of a kept line, such as \` (12.3ms)\`, is removed so the block is reproducible; every other command is raw. Output is stdout followed by stderr.`,
   ].join('\n');
 }
 
@@ -85,8 +93,8 @@ export function collectEvidence({ cwd, focus, runner = defaultRunner }) {
 
   const steps = [
     { cmd: 'npm', args: ['run', 'lint'] },
-    { cmd: 'node', args: ['--test'], filter: true },
-    ...focus.map((f) => ({ cmd: 'node', args: ['--test', f], filter: true })),
+    { cmd: 'node', args: TEST_ARGS, filter: true },
+    ...focus.map((f) => ({ cmd: 'node', args: [...TEST_ARGS, f], filter: true })),
     { cmd: 'git', args: ['diff', '--shortstat', `${BASE}...HEAD`] },
   ];
   let failed = false;
@@ -94,7 +102,11 @@ export function collectEvidence({ cwd, focus, runner = defaultRunner }) {
     const r = runner(cmd, args, cwd);
     if (r.code !== 0) failed = true;
     const text = clean(r.output);
-    return fenced([cmd, ...args].join(' '), filter ? filterTestOutput(text) : text, r.code);
+    const shown = filter ? filterTestOutput(text) : text;
+    if (filter && !shown.split('\n').some((l) => l.startsWith('ℹ tests'))) {
+      throw new EvidenceError(`${[cmd, ...args].join(' ')} printed no "ℹ tests" line; its output is not in the spec reporter format`);
+    }
+    return fenced([cmd, ...args].join(' '), shown, r.code);
   });
   return { markdown: `${header(head, mergeBase)}\n\n${blocks.join('\n\n')}\n`, failed };
 }
