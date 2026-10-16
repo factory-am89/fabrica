@@ -87,6 +87,13 @@ test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio co
 test('revisor.yml usa pull_request_target, no baja el código del PR y guarda los secretos en el environment revisor', () => {
   const texto = leer('.github/workflows/revisor.yml');
   assert.match(texto, /^on:\s*\n(\s*#.*\n)*\s+pull_request_target:/m);
+  const tipos = texto.match(/^ {4}types: \[(.*)\]$/m);
+  assert.ok(tipos, 'pull_request_target needs an explicit types list');
+  assert.deepEqual(
+    tipos[1].split(',').map((s) => s.trim()),
+    ['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited'],
+    'the reviewer must rejudge when the PR body or title is edited'
+  );
   // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha); ninguno trae el código del PR.
   const refs = [...texto.matchAll(/^\s*ref:\s*(.*)$/gm)].map((m) => m[1].trim());
   assert.deepEqual(refs, ['${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR');
