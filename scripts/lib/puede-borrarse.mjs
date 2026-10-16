@@ -3,21 +3,22 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { gitOk, norm } from './carpetas.mjs';
 import { REPO } from './repo.mjs';
-
-export const TOKEN = fileURLToPath(new URL('../token.mjs', import.meta.url));
+import { TOKEN } from './identidades.mjs';
 
 // Lanza una orden con token de App (token.mjs es la única puerta; gh a pelo no tiene sesión en este PC).
-export function conToken(token, orden, cwd) {
-  return spawnSync(process.execPath, [token, '--', ...orden], { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+// `repo` (si se da) le dice a token.mjs para qué repo canjear el token (FABRICA_REPO).
+export function conToken(token, orden, cwd, repo) {
+  const env = repo ? { ...process.env, FABRICA_REPO: repo } : process.env;
+  return spawnSync(process.execPath, [token, '--', ...orden], { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
 // Los PR fusionados por la punta de su rama: sha → número. Un PR cerrado sin fusionar no cuenta.
 // Una sola consulta REST (los últimos 100 cerrados). Si GitHub no responde, lanza: fallar en alto.
-export function prsFusionados(repo, token, cwd) {
-  const r = conToken(token, ['gh', 'api', `repos/${repo}/pulls?state=closed&per_page=100`], cwd);
+// Con `base`, solo cuentan los fusionados en esa rama (uno fusionado en otra no está en la base).
+export function prsFusionados(repo, token, cwd, base) {
+  const r = conToken(token, ['gh', 'api', `repos/${repo}/pulls?state=closed&per_page=100`], cwd, repo);
   if (r.error || r.status !== 0) throw new Error(`GitHub no responde (${r.error?.message ?? r.stderr.trim().split('\n')[0]}); no se borra nada.`);
   let lista;
   try {
@@ -26,7 +27,7 @@ export function prsFusionados(repo, token, cwd) {
     throw new Error('GitHub no responde con una lista de PR legible; no se borra nada.');
   }
   if (!Array.isArray(lista)) throw new Error('GitHub no responde con una lista de PR; no se borra nada.');
-  return new Map(lista.filter((p) => p.merged_at && p.head?.sha).map((p) => [p.head.sha, p.number]));
+  return new Map(lista.filter((p) => p.merged_at && p.head?.sha && (!base || p.base?.ref === base)).map((p) => [p.head.sha, p.number]));
 }
 
 // ¿Hay un PR fusionado con esta punta? Un commit posterior a la fusión no estaría en main.

@@ -18,7 +18,8 @@ export const pasoLimpiar = (limpiarFn = limpiar) => ({
   },
 });
 
-export const PASOS = [pasoLimpiar(), pasoAlDia(), pasoHora()];
+// al-dia primero: trae a la principal la ficha .fabrica.json (y lo nuevo) antes de que limpiar la lea.
+export const PASOS = [pasoAlDia(), pasoLimpiar(), pasoHora()];
 
 // Devuelve cuántos pasos fallaron. Los titulares de fallo van primero y luego el informe de cada paso.
 export function arrancar(pasos = PASOS, escribir = console.log) {
