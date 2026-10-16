@@ -26,6 +26,11 @@ export function leerFrontmatter(texto) {
   return campos;
 }
 
+// Única definición de «fecha válida»: AAAA-MM-DD y que Date.parse la entienda (rechaza 2026-13-45).
+export function fechaValida(fecha) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '') && !Number.isNaN(Date.parse(fecha));
+}
+
 export function diasDesde(fecha, hoy) {
   return Math.floor((Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${fecha}T00:00:00Z`)) / 86400000);
 }
@@ -42,7 +47,7 @@ function faltasDeCabecera(f, carpeta, raiz, hoy) {
   if (!f['dueño'] || !existsSync(path.join(raiz, '.claude', 'agents', `${f['dueño']}.md`))) {
     faltas.push(`dueño «${f['dueño']}» no es un agente de .claude/agents/`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.comprobado ?? '') || Number.isNaN(Date.parse(f.comprobado))) {
+  if (!fechaValida(f.comprobado)) {
     faltas.push(`comprobado «${f.comprobado}» no es una fecha AAAA-MM-DD`);
   } else {
     const dias = diasDesde(f.comprobado, hoy);
@@ -91,7 +96,7 @@ export function skillsViejas(raiz, hoy) {
   for (const carpeta of carpetasDeSkills(raiz)) {
     const nombre = path.basename(carpeta);
     const f = leerFrontmatter(readFileSync(path.join(carpeta, 'SKILL.md'), 'utf8'));
-    if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(f.comprobado ?? '')) throw new Error(`${nombre}: sin fecha «comprobado» legible`);
+    if (!f || !fechaValida(f.comprobado)) throw new Error(`${nombre}: sin fecha «comprobado» legible`);
     const dias = diasDesde(f.comprobado, hoy);
     if (dias > REVISAR_DIAS) viejas.push({ nombre, comprobado: f.comprobado, dias });
   }

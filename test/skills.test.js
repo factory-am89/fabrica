@@ -88,12 +88,28 @@ test('una fecha antigua no es una falta: la skill no caduca, solo se lista como 
   assert.deepEqual(skill(BIEN, {}, '2030-01-01'), []);
 });
 
+// Una raíz temporal con una skill de mentira por cada fecha dada (fechas fijas, ninguna del repo).
+function raizConSkills(fechas) {
+  const raiz = mkdtempSync(path.join(tmpdir(), 'forja-'));
+  fechas.forEach((fecha, n) => {
+    const carpeta = path.join(raiz, '.claude', 'skills', `s${n}`);
+    mkdirSync(carpeta, { recursive: true });
+    writeFileSync(path.join(carpeta, 'SKILL.md'), BIEN.replace('name: prueba', `name: s${n}`).replace('2026-10-01', fecha));
+  });
+  return raiz;
+}
+
 test('skillsViejas lista las de más de REVISAR_DIAS días y no las de justo ese plazo', () => {
-  const viejas = skillsViejas(RAIZ, '2027-02-01');
-  assert.equal(viejas.length, carpetasDeSkills(RAIZ).length);
-  assert.ok(viejas.length >= 4);
-  for (const v of viejas) assert.equal(v.dias, 109, v.nombre);
-  assert.deepEqual(skillsViejas(RAIZ, '2027-01-13'), []);
+  const raiz = raizConSkills(['2026-10-15', '2026-12-01']);
+  assert.deepEqual(skillsViejas(raiz, '2027-02-01'), [{ nombre: 's0', comprobado: '2026-10-15', dias: 109 }]);
+  assert.deepEqual(skillsViejas(raiz, '2027-01-13'), []);
+  assert.equal(skillsViejas(raiz, '2027-01-14').length, 1);
+});
+
+test('una fecha con formato válido pero imposible se rechaza igual en comprobarSkill y en skillsViejas', () => {
+  const rota = BIEN.replace('2026-10-01', '2026-13-45');
+  assert.match(skill(rota).join('\n'), /fecha AAAA/);
+  assert.throws(() => skillsViejas(raizConSkills(['2026-13-45']), '2027-02-01'), /sin fecha/);
 });
 
 test('skillsViejas lanza si no puede leer las skills, no dice que no hay ninguna', () => {
