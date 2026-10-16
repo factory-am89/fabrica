@@ -14,9 +14,9 @@ import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/registro-intervenciones.mjs';
+import { SIN_HORA, registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/registro-intervenciones.mjs';
 
-// A `!` older than this is not logged: it belongs to a resumed session, not to now.
+// A `!` with a readable time older than this is not logged: it belongs to a resumed session, not to now.
 const MAX_EDAD_MS = 6 * 60 * 60 * 1000;
 const MAX_LECTURA = 8 * 1024 * 1024;
 const SESION_OK = /^[\w-]{6,80}$/;
@@ -74,9 +74,14 @@ export function anotarBangs(entrada, { casa = homedir, fs = fsReal, ahora = new 
   fs.writeFileSync(marca, String(hasta));
   let n = 0;
   for (const { ts } of bangsDe(texto)) {
-    const cuando = ts ? new Date(ts) : ahora;
-    if (Number.isNaN(cuando.getTime()) || ahora.getTime() - cuando.getTime() > MAX_EDAD_MS) continue;
-    registrarIntervencion({ clase: 'sin-clasificar', origen: 'bang', ruta: rutaDeRegistroIntervenciones(casa), fs, reloj: () => cuando.getTime() });
+    const cuando = ts ? new Date(ts) : null;
+    const ruta = rutaDeRegistroIntervenciones(casa);
+    if (!cuando || Number.isNaN(cuando.getTime())) {
+      // No readable time: it cannot be told apart from an old one, so it is logged, marked, and never dropped or given a time.
+      registrarIntervencion({ clase: 'sin-clasificar', origen: SIN_HORA, ruta, fs });
+    } else if (ahora.getTime() - cuando.getTime() <= MAX_EDAD_MS) {
+      registrarIntervencion({ clase: 'sin-clasificar', origen: 'bang', ruta, fs, reloj: () => cuando.getTime() });
+    } else continue; // older than MAX_EDAD_MS: a resumed session, not now
     n++;
   }
   return n;

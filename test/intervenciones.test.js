@@ -30,7 +30,7 @@ const bang = (cmd, extra) => fila(`<bash-input>${cmd}</bash-input>`, extra);
 test('vocabulary: closed lists, exported once, in the shape of the other logs', () => {
   assert.equal(rutaDeRegistroIntervenciones(() => '/home/x'), join('/home/x', '.fabrica', 'intervenciones.jsonl'));
   assert.deepEqual(CAMPOS, ['t', 'clase', 'origen']);
-  assert.deepEqual(ORIGENES, ['bang', 'permiso']);
+  assert.deepEqual(ORIGENES, ['bang', 'permiso', 'bang-sin-hora']);
   assert.equal(CLASES.length, 10);
   assert.equal(new Set(CLASES).size, 10);
   for (const c of ['aviso-de-permiso', 'sin-clasificar', 'aprobar-puerta', 'desatasco']) assert.ok(CLASES.includes(c), c);
@@ -91,6 +91,32 @@ test('a `!` gives one line, once: a second look at the same transcript adds none
   assert.ok(!readFileSync(ruta, 'utf8').includes('rm -rf'));
 }));
 
+test('a `!` without a readable time is logged anyway, marked bang-sin-hora with t null, and counted apart (never dropped, never given a time)', () => conCasa((casa, h, ruta) => {
+  const transcript = join(casa, 'sesion.jsonl');
+  const sinHora = JSON.stringify({ type: 'user', message: { role: 'user', content: '<bash-input>x</bash-input>' } });
+  const ilegible = JSON.stringify({ type: 'user', timestamp: 'ayer por la tarde', message: { role: 'user', content: '<bash-input>y</bash-input>' } });
+  writeFileSync(transcript, `${sinHora}
+${ilegible}
+`);
+  assert.equal(anotarBangs({ session_id: 'sesion-1234', transcript_path: transcript }, { casa: h, ahora: AHORA }), 2);
+  assert.deepEqual(lineas(ruta), [{ t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora' }, { t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora' }]);
+  const c = contarIntervenciones({ ruta });
+  assert.deepEqual(c.corruptas, []);
+  assert.equal(c.porOrigen['bang-sin-hora'], 2);
+  assert.equal(c.porClase['sin-clasificar'], 2);
+  appendFileSync(ruta, `${JSON.stringify({ t: null, clase: 'sin-clasificar', origen: 'bang' })}
+`);
+  assert.deepEqual(contarIntervenciones({ ruta }).corruptas, [3], 't null is valid only for bang-sin-hora');
+}));
+
+test('the `!` format is pinned with lines cut from real Claude Code transcripts of this PC (MenuPlan sessions, v2.1.295 to 2.1.299, command replaced)', () => conCasa((casa, h, ruta) => {
+  const real = join(AQUI, 'fixtures', 'transcript-bang-real.jsonl');
+  assert.equal(bangsDe(readFileSync(real, 'utf8')).length, 3);
+  assert.ok(bangsDe(readFileSync(real, 'utf8')).every((b) => !Number.isNaN(Date.parse(b.ts))));
+  assert.equal(anotarBangs({ session_id: 'sesion-1234', transcript_path: real }, { casa: h, ahora: new Date('2026-10-14T14:00:00.000Z') }), 1, 'only the last one is within 6 h');
+  assert.equal(lineas(ruta)[0].origen, 'bang');
+}));
+
 test('a `!` of a subagent, an old `!` and an input without session do not log; a missing transcript throws', () => conCasa((casa, h, ruta) => {
   const transcript = join(casa, 'sesion.jsonl');
   writeFileSync(transcript, bang('viejo', { timestamp: '2026-10-15T01:00:00.000Z' }));
@@ -120,7 +146,7 @@ test('contarIntervenciones: counts per class and origin, every class listed (als
   assert.equal(c.porClase['aviso-de-permiso'], 2);
   assert.equal(c.porClase['sin-clasificar'], 1);
   assert.equal(c.porClase['desatasco'], 0);
-  assert.deepEqual(c.porOrigen, { bang: 1, permiso: 2 });
+  assert.deepEqual(c.porOrigen, { bang: 1, permiso: 2, 'bang-sin-hora': 0 });
   assert.deepEqual(c.corruptas, []);
 }));
 
