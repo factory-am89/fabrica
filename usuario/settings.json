@@ -1,0 +1,90 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "500000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git merge *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git worktree *)",
+      "Bash(git pull *)",
+      "Bash(git ls-files *)",
+      "Bash(git ls-remote *)",
+      "Bash(git grep *)",
+      "Bash(git cherry-pick *)",
+      "Bash(gh api *)",
+      "Bash(gh workflow *)",
+      "Bash(gh issue *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh label *)",
+      "Bash(node *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npx vitest *)",
+      "Bash(npx eslint *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(sed -n *)",
+      "Bash(wc *)",
+      "Bash(sleep *)",
+      "Bash(echo *)",
+      "Bash(pwd)",
+      "Bash(mkdir *)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(gh repo delete*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"{{home}}/.claude/hooks/limpiar-worktrees.mjs\" --hook",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"{{home}}/.claude/hooks/limpiar-worktrees.mjs\" --si --silencio",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": "{{enabledPlugins}}",
+  "promptCacheTtl": "1h",
+  "effortLevel": "high",
+  "modelSettings": {
+    "claude-sonnet-5-5": {
+      "effortLevel": "medium"
+    }
+  },
+  "tui": "fullscreen",
+  "agentPushNotifEnabled": true,
+  "autoMode": {
+    "soft_deny": "{{autoMode.soft_deny}}",
+    "environment": "{{autoMode.environment}}"
+  }
+}

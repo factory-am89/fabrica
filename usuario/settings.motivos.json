@@ -1,0 +1,22 @@
+{
+  "env": "motivo desconocido",
+  "env.CLAUDE_CODE_AUTO_COMPACT_WINDOW": "motivo desconocido",
+  "permissions": "motivo desconocido",
+  "permissions.allow": "motivo desconocido",
+  "permissions.deny": "motivo desconocido",
+  "permissions.defaultMode": "motivo desconocido",
+  "model": "motivo desconocido",
+  "hooks": "Lanzan la limpieza de worktrees fusionados (según ~/.claude/CLAUDE.md: tras cada gh pr merge y al empezar sesión).",
+  "hooks.PostToolUse": "Tras Bash o PowerShell lanza limpiar-worktrees --hook (el «tras cada gh pr merge» de ~/.claude/CLAUDE.md).",
+  "hooks.SessionStart": "Al empezar sesión lanza limpiar-worktrees --si --silencio (~/.claude/CLAUDE.md).",
+  "enabledPlugins": "motivo desconocido. Es un hueco: el valor real vive en el repo privado.",
+  "promptCacheTtl": "motivo desconocido",
+  "effortLevel": "motivo desconocido",
+  "modelSettings": "motivo desconocido",
+  "modelSettings.claude-sonnet-5-5": "motivo desconocido",
+  "tui": "motivo desconocido",
+  "agentPushNotifEnabled": "motivo desconocido",
+  "autoMode": "motivo desconocido",
+  "autoMode.soft_deny": "motivo desconocido. Es un hueco: el valor real vive en el repo privado.",
+  "autoMode.environment": "motivo desconocido. Es un hueco: el texto real vive en el repo privado; su redacción es decisión de Pablo (frontera del clasificador)."
+}
