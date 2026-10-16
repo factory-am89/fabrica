@@ -70,9 +70,12 @@ export function tocar(entrada, { dir = rutaDeSesiones(), reloj = Date.now, rama 
   if (!idValido(id)) throw new Error('hook input without a valid session_id');
   const opciones = { dir, reloj, ...(fs ? { fs } : {}) };
   const previa = leerFicha(id, opciones);
-  if (!previa && (typeof entrada.cwd !== 'string' || entrada.cwd === '')) throw new Error('hook input without cwd and no file for this session');
-  const carpeta = previa?.carpeta ?? entrada.cwd;
-  return apuntarSesion({ id, carpeta, rama: previa?.rama ?? rama(carpeta) }, opciones);
+  const hayCwd = typeof entrada.cwd === 'string' && entrada.cwd !== '';
+  if (!previa && !hayCwd) throw new Error('hook input without cwd and no file for this session');
+  // The folder and the branch come from the hook's cwd every time: a session that moves or switches branch is not left stale.
+  // Without cwd in the input the stored folder is used (never the current folder of this process).
+  const carpeta = hayCwd ? entrada.cwd : previa.carpeta;
+  return apuntarSesion({ id, carpeta, rama: rama(carpeta) }, opciones);
 }
 
 export function fin(entrada, opciones = {}) {

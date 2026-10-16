@@ -117,16 +117,19 @@ test('a file that cannot be read is named, never skipped: the listing says it an
   assert.match(r.stderr, /extra\.json, roto\.json/);
 }));
 
-test('hook tocar: updates `ultima` keeping folder and branch (git not asked again); creates the file when there is none; fin deletes it', () => conCasa((_c, dir) => {
-  sesion(dir, ID_A, 'feat/uno', () => T0, 'C:\\dev\\fabrica-uno');
-  const sinGit = () => { throw new Error('git must not be asked when the file exists'); };
-  const f = tocar({ session_id: ID_A, cwd: 'C:\\otra' }, { dir, reloj: () => T0 + H, rama: sinGit });
-  assert.deepEqual([f.carpeta, f.rama, f.ultima], ['C:\\dev\\fabrica-uno', 'feat/uno', new Date(T0 + H).toISOString()]);
-  const nueva = tocar({ session_id: ID_B, cwd: 'C:\\dev\\fabrica-dos' }, { dir, reloj: () => T0, rama: () => 'fix/dos' });
-  assert.deepEqual([nueva.carpeta, nueva.rama], ['C:\\dev\\fabrica-dos', 'fix/dos']);
+test('hook tocar: updates ultima and takes folder and branch from the hook cwd (a session that moves or switches branch is not left stale); creates the file when there is none; fin deletes it', () => conCasa((_c, dir) => {
+  sesion(dir, ID_A, 'feat/uno', () => T0, 'C:/dev/fabrica-uno');
+  const f = tocar({ session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'feat/otra' : 'mal') });
+  assert.deepEqual([f.carpeta, f.rama, f.ultima, f.inicio], ['C:/dev/fabrica-otra', 'feat/otra', new Date(T0 + H).toISOString(), new Date(T0).toISOString()]);
+  const mismaCarpeta = tocar({ session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + 2 * H, rama: () => 'fix/cambiada' });
+  assert.equal(mismaCarpeta.rama, 'fix/cambiada');
+  const sinCwd = tocar({ session_id: ID_A }, { dir, reloj: () => T0 + 3 * H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'fix/cambiada' : 'mal') });
+  assert.equal(sinCwd.carpeta, 'C:/dev/fabrica-otra');
+  const nueva = tocar({ session_id: ID_B, cwd: 'C:/dev/fabrica-dos' }, { dir, reloj: () => T0, rama: () => 'fix/dos' });
+  assert.deepEqual([nueva.carpeta, nueva.rama], ['C:/dev/fabrica-dos', 'fix/dos']);
   assert.throws(() => tocar({ cwd: 'x' }, { dir }), /valid session_id/);
   fin({ session_id: ID_A }, { dir });
-  assert.deepEqual(readdirSync(dir), [`${ID_B}.json`]);
+  assert.deepEqual(readdirSync(dir), [ID_B + '.json']);
 }));
 
 test('hook modes run for real: tocar and fin read the hook JSON on stdin', () => conCasa((casa, dir) => {
