@@ -6,8 +6,8 @@
 # cualquiera que sea ADMIN del repo, y la App revisora tiene que estar instalada en la cuenta DUENA.
 # -ContextoTests es el nombre del check de tests que se exige (por defecto 'tests'); un workflow
 # reutilizado puede publicarlo con otro nombre (p. ej. 'tests / tests'): se mira en un PR real antes.
-# Suelto hace login y, siempre (tambien si falla), logout de gh; con -SesionAbierta usa la sesion del
-# que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el
+# Suelto, si no hay sesion de gh abierta, hace login y la cierra al acabar (tambien si falla); una sesion
+# que ya existia no se cierra. Con -SesionAbierta usa la sesion del que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el
 # id de la App aunque aun no haya corrido (solo corre en PR). Se puede relanzar: si el ruleset existe, no lo toca. Textos sin tildes a proposito (Windows PowerShell 5.1
 # lee un .ps1 sin BOM como ANSI).
 param(
@@ -19,6 +19,7 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+$AbriSesion = $false   # $true si el login lo hace este script: solo esa sesion se cierra al final
 $Usuario = $null   # usuario de la sesion de gh: se lee tras el login; NO tiene por que ser el dueno del repo
 $IdGitHubActions = 15368   # integracion de GitHub Actions: origen del check `tests`
 
@@ -42,6 +43,7 @@ try {
   & gh.exe auth status --hostname github.com 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  Se abrira el navegador: copia el codigo que te da gh, pegalo y autoriza.'
+    $AbriSesion = $true
     Gh-Login
     if ($LASTEXITCODE -ne 0) { throw 'gh auth login no termino bien.' }
   }
@@ -105,6 +107,7 @@ catch {
 finally {
   Write-Host '=== Cierre ===' -ForegroundColor Cyan
   if ($SesionAbierta) { Write-Host '  La sesion de gh es de quien me llamo: no la cierro aqui.' }
+  elseif (-not $AbriSesion) { Write-Host '  La sesion de gh ya existia antes de este script: no la cierro.' }
   else {
     # Se cierra la sesion que abrio este script (la del usuario leido tras el login), no la del dueno del repo.
     if ($Usuario) { & gh.exe auth logout --hostname github.com --user $Usuario 2>&1 | Out-Null }
