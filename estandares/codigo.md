@@ -28,7 +28,7 @@ C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y
 ## Preguntas
 
 ### C1 — ¿El lint pasa sin avisos?
-Quién: máquina (`npm run lint`).
+Quién: máquina (`npm run lint`; en un repo que llama a `tests.yml`, el mismo `eslint.config.js` de la Fábrica, bajado a `.fabrica/`).
 Bien: `eslint . --max-warnings 0` sale con 0.
 Mal: un `// eslint-disable` sin motivo para que pase.
 
@@ -43,9 +43,11 @@ Bien: una función por idea, de 20 líneas.
 Mal: una función de 300 líneas que lee, valida y escribe.
 
 ### C4 — ¿Cada acción de un workflow va fijada por SHA, y cada workflow declara sus permisos?
-Quién: máquina (`test/fabrica.test.js`).
+Quién: máquina (`test/workflows.test.js`, que `tests.yml` lanza también sobre el repo que lo llama).
 Bien: `uses: actions/checkout@<40 hex> # v7.0.1` y `permissions: contents: read`.
 Mal: `uses: actions/checkout@v7` (una etiqueta se puede mover) o un workflow sin `permissions`.
+Excepción, una sola y comprobada por máquina (`accionFijada` en `scripts/lib/acciones.mjs`, probada en `test/fabrica.test.js`): `uses: factory-am89/fabrica/.github/workflows/<fichero>.yml@main`, el juez reutilizable de la Fábrica, que los repos de la organización llaman siempre en su versión actual. Ningún otro repo, ruta ni referencia sin SHA.
+Aplica también al repo que llama: sus workflows pasan por la misma comprobación, sin «no aplica».
 
 ### C5 — ¿Todo fallo se ve, se lanza o se registra, y nada lo sustituye por un valor por defecto?
 Quién: revisor (el lint solo ve el `catch` vacío).

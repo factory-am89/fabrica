@@ -96,7 +96,31 @@ try {
   Prueba 'Buscar-App-Instalada dice ninguna si la App no esta en la lista' ((Buscar-App-Instalada 'no-esta').Estado -eq 'ninguna')
   function gh.exe { cmd /c "echo HTTP 403 1>&2 & exit 1" }
   Prueba 'Buscar-App-Instalada dice dudosa si gh falla' ((Buscar-App-Instalada 'fabrica-revisor').Estado -eq 'dudosa')
+  # Una App instalada en dos cuentas: con $Cuenta solo cuenta la instalacion de esa cuenta.
+  function gh.exe { $global:LASTEXITCODE = 0; '{"installations":[{"id":1,"app_id":111,"app_slug":"fabrica-revisor","account":{"login":"pabloam89"}},{"id":2,"app_id":222,"app_slug":"fabrica-revisor","account":{"login":"factory-am89"}}]}' }
+  $o = Buscar-App-Instalada 'fabrica-revisor' 'factory-am89'
+  Prueba 'Buscar-App-Instalada con cuenta coge la instalacion de esa cuenta' ($o.Estado -eq 'ok' -and $o.Id -eq 222 -and $o.Cuenta -eq 'factory-am89')
+  Prueba 'Buscar-App-Instalada con cuenta no mira mayusculas' ((Buscar-App-Instalada 'fabrica-revisor' 'FACTORY-AM89').Id -eq 222)
+  Prueba 'Buscar-App-Instalada dice ninguna si la App esta en otra cuenta' ((Buscar-App-Instalada 'fabrica-revisor' 'otra-org').Estado -eq 'ninguna')
   Remove-Item Function:\gh.exe
+  # Repo: el dueno sale del texto, no de la sesion de gh.
+  $r = Partir-Repo 'factory-am89/homenu-panel'
+  Prueba 'Partir-Repo separa dueno y nombre' ($r.Dueno -eq 'factory-am89' -and $r.Nombre -eq 'homenu-panel')
+  foreach ($malo in @('sinbarra', '', 'a/b/c', '/x', 'x/', 'a b/c')) {
+    Prueba "Partir-Repo para con '$malo'" (-not (Pasa { [void](Partir-Repo $malo) }))
+  }
+  # Cuerpo del ruleset: el contexto de tests es parametro; revisor, sin bypass y sin update.
+  $c = Cuerpo-Ruleset 'main' 'tests' 15368 777
+  $ch = @(($c.rules | Where-Object { $_.type -eq 'required_status_checks' }).parameters.required_status_checks)
+  Prueba 'Cuerpo-Ruleset exige tests (Actions) y revisor (su App), en ese orden' ($ch.Count -eq 2 -and $ch[0].context -eq 'tests' -and $ch[0].integration_id -eq 15368 -and $ch[1].context -eq 'revisor' -and $ch[1].integration_id -eq 777)
+  $c2 = Cuerpo-Ruleset 'main' 'tests / tests' 15368 777
+  $ch2 = @(($c2.rules | Where-Object { $_.type -eq 'required_status_checks' }).parameters.required_status_checks)
+  Prueba 'Cuerpo-Ruleset usa el contexto de tests que se le da' ($ch2[0].context -eq 'tests / tests' -and $ch2[1].context -eq 'revisor')
+  $tipos = @($c.rules | ForEach-Object { $_.type })
+  Prueba 'Cuerpo-Ruleset: PR, checks, sin force push, sin borrado y sin update' (($tipos -join ',') -eq 'pull_request,required_status_checks,non_fast_forward,deletion')
+  Prueba 'Cuerpo-Ruleset: sin bypass y solo la rama por defecto' ($c.bypass_actors.Count -eq 0 -and $c.conditions.ref_name.include[0] -eq '~DEFAULT_BRANCH' -and $c.enforcement -eq 'active')
+  Prueba 'Cuerpo-Ruleset para sin contexto de tests' (-not (Pasa { [void](Cuerpo-Ruleset 'main' '' 15368 777) }))
+  Prueba 'Cuerpo-Ruleset se convierte a JSON con el contexto' ((($c2 | ConvertTo-Json -Depth 10) -match '"context":\s+"tests / tests"'))
 } finally {
   Remove-Item -Recurse -Force $t -ErrorAction SilentlyContinue
 }

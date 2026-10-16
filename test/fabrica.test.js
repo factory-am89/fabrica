@@ -8,6 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
+import { accionFijada } from '../scripts/lib/acciones.mjs';
+import { REPO } from '../scripts/lib/repo.mjs';
 
 const leer = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8');
 const preguntas = leerPreguntas(leer('estandares/codigo.md'));
@@ -42,24 +44,52 @@ test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bi
   }
 });
 
-const workflows = readdirSync(new URL('../.github/workflows/', import.meta.url));
-
-test('los workflows declaran permisos y fijan cada acción por SHA (C4)', () => {
-  assert.ok(workflows.length > 0);
-  for (const f of workflows) {
-    const texto = leer(`.github/workflows/${f}`);
-    assert.match(texto, /^permissions:/m, `${f} sin permissions`);
-    assert.doesNotMatch(texto, /permissions:\s*write-all/, `${f} con write-all`);
-    for (const [, accion] of texto.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)) {
-      assert.match(accion, /@[0-9a-f]{40}$/, `${f}: ${accion} sin SHA`);
-    }
+// Los workflows se comprueban (permisos y SHA, C4) en test/workflows.test.js, que también sirve
+// para el repo que llama a tests.yml; aquí solo la regla de la excepción.
+test('C4: la única excepción al SHA es un workflow de la Fábrica con @main, y nada más', () => {
+  const sha = 'a'.repeat(40);
+  for (const bien of [`actions/checkout@${sha}`, `${REPO}/.github/workflows/tests.yml@main`, `${REPO}/.github/workflows/revisor.yml@main`]) {
+    assert.equal(accionFijada(bien), true, bien);
   }
+  for (const mal of [
+    'actions/checkout@v7', 'actions/checkout@main', // una acción de otro repo, sin SHA
+    'otro/fabrica/.github/workflows/tests.yml@main', // otro repo
+    `${REPO}x/.github/workflows/tests.yml@main`, // repo con el mismo prefijo
+    `${REPO}/.github/workflows/tests.yml@v1`, // otra referencia
+    `${REPO}/.github/workflows/tests.yml@master`,
+    `${REPO}/.github/actions/x@main`, // otra ruta
+    `${REPO}/scripts/x.yml@main`,
+    `${REPO}/.github/workflows/../../x.yml@main`, // salida de la carpeta
+    `${REPO}/.github/workflows/sub/x.yml@main`,
+    './.github/workflows/tests.yml', // local, sin referencia
+  ]) {
+    assert.equal(accionFijada(mal), false, mal);
+  }
+});
+
+test('el estándar escribe la excepción de C4 con el repo de scripts/lib/repo.mjs', () => {
+  assert.ok(leer('estandares/codigo.md').includes(`${REPO}/.github/workflows/<fichero>.yml@main`), 'la excepción del estándar no coincide con REPO');
+});
+
+test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio commit', () => {
+  const texto = leer('.github/workflows/revisor.yml');
+  assert.match(texto, /^ {2}workflow_call:/m, 'sin workflow_call no se puede llamar desde otro repo');
+  const checkout = texto.split(/^ {6}- /m).find((b) => b.includes('path: .fabrica'));
+  assert.ok(checkout, 'falta el checkout de la Fábrica en .fabrica/');
+  assert.ok(checkout.includes(`repository: ${REPO}`), 'el checkout de .fabrica no fija repository: la Fábrica');
+  assert.match(checkout, /ref: \$\{\{ job\.workflow_sha \}\}/, 'la Fábrica debe bajarse en el commit del workflow llamado');
+  assert.match(texto, /node \.fabrica\/scripts\/veredicto\.mjs/);
+  assert.match(texto, /\.fabrica\/\.claude\/agents\/revisor\.md/);
+  assert.match(texto, /\.fabrica\/estandares\/codigo\.md/);
+  assert.doesNotMatch(texto, /node scripts\/veredicto/, 'la ruta sin .fabrica/ bajaría el repo que llama');
 });
 
 test('revisor.yml usa pull_request_target, no baja el código del PR y guarda los secretos en el environment revisor', () => {
   const texto = leer('.github/workflows/revisor.yml');
   assert.match(texto, /^on:\s*\n(\s*#.*\n)*\s+pull_request_target:/m);
-  assert.doesNotMatch(texto, /^\s*ref:/m, 'un checkout con ref: traería el código del PR');
+  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha); ninguno trae el código del PR.
+  const refs = [...texto.matchAll(/^\s*ref:\s*(.*)$/gm)].map((m) => m[1].trim());
+  assert.deepEqual(refs, ['${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR');
   assert.match(texto, /^ {4}environment: revisor$/m, 'sin environment revisor los secretos serían del repo');
 });
 
@@ -107,11 +137,29 @@ test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subi
   assert.match(leer('apps/lib-gh.ps1'), /auth login/);
   const ruleset = leer('apps/ruleset.ps1');
   assert.doesNotMatch(ruleset, /check-runs/, 'el check revisor no debe haber corrido antes: solo corre en PR');
-  assert.match(ruleset, /context = 'revisor'; integration_id = \$idRevisor/);
-  assert.match(ruleset, /type = 'non_fast_forward'/);
-  assert.match(ruleset, /type = 'deletion'/);
-  assert.doesNotMatch(ruleset, /type = 'update'/);
-  assert.match(ruleset, /bypass_actors = @\(\)/);
+  // El cuerpo del ruleset vive en Cuerpo-Ruleset (apps/lib-gh.ps1). Su comportamiento lo prueba
+  // test/lib-gh.prueba.ps1 (solo Windows); estas aserciones sobre el texto corren tambien en el CI de Linux.
+  assert.match(ruleset, /Cuerpo-Ruleset \$NombreRuleset \$ContextoTests \$IdGitHubActions \$idRevisor/);
+  assert.doesNotMatch(ruleset, /type = '/, 'el cuerpo del ruleset no se repite en ruleset.ps1');
+  const lib = leer('apps/lib-gh.ps1');
+  assert.match(lib, /context = 'revisor'; integration_id = \$IdRevisor/);
+  assert.match(lib, /context = \$ContextoTests; integration_id = \$IdActions/);
+  assert.match(lib, /type = 'non_fast_forward'/);
+  assert.match(lib, /type = 'deletion'/);
+  assert.doesNotMatch(lib, /type = 'update'/);
+  assert.match(lib, /bypass_actors = @\(\)/);
+});
+
+test('ruleset.ps1 sirve a repos de organizacion: -Repo obligatorio, sin repo ni usuario escritos, sesion admin', () => {
+  const ruleset = leer('apps/ruleset.ps1');
+  assert.match(ruleset, /\[Parameter\(Mandatory = \$true\)\]\[string\]\$Repo,/);
+  assert.match(ruleset, /\[string\]\$ContextoTests = 'tests'/);
+  assert.doesNotMatch(ruleset, /pabloam89\/fabrica/, 'repo obsoleto');
+  assert.doesNotMatch(ruleset, /\$Repo = '/, '-Repo no tiene valor por defecto');
+  assert.doesNotMatch(ruleset, /-ne \$Dueno|-ne '\$Dueno'/, 'la sesion no tiene que ser del dueno del repo');
+  assert.match(ruleset, /permissions\.admin/, 'la sesion debe ser admin del repo');
+  assert.match(ruleset, /elseif \(-not \$AbriSesion\)/, 'una sesion de gh que ya existia no se cierra al acabar');
+  assert.match(ruleset, /Buscar-App-Instalada \$AppRevisor \$Dueno/, 'la App debe estar instalada en la cuenta duena');
 });
 
 function manifests() {

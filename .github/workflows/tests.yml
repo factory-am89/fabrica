@@ -1,9 +1,27 @@
 name: tests
 
+# Corre en la propia Fábrica (pull_request y push a main) y, como workflow reutilizable
+# (workflow_call), sobre el repo que lo llama:
+#   jobs:
+#     tests:
+#       uses: factory-am89/fabrica/.github/workflows/tests.yml@main
+# desde un workflow suyo con `on: pull_request` (y `permissions: contents: read`). Sin secretos.
+#
+# Qué exige al repo que llama (si falta algo, el job FALLA; no se salta nada en silencio):
+#   - package-lock.json (lo exigen `npm ci` y `cache: npm`) y un script `test` en package.json.
+#   - Nada de lint: se aplica la configuración de la Fábrica (eslint.config.js) con el ESLint de
+#     la Fábrica; el repo que llama no necesita ESLint, ni su script lint, ni su configuración.
+#   - Sus workflows pasan las reglas de máquina de la Fábrica (YAML válido, permissions, acciones
+#     por SHA salvo la excepción de C4): test/workflows.test.js apuntando a su carpeta.
+# En un workflow reutilizable `github.repository` es el del repo que llama, y el checkout sin
+# parámetros baja ese repo: es el que se comprueba. La Fábrica se baja aparte a `.fabrica/`
+# (siempre, también en la propia Fábrica: un solo camino) en el commit de este workflow
+# (job.workflow_sha) y DESPUÉS de correr los tests del repo, para que su `npm test` no la vea.
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -21,5 +39,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run lint
       - run: npm test
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: factory-am89/fabrica
+          ref: ${{ job.workflow_sha }}
+          path: .fabrica
+          persist-credentials: false
+      - name: Instalar las herramientas de la Fábrica
+        run: npm ci --prefix .fabrica
+      - name: Lint con la configuración de la Fábrica
+        run: .fabrica/node_modules/.bin/eslint --config .fabrica/eslint.config.js . --max-warnings 0
+      - name: Reglas de máquina sobre los workflows del repo
+        run: node --test .fabrica/test/workflows.test.js
+        env:
+          FABRICA_REPO_A_COMPROBAR: ${{ github.workspace }}
