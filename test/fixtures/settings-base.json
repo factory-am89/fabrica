@@ -1,0 +1,60 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "500000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(npm run *)",
+      "Bash(ls *)",
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(gh repo delete*)"
+    ],
+    "ask": [
+      "Bash(git push *)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node ruta-de-prueba/hook.mjs --hook", "timeout": 300 }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ruta-de-prueba/hook.mjs --si", "timeout": 300 }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "plugin-de-prueba@mercado": true
+  },
+  "promptCacheTtl": "1h",
+  "effortLevel": "high",
+  "modelSettings": {
+    "modelo-de-prueba": {
+      "effortLevel": "medium"
+    }
+  },
+  "tui": "fullscreen",
+  "agentPushNotifEnabled": true,
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Bash(taskkill:*)"
+    ],
+    "environment": [
+      "Frontera de prueba uno",
+      "Frontera de prueba dos"
+    ]
+  }
+}
