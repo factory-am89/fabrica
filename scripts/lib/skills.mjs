@@ -98,6 +98,7 @@ export function skillsViejas(raiz, hoy) {
     const f = leerFrontmatter(readFileSync(path.join(carpeta, 'SKILL.md'), 'utf8'));
     if (!f || !fechaValida(f.comprobado)) throw new Error(`${nombre}: sin fecha «comprobado» legible`);
     const dias = diasDesde(f.comprobado, hoy);
+    if (dias < 0) throw new Error(`${nombre}: comprobado ${f.comprobado} está en el futuro (hoy es ${hoy})`);
     if (dias > REVISAR_DIAS) viejas.push({ nombre, comprobado: f.comprobado, dias });
   }
   return viejas;

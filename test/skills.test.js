@@ -124,3 +124,7 @@ test('una referencia que SKILL.md no cita es huérfana, y una carpeta ajena sobr
   assert.match(skill(BIEN, { 'referencias/huerfana.md': 'x' }).join('\n'), /huérfana/);
   assert.match(skill(BIEN, { 'casos.json': '[]' }).join('\n'), /sobra «casos.json»/);
 });
+
+test('skillsViejas lanza si una skill tiene comprobado en el futuro', () => {
+  assert.throws(() => skillsViejas(raizConSkills(['2027-03-01']), '2027-02-01'), /en el futuro/);
+});
