@@ -23,9 +23,10 @@ comprobado: 2026-10-15
   ejecuta código del PR** (ese lo ejecuta `tests.yml`, sin secretos). Sus secretos viven en el environment
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
 - **Pausar el ruleset está prohibido desde el 16 oct 2026** (decisión de Pablo): sin «ventanas», tampoco para el
-  juez. Los cambios a la puerta (`GATE_FILES`, `scripts/lib/gate.mjs`) van por su Approve. `npm run ventana` queda
-  solo para emergencias (hoy no está en `main`); la entrada del 2026-10-16 de abajo es historia, no receta.
-- **Ningún cambio salvo los de la puerta pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
+  juez. Si el revisor rechaza por error un cambio a la puerta (`GATE_FILES`) no hay salida automática: se para y se
+  apunta para Pablo (issue o `intervenciones.md`); su mecanismo de anulación está por diseñar. `npm run ventana`
+  (PR #53, aún no en `main`) es solo para emergencias; la entrada del 2026-10-16 de abajo es historia, no receta.
+- **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
   la pregunta C13 está en `standards/code.md` (única fuente).
 
 ## Identidad del constructor
