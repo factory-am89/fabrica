@@ -2,14 +2,17 @@
 //   node scripts/token.mjs -- gh pr create --fill
 // Saca la clave privada de 1Password (bóveda Fabrica) en memoria, firma un JWT, canjea un
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
-// clave no se imprimen, no van por argumentos y no se guardan en disco: cada uso, un token.
+// clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
+// scripts/lib/cache-token.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de la App, no es secreto; lo imprime
 // convertir.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import * as fsReal from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, protegerFichero, rutaDeCache } from './lib/cache-token.mjs';
 import { REPO } from './lib/repo.mjs';
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
@@ -28,8 +31,8 @@ export function orden(argv) {
   return cmd;
 }
 
-async function api(jwtApp, metodo, ruta) {
-  const res = await fetch(`https://api.github.com${ruta}`, {
+async function api(jwtApp, metodo, ruta, fetchFn = fetch) {
+  const res = await fetchFn(`https://api.github.com${ruta}`, {
     method: metodo,
     headers: { authorization: `Bearer ${jwtApp}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
   });
@@ -100,6 +103,7 @@ export function entornoHijo(cmd, token, env = process.env) {
   return hijo;
 }
 
+// Reads the .pem from 1Password (unchanged).
 function clavePrivada() {
   const args = ['document', 'get', 'fabrica-constructor.pem', '--vault', process.env.OP_VAULT ?? 'Fabrica'];
   const token = tokenServicio();
@@ -110,14 +114,62 @@ function clavePrivada() {
   return r.stdout;
 }
 
+// Signs the JWT and exchanges it for an installation token. Returns { token, expiraEn }.
+async function canjear({ clientId, repo, pem, fetchFn, ahora }) {
+  const firmado = jwt(clientId, pem, ahora);
+  const { id } = await api(firmado, 'GET', `/repos/${repo}/installation`, fetchFn);
+  const { token, expires_at: expiraEn } = await api(firmado, 'POST', `/app/installations/${id}/access_tokens`, fetchFn);
+  return { token, expiraEn };
+}
+
+// One stderr line with the closed reason (never a value) whenever the cache is not used or not saved.
+export function avisoCache(motivo) {
+  if (!MOTIVOS_CACHE.includes(motivo)) throw new Error(`cache reason outside the vocabulary: ${motivo}`);
+  console.error(`cache: ${motivo}`);
+}
+
+// The token for one call: the saved one while it has more than MARGEN_MS left, else one exchange under
+// a lock (the .pem is read only there). A cache problem never breaks the call (it exchanges as before)
+// but it is always reported through `avisar`. `cache` injects ruta, fs, proteger, permisosBien, dormir and avisar.
+export async function obtenerToken({ env = process.env, leer = () => clavePrivada(), fetchFn = fetch, reloj = Date.now, cache = {} } = {}) {
+  const clientId = env.FABRICA_CONSTRUCTOR_CLIENT_ID;
+  if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
+  const repo = env.FABRICA_REPO ?? REPO;
+  const avisar = cache.avisar ?? avisoCache;
+  const canje = () => canjear({ clientId, repo, pem: leer(env), fetchFn, ahora: Math.floor(reloj() / 1000) });
+  // The cache is per client id and cannot tell owners apart without the key: another owner's repo exchanges as before
+  const mismoDueno = repo.split('/')[0].toLowerCase() === REPO.split('/')[0].toLowerCase();
+  const ruta = !mismoDueno ? null : cache.ruta !== undefined ? cache.ruta : rutaDeCache(env);
+  if (!ruta) {
+    avisar(mismoDueno ? MOTIVO['sin-ruta'] : MOTIVO['otro-dueno']);
+    return { token: (await canje()).token };
+  }
+  const fs = cache.fs ?? fsReal;
+  const permisosBien = cache.permisosBien ?? permisosDelUsuario;
+  const leerGuardado = () => leerCache({ ruta, ids: { appId: clientId }, reloj, fs, permisosBien });
+  const guardado = leerGuardado();
+  if (guardado.motivo === MOTIVO.ok && guardado.restanteMs > MARGEN_MS) return { token: guardado.entrada.token };
+  // `ok` with little time left is the normal hourly refresh and `ausente` the first run; everything else is reported
+  if (guardado.motivo !== MOTIVO.ok && guardado.motivo !== MOTIVO.ausente) avisar(guardado.motivo);
+  return conBloqueo({
+    ruta, fs, reloj, esperaMs: cache.esperaBloqueoMs, sondeoMs: cache.sondeoMs, dormir: cache.dormir,
+    fn: async ({ bloqueado, razon }) => {
+      // Another session may have exchanged while this one waited for the lock
+      const previa = leerGuardado();
+      if (previa.motivo === MOTIVO.ok && previa.restanteMs > MARGEN_MS) return { token: previa.entrada.token };
+      if (!bloqueado && razon === 'ocupado') throw new Error('bloqueo-ocupado: another session is getting the token and did not finish in time.');
+      if (!bloqueado) avisar(MOTIVO.disco); // the lock could not even be created
+      const t = await canje();
+      const guardada = escribirCache({ ruta, fs, proteger: cache.proteger ?? protegerFichero, datos: { token: t.token, expiraEn: t.expiraEn, appId: clientId } });
+      if (guardada !== MOTIVO.ok) avisar(guardada);
+      return { token: t.token };
+    },
+  });
+}
+
 async function main() {
   const cmd = orden(process.argv.slice(2));
-  const clientId = process.env.FABRICA_CONSTRUCTOR_CLIENT_ID;
-  if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
-  const repo = process.env.FABRICA_REPO ?? REPO;
-  const firmado = jwt(clientId, clavePrivada());
-  const { id } = await api(firmado, 'GET', `/repos/${repo}/installation`);
-  const { token } = await api(firmado, 'POST', `/app/installations/${id}/access_tokens`);
+  const { token } = await obtenerToken();
   const r = spawnSync(cmd[0], cmd.slice(1), { stdio: 'inherit', env: entornoHijo(cmd, token) });
   if (r.error) throw new Error(`No pude lanzar «${cmd[0]}»: ${r.error.message}`);
   process.exit(r.status ?? 1);
