@@ -1,0 +1,23 @@
+{
+  "EXIT": {
+    "OK": 0,
+    "UNEXPECTED": 1,
+    "USAGE": 2,
+    "INVALID_BRANCH": 10,
+    "FOLDER_EXISTS": 11,
+    "GIT_FAILED": 12,
+    "INSTALL_FAILED": 13,
+    "NOT_FOUND": 20,
+    "DETACHED_HEAD": 21,
+    "INSIDE_FOLDER": 22,
+    "UNSAVED_CHANGES": 23,
+    "NOT_MERGED": 24,
+    "GH_FAILED": 25,
+    "DONE_LINT_FAILED": 30,
+    "DONE_TESTS_FAILED": 31
+  },
+  "RETIRE_RESULT": {
+    "REMOVED": "removed",
+    "REFUSED": "refused"
+  }
+}
