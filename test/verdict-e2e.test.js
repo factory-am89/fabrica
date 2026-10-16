@@ -79,7 +79,7 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   const raiz = mkdtempSync(path.join(tmpdir(), 'juez-p-'));
   mkdirSync(path.join(raiz, 'scripts', 'lib'), { recursive: true });
   mkdirSync(path.join(raiz, 'standards'));
-  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
+  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
   writeFileSync(path.join(raiz, 'standards', 'p.md'), '### P1 — First question\nQuién: revisor\n\n### P2 — Second question\nQuién: revisor\n');
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });

@@ -1,0 +1,55 @@
+name: anulacion
+
+# La anulación por Pablo: la única salida cuando el revisor rechaza por error (pausar el ruleset está prohibido).
+# Pablo pulsa «Approve» en la pestaña Files changed del PR; este workflow lo comprueba y, si es suya y de la
+# cabeza actual, publica el check `revisor` en verde con el título «override by Pablo» (scripts/veredicto.mjs,
+# MODO=anulacion; la regla está allí, en aprobacionDePablo).
+#
+# Por qué workflow_run y no pull_request_review: pull_request_review ejecuta el workflow tal como lo trae el PR y su
+# rama no puede usar el environment `revisor` (limitado a main). workflow_run corre siempre la versión de main, con
+# el código de main, y despierta tras senal-review.yml, que no tiene secretos. Aquí NUNCA se baja el código del PR:
+# el checkout no lleva `ref:` (baja main) y el PR solo se lee por API.
+on:
+  workflow_run:
+    workflows: [senal-review]
+    types: [completed]
+
+# No cancela una anulación en curso (otra review llegada a la vez); sí espera a la anterior del mismo PR.
+concurrency:
+  group: anulacion-${{ github.event.workflow_run.pull_requests[0].number }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  anular:
+    # Solo PR de ramas del propio repo con la review ya enviada: un fork no recibe nuestros secretos.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'pull_request_review'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.pull_requests[0].number != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: revisor
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.REVISOR_CLIENT_ID }}
+          private-key: ${{ secrets.REVISOR_APP_KEY }}
+          permission-pull-requests: read
+          permission-checks: write
+
+      - run: node scripts/veredicto.mjs
+        env:
+          MODO: anulacion
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          TOKEN: ${{ steps.app.outputs.token }}

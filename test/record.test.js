@@ -96,7 +96,7 @@ test('CLI: good file prints the figures and exits 0', () => {
   const r = cli('--file', path.join(import.meta.dirname, 'fixtures', 'records', 'ok.json'), '--json');
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(r.stdout);
-  assert.deepEqual(Object.keys(j).sort(), ['porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
+  assert.deepEqual(Object.keys(j).sort(), ['overrides', 'porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
   assert.equal(j.records, 4);
   assert.equal(j.rondasMedias, 4 / 3);
   assert.equal(j.porPregunta.C5.no, 1);

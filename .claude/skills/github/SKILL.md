@@ -22,8 +22,12 @@ comprobado: 2026-10-15
 - **`revisor.yml` usa `pull_request_target`**: corre la versión de `main`, tiene secretos y **nunca
   ejecuta código del PR** (ese lo ejecuta `tests.yml`, sin secretos). Sus secretos viven en el environment
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
-- **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
-  la pregunta C13 está en `standards/code.md` (única fuente).
+- **Decide el check `revisor`; solo una aprobación de Pablo lo anula.** Pausar el ruleset de `main` está
+  PROHIBIDO (Pablo, 16 oct 2026). Si el revisor rechaza por error, Pablo pulsa **Approve** en Files changed, nada
+  más. `anulacion.yml` (desde `main`; `senal-review.yml` solo lo despierta) comprueba por API autor `OWNER_LOGIN`
+  (`scripts/lib/repo.mjs`) y `commit_id` = cabeza actual; publica `revisor` en verde, «override by Pablo», con los
+  hallazgos anulados. Un push nuevo la invalida. `node scripts/records.mjs` cuenta `overrides`. `npm run ventana`
+  solo en emergencia. Rutas que vigila C13: `standards/code.md`.
 
 ## Identidad del constructor
 
@@ -65,19 +69,15 @@ nothing else). A bare `gh` is not counted.
   it runs, per session). To read one issue or PR: `gh api repos/<repo>/issues/<n> --jq .body`.
   `test/gh-quota.test.js` fails on `--watch` with gh or on
   `gh issue list` / `gh pr list` inside a loop in code, skills and agents (the sections that explain it are exempt).
-- **No snapshot yet.** The issue list here is short: measure before building a published copy of it.
 - The 1Password side of the same quota incident of 2026-10-16: skill `1password`, "Lo que falló".
 
 ## Lo que falló
 
 - **2026-10-16 · PR #20 entered `main` without the `revisor` check.** Cause: the ruleset was lifted for a moment to merge
   #19 (an owner action Pablo approved), and GitHub merged at once every other PR with auto-merge armed (#20 at 10:57:32
-  UTC, before its `tests` and `revisor` finished; `revisor` then said «no»). It happened again with #52: a PR can be born
-  armed inside the window. Fix: `npm run ventana -- abrir` right before Pablo pauses the ruleset (saves the armed PRs,
-  disarms all, fails if any stays armed; repeat it just before the pause) and `npm run ventana -- cerrar` after it is
-  back (re-arms only if the ruleset is `active`, never a PR with `revisor` red, and names any armed PR born inside the
-  window). It never touches the ruleset: that is Pablo's action (`scripts/lib/ventana.mjs`, `test/ventana.test.js`).
-  The findings of #20 went to PR #23.
+  UTC, before `revisor` finished; it then said «no»); again with #52, born armed inside the window. Fix: `npm run ventana -- abrir` before a pause (saves the armed PRs, disarms all, fails if
+  any stays armed) and `-- cerrar` after it (re-arms only if the ruleset is `active`, never a PR with `revisor` red;
+  `scripts/lib/ventana.mjs`). Pausing is now prohibited (above); the findings of #20 went to PR #23.
 - **2026-10-10 · from MenuPlan, unverified here: the GraphQL quota hit 0 twice while `gh api rate_limit` showed spare.** Cause: all
   sessions spent the same token (each startup read all issues, ~320 points; `gh pr checks --watch` kept querying) and
   `rate_limit` shows only REST. Fix there: caches, waiting for CI over REST, one accounting line per call, ceilings in a

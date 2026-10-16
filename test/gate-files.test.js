@@ -8,7 +8,7 @@ import yaml from 'js-yaml';
 import { GATE_FILES, ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const WORKFLOWS = ['.github/workflows/revisor.yml', '.github/workflows/tests.yml'];
+const WORKFLOWS = ['.github/workflows/revisor.yml', '.github/workflows/tests.yml', '.github/workflows/anulacion.yml', '.github/workflows/senal-review.yml'];
 
 function strings(node, out = []) {
   if (typeof node === 'string') out.push(node);

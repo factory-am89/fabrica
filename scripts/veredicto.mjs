@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
-import { ANSWER, ANSWERS, ERROR, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { OWNER_LOGIN } from './lib/repo.mjs';
+import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
 // (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
@@ -115,29 +116,77 @@ async function api(token, metodo, ruta, cuerpo) {
   return res.json();
 }
 
+// La anulación por Pablo: la única salida cuando el revisor rechaza por error. Una review cuenta si y solo si
+// (1) su autor es OWNER_LOGIN, (2) su última review decisiva (APPROVED, CHANGES_REQUESTED o DISMISSED; las COMMENTED
+// no cuentan) es APPROVED y (3) su commit_id es exactamente la cabeza actual del PR. Un push posterior cambia la cabeza
+// y la anulación deja de valer. `reviews` viene en orden cronológico, como la API. Devuelve la review o null.
+const DECISIVAS = ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'];
+export function aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN) {
+  if (!/^[0-9a-f]{40}$/.test(String(cabeza))) return null;
+  const suyas = (Array.isArray(reviews) ? reviews : []).filter(
+    (r) => typeof r?.user?.login === 'string' && r.user.login.toLowerCase() === dueno.toLowerCase() && DECISIVAS.includes(r.state)
+  );
+  const ultima = suyas.at(-1);
+  return ultima?.state === 'APPROVED' && ultima.commit_id === cabeza ? ultima : null;
+}
+
+// Resumen del check de anulación: quién, sobre qué cabeza y qué hallazgos del revisor se anulan.
+export function resumenAnulacion(review, cabeza, hallazgos) {
+  const lista = hallazgos.length ? hallazgos.map((f) => `- ${f}`).join('\n') : '- (ninguno recogido)';
+  return `Anulado por la aprobación de ${review.user.login} (review ${review.id}) sobre ${cabeza}.\nHallazgos que se anulan:\n${lista}`;
+}
+
+async function reviewsDe({ repo, pr, token }) {
+  const todas = [];
+  for (let pagina = 1; ; pagina += 1) {
+    const lote = await api(token, 'GET', `/repos/${repo}/pulls/${pr}/reviews?per_page=100&page=${pagina}`);
+    todas.push(...lote);
+    if (lote.length < 100) return todas;
+  }
+}
+
 async function leerContexto({ repo, pr, sha, token }) {
   const datosPr = await api(token, 'GET', `/repos/${repo}/pulls/${pr}`);
-  return { sha, cabeza: datosPr.head.sha };
+  return { sha, cabeza: datosPr.head.sha, reviews: await reviewsDe({ repo, pr, token }) };
 }
+
+const publicarCheck = (repo, sha, token, conclusion, output) =>
+  api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, status: 'completed', conclusion, output });
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
 async function publicar({ repo, pr, sha, token, veredicto, ctx, registro }) {
   const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
-  await api(token, 'POST', `/repos/${repo}/check-runs`, {
-    name: 'revisor',
-    head_sha: sha,
-    status: 'completed',
-    conclusion: veredicto.ok ? 'success' : 'failure',
-    output: { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) },
-  });
+  await publicarCheck(repo, sha, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
+  // Si Pablo aprobó esta cabeza, el «no» (ya publicado, con su registro) queda anulado por un segundo check, el último.
+  const aprobacion = !veredicto.ok && ctx.sha === ctx.cabeza ? aprobacionDePablo(ctx.reviews, ctx.cabeza) : null;
+  if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
   // La aprobación de la App solo si el PR sigue en el SHA juzgado.
   if (veredicto.ok && ctx.sha === ctx.cabeza) {
     await api(token, 'POST', `/repos/${repo}/pulls/${pr}/reviews`, { commit_id: sha, event: 'APPROVE', body: 'Veredicto: sí.' });
   }
 }
 
+// MODO=anulacion (lo lanza anulacion.yml tras una review): sin modelo. Solo si Pablo aprobó la cabeza actual y el
+// último check `revisor` de esa cabeza, publicado por la App, no está en verde, publica el check de anulación.
+async function anular({ REPO, PR, TOKEN }) {
+  const ctx = await leerContexto({ repo: REPO, pr: PR, sha: null, token: TOKEN });
+  const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
+  if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
+  const { check_runs: checks } = await api(TOKEN, 'GET', `/repos/${REPO}/commits/${ctx.cabeza}/check-runs?check_name=revisor`);
+  const ultimo = checks.filter((c) => c.status === 'completed' && c.app?.slug === 'fabrica-revisor').sort((a, b) => b.id - a.id)[0];
+  if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
+  if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
+  const hallazgos = String(ultimo.output?.summary ?? '').split('\n').map((l) => l.replace(/^- /, '')).filter(Boolean);
+  await publicarCheck(REPO, ctx.cabeza, TOKEN, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, ctx.cabeza, hallazgos) });
+  console.log(TITULO_ANULACION);
+}
+
 async function main() {
+  if (process.env.MODO === 'anulacion') {
+    for (const k of ['REPO', 'PR', 'TOKEN']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
+    return anular(process.env);
+  }
   const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD } = process.env;
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN })) {
     if (!v) throw new Error(`falta la variable ${k}`);
