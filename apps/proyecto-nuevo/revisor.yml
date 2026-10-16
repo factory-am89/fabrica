@@ -1,0 +1,19 @@
+name: revisor
+
+# Llama al juez reutilizable de la Fábrica (factory-am89/fabrica). Corre con pull_request_target: ejecuta
+# la versión de este fichero que está en main, no la del PR. Los secretos (CLAUDE_CODE_OAUTH_TOKEN,
+# REVISOR_CLIENT_ID y REVISOR_APP_KEY) viven en el environment `revisor` de este repo, limitado a main.
+# Lo crea apps/proyecto-nuevo.ps1.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  revisor:
+    uses: factory-am89/fabrica/.github/workflows/revisor.yml@main
+    secrets: inherit
