@@ -297,22 +297,23 @@ test('avisoCache: one stderr line with the reason; a reason outside the vocabula
 // op fake: one result per call, counting calls.
 const opFalso = (resultado) => { const f = () => { f.llamadas++; return resultado; }; f.llamadas = 0; return f; };
 const nadie = () => {}; // the read log is not under test here: it must never touch the real ~/.fabrica
+const LIBRE = () => ({ total: 0, porScript: {}, corruptas: [] }); // an empty budget count: never read the real read log
 const LIMITE = { status: 1, stdout: '', stderr: '[ERROR] 2026/10/16 Too many requests. Try again in 3 hours. op_SECRETO_VALOR' };
 
 test('clavePrivada: "Too many requests" -> limite-de-1password, one op call, no retry, no op output in the message', () => {
   const op = opFalso(LIMITE);
   assert.throws(
-    () => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie),
+    () => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie, LIBRE),
     (x) => x instanceof ErrorToken && x.motivo === 'limite-de-1password' && !x.message.includes('SECRETO') && !x.message.includes('\n'),
   );
   assert.equal(op.llamadas, 1);
 });
 
 test('clavePrivada: another failure is sin-clave; success returns the key; the vault is the configured one only', () => {
-  assert.throws(() => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, opFalso({ status: 1, stdout: '', stderr: 'no access' }), nadie), (x) => x.motivo === 'sin-clave');
+  assert.throws(() => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, opFalso({ status: 1, stdout: '', stderr: 'no access' }), nadie, LIBRE), (x) => x.motivo === 'sin-clave');
   const argsDeOp = [];
   const op = (args) => { argsDeOp.push(args); return { status: 0, stdout: PEM, stderr: '' }; };
-  assert.equal(clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', OP_VAULT: 'V' }, op, nadie), PEM);
+  assert.equal(clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', OP_VAULT: 'V' }, op, nadie, LIBRE), PEM);
   assert.deepEqual(argsDeOp, [['document', 'get', DOCUMENTO_CLAVE, '--vault', 'V']]);
 });
 
@@ -320,7 +321,7 @@ test('clavePrivada: the read log records the same document that op is asked for'
   const pedidos = [];
   const anotados = [];
   const op = (args) => { pedidos.push(args[2]); return { status: 0, stdout: PEM, stderr: '' }; };
-  clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, (linea) => anotados.push(linea.nombre));
+  clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, (linea) => anotados.push(linea.nombre), LIBRE);
   assert.deepEqual(anotados, pedidos);
   assert.deepEqual(pedidos, [DOCUMENTO_CLAVE]);
 });
@@ -329,7 +330,7 @@ test('obtenerToken: rate limited with no saved token -> limite-de-1password, one
   const e = entorno();
   const op = opFalso(LIMITE);
   try {
-    await assert.rejects(e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie) }), (x) => x.motivo === 'limite-de-1password');
+    await assert.rejects(e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie, LIBRE) }), (x) => x.motivo === 'limite-de-1password');
     assert.equal(op.llamadas, 1);
   } finally { e.limpiar(); }
 });
@@ -339,7 +340,7 @@ test('obtenerToken: rate limited with a saved token still alive (but under MARGE
   const op = opFalso(LIMITE);
   try {
     guardado(e, { restante: MARGEN_MS / 3, token: OTRO });
-    const r = await e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie) });
+    const r = await e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op, nadie, LIBRE) });
     assert.equal(r.token, OTRO);
     assert.match(r.aviso, /^limite-de-1password: /);
     assert.ok(!r.aviso.includes('\n'));

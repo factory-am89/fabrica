@@ -47,3 +47,40 @@ export function contarLecturas({ ruta = rutaDeRegistro(), fs = fsReal } = {}) {
   });
   return cuentas;
 }
+
+export const VENTANA_MS = 60 * 60 * 1000;
+
+// Reads inside the last VENTANA_MS, all scripts: { total, porScript, corruptas }. This is the number the read
+// budget in token.mjs compares. A line that cannot be read (not JSON, wrong shape, no valid time) is NOT
+// dropped: it counts as a read (it cannot be proven old) and its line number goes in `corruptas`, so the
+// caller can say it. No file means no reads; any other disk error throws.
+export function lecturasRecientes({ ruta = rutaDeRegistro(), fs = fsReal, reloj = Date.now, ventanaMs = VENTANA_MS } = {}) {
+  let crudo;
+  try {
+    crudo = fs.readFileSync(ruta, 'utf8');
+  } catch (e) {
+    if (e?.code === 'ENOENT') return { total: 0, porScript: {}, corruptas: [] };
+    throw e;
+  }
+  const desde = reloj() - ventanaMs;
+  const porScript = {};
+  const corruptas = [];
+  let total = 0;
+  crudo.split('\n').forEach((linea, i) => {
+    if (!linea) return;
+    let d;
+    try {
+      d = JSON.parse(linea);
+    } catch {
+      d = null;
+    }
+    const t = typeof d?.t === 'string' ? Date.parse(d.t) : Number.NaN;
+    const valida = typeof d?.script === 'string' && !Number.isNaN(t);
+    if (!valida) corruptas.push(i + 1);
+    else if (t <= desde) return;
+    const script = valida ? d.script : '(unreadable line)';
+    porScript[script] = (porScript[script] ?? 0) + 1;
+    total++;
+  });
+  return { total, porScript, corruptas };
+}
