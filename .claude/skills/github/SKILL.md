@@ -70,6 +70,11 @@ nothing else). A bare `gh` is not counted.
 
 ## Lo que falló
 
+- **2026-10-16 · PR #20 entered `main` without the `revisor` check.** Cause: the ruleset was lifted for a moment to merge
+  #19 (an owner action Pablo approved), and GitHub merged at once every other PR with auto-merge armed (#20 at 10:57:32
+  UTC, before its `tests` and `revisor` finished; `revisor` then said «no»). Fix: before lifting the ruleset, disarm
+  auto-merge on every other open PR (`node scripts/token.mjs -- gh pr merge <n> --disable-auto`) and arm it again once
+  the ruleset is back. The findings of #20 went to PR #23.
 - **2026-10-10 · from MenuPlan, unverified here: the GraphQL quota hit 0 twice while `gh api rate_limit` showed spare.** Cause: all
   sessions spent the same token (each startup read all issues, ~320 points; `gh pr checks --watch` kept querying) and
   `rate_limit` shows only REST. Fix there: caches, waiting for CI over REST, one accounting line per call, ceilings in a
