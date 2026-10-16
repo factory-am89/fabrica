@@ -330,7 +330,7 @@ npm test
 ## Decisions for Pablo
 
 ### A. Con esta App, cada ventana (pausar el ruleset) expone la clave administradora: ¿qué se hace con la ventana? (antes D1)
-Decidida el 16 oct 2026: opción 1; consta en `intervenciones.md`, fila que añade el PR #63.
+Decidida solo en parte, y no con estas opciones: `intervenciones.md:26` (16 oct 2026; la tomó la sesión coordinadora con la delegación de Pablo, no una frase suya) prohíbe pausar el ruleset «como práctica», pero deja `npm run ventana` para emergencias. Así que la ventana sigue existiendo y el agujero principal del punto 2 sigue abierto mientras haya una emergencia posible. Con la anulación de #61 (cuando entre), un juez roto ya no necesita la ventana, porque basta el Approve de Pablo. Queda por decidir qué pasa con la clave en una emergencia; hasta entonces, ningún trozo que instale la clave empieza.
 1. Prohibir la ventana: un juez roto se arregla con un PR que el juez viejo pueda aprobar, y si no puede, Pablo hace el arreglo como dueño sin pausar el ruleset para todos (recommended)
 2. Mantener la ventana pero desactivar antes el environment `administrador` (un clic más de Pablo cada vez)
 3. Aceptar el riesgo y apuntarlo
