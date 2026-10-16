@@ -19,7 +19,7 @@ test('repo: los .mjs importan scripts/lib/repo.mjs y no escriben el nombre a man
 });
 
 test('repo: cada copia que no puede importarlo coincide con scripts/lib/repo.mjs', () => {
-  for (const f of ['apps/arranque.ps1', 'apps/ruleset.ps1', 'apps/crear-apps.html', 'PASOS-PABLO.md', '.github/workflows/revisor.yml']) {
+  for (const f of ['apps/arranque.ps1', 'apps/ruleset.ps1', 'apps/crear-apps.html', 'PASOS-PABLO.md', '.github/workflows/revisor.yml', '.github/workflows/tests.yml']) {
     const encontrados = nombres(leer(f));
     assert.ok(encontrados.length > 0, `${f} ya no nombra el repo: quítalo de esta lista`);
     for (const n of encontrados) assert.equal(n, REPO, `${f} dice ${n} y la fuente dice ${REPO}`);

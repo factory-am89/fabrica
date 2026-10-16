@@ -19,6 +19,8 @@ name: tests
 # (job.workflow_sha) y DESPUÉS de correr los tests del repo, para que su `npm test` no la vea.
 on:
   pull_request:
+    # edited: editing the PR body re-runs the body check at the end of the job.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_call:
@@ -55,3 +57,19 @@ jobs:
         run: node --test .fabrica/test/workflows.test.js
         env:
           FABRICA_REPO_A_COMPROBAR: ${{ github.workspace }}
+
+      # PR body check, only in the Factory itself: in a calling repo github.repository is theirs, so the
+      # step is skipped on purpose (test/tests-reutilizable.test.js pins this). Everything comes in through
+      # env: the body is untrusted text and must never be interpolated into the script.
+      - name: PR body has the template sections
+        if: github.event_name == 'pull_request' && github.repository == 'factory-am89/fabrica'
+        run: |
+          gh api "repos/$REPO/compare/$BASE...$SHA" > "$RUNNER_TEMP/compare.json"
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          node .fabrica/scripts/pr-body.mjs --body-file "$RUNNER_TEMP/pr-body.md" --compare-file "$RUNNER_TEMP/compare.json"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
