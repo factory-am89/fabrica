@@ -40,7 +40,7 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 |---|---|---|
 | Abrir un PR como la App | `node scripts/token.mjs -- gh pr create --fill` | la URL del PR |
 | Armar la fusión automática | `node scripts/token.mjs -- gh pr merge <n> --auto --squash` | `will be automatically merged` |
-| Checks de un PR (una vez, al final) | `gh api repos/<repo>/commits/<sha>/check-runs --jq '.check_runs[] | "(.name) (.conclusion)"'` | `tests` y `revisor` en `success`, o `failure` |
+| Checks de un PR (una vez, al final) | `gh api repos/<repo>/commits/<sha>/check-runs --jq '.check_runs[] \| "\(.name) \(.conclusion)"'` | una línea por check: `tests success`, `revisor success` (o `failure`) |
 | Solo lo que falló | `gh run view <run> --log-failed` | el error: fichero y regla, o nombre del test |
 | Relanzar | `gh run rerun <run> --failed` | el run vuelve a `in_progress` |
 | Reglas que aplican a `main` | `gh api repos/<repo>/rules/branches/main` | `pull_request` y `required_status_checks` con `tests` y `revisor` |
