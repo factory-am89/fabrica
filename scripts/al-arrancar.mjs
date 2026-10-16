@@ -1,33 +1,40 @@
 // Lo que se hace al arrancar una sesión: .claude/settings.json lanza solo este script (SessionStart).
 // Un paso nuevo se añade a PASOS, no a settings.json. Un paso que falla se dice y no impide los demás.
+//
+// Siempre sale con 0 y todo va a stdout: en SessionStart, Claude Code añade el stdout como contexto que Claude ve
+// y puede usar (https://code.claude.com/docs/en/hooks); con otra salida solo habría un aviso con la 1.ª línea de stderr.
+// Si un paso falla, la primera línea lo dice sin ambigüedad y luego va el detalle: la sesión debe enterarse.
 import { fileURLToPath } from 'node:url';
 import { limpiar, imprimir } from './limpiar.mjs';
 
-export const PASOS = [
-  {
-    nombre: 'limpiar',
-    ejecutar: (escribir) => {
-      const s = limpiar();
-      imprimir(s, escribir);
-      if (s.fallos > 0) throw new Error(`${s.fallos} cosas sin borrar (arriba)`);
-    },
+export const pasoLimpiar = (limpiarFn = limpiar) => ({
+  nombre: 'limpiar',
+  ejecutar: (escribir) => {
+    const s = limpiarFn();
+    imprimir(s, escribir);
+    if (s.fallos > 0) throw new Error(`${s.fallos} cosas sin borrar (arriba)`);
   },
-];
+});
 
-// Devuelve cuántos pasos fallaron.
+export const PASOS = [pasoLimpiar()];
+
+// Devuelve cuántos pasos fallaron. Los titulares de fallo van primero y luego el informe de cada paso.
 export function arrancar(pasos = PASOS, escribir = console.log) {
-  let fallos = 0;
+  const titulares = [];
+  const informe = [];
   for (const paso of pasos) {
+    const lineas = [];
     try {
-      paso.ejecutar(escribir);
+      paso.ejecutar((l) => lineas.push(l));
     } catch (e) {
-      fallos += 1;
-      escribir(`al-arrancar FALLÓ el paso «${paso.nombre}»: ${e.message}`);
+      titulares.push(`FÁBRICA AL ARRANCAR: FALLÓ el paso «${paso.nombre}»: ${e.message}. Díselo a Pablo y no sigas como si nada.`);
     }
+    informe.push(...lineas);
   }
-  return fallos;
+  [...titulares, ...informe].forEach((l) => escribir(l));
+  return titulares.length;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  process.exit(arrancar() > 0 ? 1 : 0);
+  arrancar();
 }
