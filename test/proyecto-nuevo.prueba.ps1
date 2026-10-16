@@ -150,13 +150,11 @@ Prueba '-ContextoTests manda sobre lo observado' ($r.Code -eq 0 -and $e.cuerpoRu
 # 10. Respuestas ilegibles o llamadas fallidas: se para con el motivo real y la salida de gh, nunca en silencio.
 $e = Nuevo-Estado; $e.enMain = @(); $e.rompe["repos/$RP/pulls?*"] = @{ Texto = '<html>Bad gateway</html>'; Codigo = 0 }
 $r = Lanza $e
-Prueba 'lista de PR ilegible: sale 1 con el motivo y la salida de gh' ($r.Code -eq 1 -and $r.Out -match 'los PR abiertos' -and $r.Out -match 'Bad[ 
-]+gateway')
+Prueba 'lista de PR ilegible: sale 1 con el motivo y la salida de gh' ($r.Code -eq 1 -and $r.Out -match 'los PR abiertos' -and $r.Out -match 'Bad\s+gateway')
 Prueba 'lista de PR ilegible: no crea rama ni PR' (-not $e.ramaCreada -and -not $e.prAbierto -and $e.enRama.Count -eq 0)
 $e = Nuevo-Estado; $e.rompe["repos/$RP"] = @{ Texto = '<html>Bad gateway</html>'; Codigo = 0 }
 $r = Lanza $e
-Prueba 'repo ilegible: dice que no es JSON con la salida y no culpa a los permisos' ($r.Code -eq 1 -and $r.Out -match 'no es JSON' -and $r.Out -match 'Bad[ 
-]+gateway' -and $r.Out -notmatch 'no es administradora')
+Prueba 'repo ilegible: dice que no es JSON con la salida y no culpa a los permisos' ($r.Code -eq 1 -and $r.Out -match 'no es JSON' -and $r.Out -match 'Bad\s+gateway' -and $r.Out -notmatch 'no es administradora')
 $e = Nuevo-Estado; $e.rompe["repos/$RP"] = @{ Texto = 'gh: Server Error (HTTP 500)'; Codigo = 1 }
 $r = Lanza $e
 Prueba 'llamada al repo fallida: la salida de gh llega al mensaje' ($r.Code -eq 1 -and $r.Out -match 'HTTP 500' -and $r.Out -notmatch 'no es administradora')
