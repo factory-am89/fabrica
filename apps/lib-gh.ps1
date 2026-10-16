@@ -116,6 +116,27 @@ function Buscar-App-Instalada([string]$Slug, [string]$Cuenta = '') {
   return [pscustomobject]@{ Estado = 'ok'; Id = [int]$m[0].app_id; ClientId = $cid; Cuenta = [string]$m[0].account.login }
 }
 
+# ---------- environment revisor ----------
+# Crea (o deja) el environment `revisor` limitado a la rama main. Devuelve 'ok' o 'ya hecho'; lanza si
+# GitHub no deja. Si admite ademas otras ramas, avisa (no las quita). Lo usan arranque.ps1 y proyecto-nuevo.ps1.
+function Asegurar-Environment-Revisor([string]$Repo) {
+  $estado = 'ok'
+  $e = Gh @('api', "repos/$Repo/environments/revisor")
+  $existia = ($e.Code -eq 0)
+  $r = Gh @('api', '-X', 'PUT', "repos/$Repo/environments/revisor", '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true')
+  if ($r.Code -ne 0) { throw "No pude crear el environment: $($r.Out)" }
+  $p = Gh @('api', "repos/$Repo/environments/revisor/deployment-branch-policies", '--jq', '.branch_policies[].name')
+  if ($p.Code -ne 0) { throw "No pude leer las ramas permitidas: $($p.Out)" }
+  $nombres = @($p.Out -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  if ($nombres -notcontains 'main') {
+    $n = Gh @('api', '-X', 'POST', "repos/$Repo/environments/revisor/deployment-branch-policies", '-f', 'name=main', '-f', 'type=branch')
+    if ($n.Code -ne 0) { throw "No pude limitar el environment a main: $($n.Out)" }
+  } elseif ($existia) { $estado = 'ya hecho' }
+  $extra = @($nombres | Where-Object { $_ -ne 'main' })
+  if ($extra.Count -gt 0) { Aviso "El environment admite ademas: $($extra -join ', '). Deberia ser solo main." }
+  return $estado
+}
+
 # ---------- ruleset de main (funciones puras: no tocan GitHub) ----------
 # Parte 'dueno/nombre' en Dueno y Nombre; lanza si no tiene esa forma. El dueno del repo (usuario u
 # organizacion) NO es el usuario de la sesion de gh: la sesion solo tiene que ser admin del repo.

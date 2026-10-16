@@ -1,0 +1,17 @@
+name: tests
+
+# Llama al workflow reutilizable de la Fábrica (factory-am89/fabrica): tests, lint y reglas de workflows
+# con la configuración de la Fábrica. Lo crea apps/proyecto-nuevo.ps1; no lleva secretos.
+# El check se llama `tests / tests` (job que llama / job llamado): es el que exige el ruleset de main.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: factory-am89/fabrica/.github/workflows/tests.yml@main
