@@ -36,10 +36,10 @@ const BASE = [
 // The administrator App key (plan-app-admin, piece 2): whoever can change these files can change what that key does,
 // so they are gate files too. They are not used by the two gate workflows, so test/gate-files.test.js does not derive them;
 // it requires them here by name. The workflow and scripts/admin/ do not exist yet: the guard (test/administrador.test.js)
-// goes first on purpose. 'scripts/admin/**' is a pattern: every file under that folder.
+// goes first on purpose. 'scripts/admin/' ends in '/': every file under that folder (the convention scripts/lib/plan.mjs matchesAny understands).
 export const ADMIN_GATE_FILES = [
   '.github/workflows/administrar.yml', // the only workflow allowed to name the administrator secrets
-  'scripts/admin/**', // the code that runs with that key
+  'scripts/admin/', // the code that runs with that key
   'test/administrador.test.js', // the machine guard on the two above
 ];
 

@@ -9,7 +9,8 @@
 //   2. Its triggers are a closed list: push to main on proyectos/** and scripts/admin/**, and schedule.
 //      Anything else (pull_request_target, workflow_dispatch, workflow_call, issues...) lets code that did not
 //      pass `tests` and `revisor` run with the key.
-//   3. Its `permissions` are `contents: read` and the App token asks for no more than the plan's manifest.
+//   3. Its `permissions` are exactly `contents: read`. NOT YET: the `permission-*` inputs of the App token must
+//      equal the manifest in apps/crear-apps.html; that needs PR #58 (the manifest) and is added after it, never as a copied list.
 //   4. scripts/admin/ never deletes a repo, never grants bypass, and never creates a ruleset without
 //      `tests` and `revisor` as required checks and `enforcement: active`.
 // Limits, not checked here: a secret named through a computed expression (${{ secrets[format(...)] }}), and
@@ -20,19 +21,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
+import { checkPlan } from '../scripts/lib/plan.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
-const WORKFLOW = '.github/workflows/administrar.yml';
-const CODIGO = 'scripts/admin';
+// The names come from the gate list (one source): the workflow is the .yml entry, the code folder the entry ending in '/'.
+const WORKFLOW = ADMIN_GATE_FILES.find((f) => f.endsWith('.yml'));
+const CODIGO = ADMIN_GATE_FILES.find((f) => f.endsWith('/')).slice(0, -1);
 
 const NOMBRA_LA_CLAVE = /\bADMIN_(?:APP_KEY|CLIENT_ID)\b|\badministrador\b/i;
-const PUSH_PATHS = ['proyectos/**', 'scripts/admin/**'];
-// Manifest of the plan (point 1), as `permission-*` input names of the token action. Level is the maximum.
-const PERMISOS_APP = {
-  administration: 'write', contents: 'write', workflows: 'write', environments: 'write',
-  'pull-requests': 'write', checks: 'read', actions: 'read', metadata: 'read',
-};
-const NIVEL = { read: 1, write: 2 };
+const PUSH_PATHS = ['proyectos/**', `${CODIGO}/**`];
 
 function ficheros(dir, out = []) {
   if (!existsSync(dir)) return out;
@@ -42,11 +40,6 @@ function ficheros(dir, out = []) {
     else out.push(p);
   }
   return out;
-}
-
-function recorrer(nodo, f) {
-  f(nodo);
-  if (nodo && typeof nodo === 'object') for (const v of Object.values(nodo)) recorrer(v, f);
 }
 
 function disparadores(doc) {
@@ -75,15 +68,6 @@ function reglaDeWorkflow(texto) {
   for (const [nombre, job] of Object.entries(doc.jobs ?? {})) {
     if (job.permissions !== undefined && !permisosOk(job.permissions)) fallos.push(`job ${nombre}: permissions must be exactly {contents: read}`);
   }
-  recorrer(doc, (n) => {
-    if (!n || typeof n !== 'object' || Array.isArray(n)) return;
-    for (const [k, v] of Object.entries(n)) {
-      const m = /^permission-(.+)$/.exec(k);
-      if (!m) continue;
-      if (!(m[1] in PERMISOS_APP)) fallos.push(`token permission ${m[1]} is not in the manifest`);
-      else if (!(NIVEL[v] <= NIVEL[PERMISOS_APP[m[1]]])) fallos.push(`token permission ${m[1]}: ${v} is above the manifest (${PERMISOS_APP[m[1]]})`);
-    }
-  });
   return fallos;
 }
 
@@ -200,12 +184,10 @@ test('rule 2 (red): each forbidden trigger, and a push that is not main + the pl
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('    paths: [proyectos/**, scripts/admin/**]\n', '') }).join('\n'), /push must have exactly branches and paths/);
 });
 
-test('rule 3 (red): permissions beyond contents: read, and token permissions above the manifest', () => {
+test('rule 3 (red): permissions beyond contents: read', () => {
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('  contents: read', '  contents: write') }).join('\n'), /permissions must be exactly/);
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('jobs:', 'jobs:').replace('    environment: administrador', '    environment: administrador\n    permissions: write-all') }).join('\n'), /job administrar: permissions/);
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permissions:\n  contents: read\n', '') }).join('\n'), /permissions must be exactly/);
-  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permission-checks: read', 'permission-checks: write') }).join('\n'), /checks: write is above the manifest/);
-  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permission-checks: read', 'permission-organization-secrets: write') }).join('\n'), /organization-secrets is not in the manifest/);
 });
 
 test('rule 4 (red): scripts/admin deleting a repo, granting bypass, or a weak ruleset', () => {
@@ -228,4 +210,16 @@ test('rule 4 (red): scripts/admin deleting a repo, granting bypass, or a weak ru
 
 test('rule 4 (good): the word delete in a comment or a bypass_actors: [] is not a violation', () => {
   assert.deepEqual(motivos({ 'scripts/admin/x.mjs': `${BUEN_CODIGO}// never delete a repo here\n` }), []);
+});
+
+// The gate list reaches the plan check: a file under the admin folder must make a chunk a gate chunk.
+// Red by mutation: written as a glob ('scripts/admin/**') matchesAny never matched it.
+test('a file under the admin folder counts as gate in checkPlan; a glob entry would not', () => {
+  const ancla = 'Files: `src/parser.js`, `test/parser.test.js`';
+  const buena = readFileSync(path.join(RAIZ, 'test', 'fixtures', 'plans', 'good.md'), 'utf8');
+  assert.ok(buena.includes(ancla), 'fixture anchor not found');
+  const plan = buena.replace(ancla, `Files: \`${CODIGO}/aplicar.mjs\``);
+  assert.equal(checkPlan(plan, { gateFiles: ADMIN_GATE_FILES }).chunks[0].gate, true);
+  const comoGlob = ADMIN_GATE_FILES.map((f) => (f.endsWith('/') ? `${f}**` : f));
+  assert.equal(checkPlan(plan, { gateFiles: comoGlob }).chunks[0].gate, false);
 });
