@@ -1,8 +1,8 @@
-// The two GitHub Apps (manifests, convertir.mjs) and the token.mjs JWT.
+// The three GitHub Apps (manifests, convertir.mjs) and the token.mjs JWT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { destino, argsSecreto } from '../apps/convertir.mjs';
+import { destino, argsSecreto, argsEntorno, ENTORNO_ADMIN } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
 import { leer } from './apoyo/fabrica.mjs';
 
@@ -17,7 +17,7 @@ function manifests() {
   return valores.map((v) => JSON.parse(v.replaceAll('&quot;', '"').replaceAll('&amp;', '&')));
 }
 
-test('las dos Apps piden solo los permisos acordados', () => {
+test('constructor y revisor piden solo los permisos acordados', () => {
   const [constructor, revisor] = manifests();
   assert.deepEqual(constructor.default_permissions, {
     contents: 'write', pull_requests: 'write', issues: 'write', workflows: 'write', checks: 'read', actions: 'read',
@@ -30,9 +30,35 @@ test('las dos Apps piden solo los permisos acordados', () => {
   }
 });
 
-test('convertir.mjs solo reconoce las dos Apps', () => {
+// Lista CERRADA de la App administradora (plan-app-admin, punto 1). Igualdad, no inclusión:
+// añadir un permiso o un evento, o cambiar un nivel, hace fallar este test.
+const PERMISOS_ADMIN = {
+  administration: 'write', contents: 'write', workflows: 'write', environments: 'write',
+  pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read',
+};
+
+test('fabrica-administrador pide exactamente la lista cerrada de permisos y ningún evento', () => {
+  const admin = manifests().find((m) => m.name === 'fabrica-administrador');
+  assert.ok(admin, 'falta el botón de fabrica-administrador');
+  assert.deepEqual(admin.default_permissions, PERMISOS_ADMIN);
+  assert.deepEqual(admin.default_events, []);
+  assert.equal(admin.public, false);
+  assert.ok(!('hook_attributes' in admin), 'la App no tiene webhook');
+});
+
+test('convertir.mjs guarda la clave administradora en el environment administrador, limitado a main', () => {
+  assert.equal(ENTORNO_ADMIN, 'administrador');
+  assert.deepEqual(argsSecreto('ADMIN_APP_KEY', 'o/r', ENTORNO_ADMIN), ['secret', 'set', 'ADMIN_APP_KEY', '--repo', 'o/r', '--env', 'administrador']);
+  const [crea, rama] = argsEntorno('o/r', ENTORNO_ADMIN);
+  assert.ok(crea.join(' ').includes('repos/o/r/environments/administrador'));
+  assert.ok(rama.join(' ').includes('deployment-branch-policies') && rama.join(' ').includes('name=main'));
+  assert.doesNotMatch(leer('apps/convertir.mjs'), /ADMIN_APP_ID/);
+});
+
+test('convertir.mjs solo reconoce las tres Apps', () => {
   assert.equal(destino('fabrica-constructor'), 'constructor');
   assert.equal(destino('fabrica-revisor-1'), 'revisor');
+  assert.equal(destino('fabrica-administrador'), 'administrador');
   assert.throws(() => destino('otra'));
 });
 

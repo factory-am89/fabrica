@@ -1,6 +1,7 @@
 // Canjea el código del manifest por las credenciales de la App y guarda la clave
 // privada sin imprimirla: la del constructor, en 1Password; la del revisor, en
-// los secretos del environment `revisor` del repo. Si no puede, la deja en un fichero temporal protegido y lo dice.
+// los secretos del environment `revisor` del repo; la del administrador, en los del environment `administrador`
+// (que crea limitado a `main` si falta). Si no puede, la deja en un fichero temporal protegido y lo dice.
 // Uso: node apps/convertir.mjs <code>
 // Variables opcionales: REPO (por defecto, el de scripts/lib/repo.mjs), OP_VAULT (bóveda de 1Password).
 import { spawnSync } from 'node:child_process';
@@ -14,12 +15,23 @@ const REPO = process.env.REPO ?? REPO_FABRICA;
 export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
 
 // Argumentos de `gh secret set` para un secreto del revisor: siempre en su environment.
-export const argsSecreto = (nombre, repo = REPO) => ['secret', 'set', nombre, '--repo', repo, '--env', ENTORNO];
+export const ENTORNO_ADMIN = 'administrador'; // solo lo lee administrar.yml (plan-app-admin, punto 2)
+
+// Argumentos de `gh secret set` para un secreto: siempre en un environment, nunca en el repo.
+export const argsSecreto = (nombre, repo = REPO, entorno = ENTORNO) => ['secret', 'set', nombre, '--repo', repo, '--env', entorno];
+
+// Llamadas `gh api` que dejan el environment limitado a la rama main (crearlo es idempotente).
+export const argsEntorno = (repo, entorno) => [
+  ['api', '--method', 'PUT', `repos/${repo}/environments/${entorno}`,
+    '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true'],
+  ['api', '--method', 'POST', `repos/${repo}/environments/${entorno}/deployment-branch-policies`, '-f', 'name=main'],
+];
 
 export function destino(slug) {
   if (slug.startsWith('fabrica-constructor')) return 'constructor';
   if (slug.startsWith('fabrica-revisor')) return 'revisor';
-  throw new Error(`App inesperada: «${slug}». Solo se guardan fabrica-constructor y fabrica-revisor.`);
+  if (slug.startsWith('fabrica-administrador')) return 'administrador';
+  throw new Error(`App inesperada: «${slug}». Solo se guardan fabrica-constructor, fabrica-revisor y fabrica-administrador.`);
 }
 
 // Ejecuta un programa pasando el secreto por la entrada estándar, nunca por argumentos.
@@ -36,6 +48,20 @@ function guardarEnFichero(slug, pem, motivo) {
   console.log(`AVISO: ${motivo}. La clave está en ${ruta}. Guárdala donde toque y borra el fichero.`);
 }
 
+function guardarAdmin(app) {
+  for (const args of argsEntorno(REPO, ENTORNO_ADMIN)) {
+    const r = spawnSync('gh', args, { encoding: 'utf8', shell: process.platform === 'win32' });
+    // 422 en la política de rama = ya existe (relanzado): no es un fallo.
+    if (r.status !== 0 && !/already exists|422/.test(r.stderr ?? '')) {
+      return guardarEnFichero(app.slug, app.pem, `no pude crear el environment ${ENTORNO_ADMIN} (${r.error?.message ?? r.stderr?.trim()})`);
+    }
+  }
+  const clave = conStdin('gh', argsSecreto('ADMIN_APP_KEY', REPO, ENTORNO_ADMIN), app.pem);
+  const id = conStdin('gh', argsSecreto('ADMIN_CLIENT_ID', REPO, ENTORNO_ADMIN), String(app.client_id));
+  if (clave.ok && id.ok) return console.log(`Secretos ADMIN_APP_KEY y ADMIN_CLIENT_ID guardados en el environment ${ENTORNO_ADMIN} de ${REPO}.`);
+  guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`);
+}
+
 function guardar(app, quien) {
   if (quien === 'constructor') {
     const args = ['document', 'create', '-', '--title', `${app.slug}.pem`];
@@ -44,6 +70,7 @@ function guardar(app, quien) {
     if (r.ok) return console.log(`Clave del constructor guardada en 1Password como «${app.slug}.pem».`);
     return guardarEnFichero(app.slug, app.pem, `no pude escribir en 1Password (${r.error})`);
   }
+  if (quien === 'administrador') return guardarAdmin(app);
   const clave = conStdin('gh', argsSecreto('REVISOR_APP_KEY'), app.pem);
   const id = conStdin('gh', argsSecreto('REVISOR_CLIENT_ID'), String(app.client_id));
   if (clave.ok && id.ok) return console.log(`Secretos REVISOR_APP_KEY y REVISOR_CLIENT_ID guardados en el environment ${ENTORNO} de ${REPO}.`);
