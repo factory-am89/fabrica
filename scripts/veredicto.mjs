@@ -6,8 +6,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readQuestions } from './lib/questions.mjs';
-import { ANSWER, ANSWERS, ERROR, STANDARD_SOURCE, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { CHECKED_BY, readQuestions } from './lib/questions.mjs';
+import { ANSWER, ANSWERS, ERROR, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
@@ -36,7 +36,7 @@ export function cargarPreguntas(valor, raiz = RAIZ) {
     throw new Error('STANDARD no apunta a un fichero que exista');
   }
   const preguntas = leerPreguntas(md);
-  if (!preguntas.some((q) => q.quien === 'revisor')) throw new Error('el estándar de STANDARD no tiene ninguna pregunta del revisor');
+  if (!preguntas.some((q) => q.quien === CHECKED_BY.reviewer)) throw new Error('el estándar de STANDARD no tiene ninguna pregunta del revisor');
   return preguntas;
 }
 
@@ -65,7 +65,7 @@ export function decidir(salida, preguntas, ctx = {}) {
   const porId = new Map();
   let desconocidos = 0;
   for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
-    if (typeof r?.id !== 'string' || !/^C\d+$/.test(r.id) || !conocidos.has(r.id)) {
+    if (typeof r?.id !== 'string' || !conocidos.has(r.id)) {
       desconocidos += 1;
       continue;
     }
@@ -77,7 +77,7 @@ export function decidir(salida, preguntas, ctx = {}) {
   }
   for (const id of repetidos) fallos.push(`${id}: id repetido`);
   if (desconocidos) fallos.push(`${desconocidos} ids desconocidos`);
-  const delRevisor = preguntas.filter((q) => q.quien === 'revisor');
+  const delRevisor = preguntas.filter((q) => q.quien === CHECKED_BY.reviewer);
   if (delRevisor.length === 0) fallos.push('el estándar viene sin preguntas del revisor');
   for (const p of delRevisor) {
     const r = porId.get(p.id);
@@ -94,7 +94,7 @@ export function decidir(salida, preguntas, ctx = {}) {
     const resp = normalizar(porId.get(p.id)?.respuesta);
     answers[p.id] = repetidos.has(p.id) || !ANSWERS.includes(resp) ? null : resp;
   }
-  return { ok: fallos.length === 0, fallos, respuestas: { answers, invalid: desconocidos + sobrantes } };
+  return { ok: fallos.length === 0, fallos, respuestas: answersSummary(answers, desconocidos + sobrantes) };
 }
 
 async function api(token, metodo, ruta, cuerpo) {
@@ -152,11 +152,11 @@ async function main() {
   let registro = null;
   let errorRegistro = null;
   try {
-    const resumen = errorEstandar ? { answers: {}, invalid: 0 } : veredicto.respuestas;
+    const resumen = errorEstandar ? answersSummary() : veredicto.respuestas;
     const estandar = (STANDARD ?? '').match(RUTA_ESTANDAR)?.[2] ?? null;
     registro = buildRecord({
       repo: REPO, pr: PR, sha: SHA, standard: estandar, veredicto,
-      respuestas: resumen ?? { answers: {}, invalid: 0 },
+      respuestas: resumen ?? answersSummary(),
       run: runFromEnv(process.env),
       error: errorEstandar ? ERROR.standardUnloadable : resumen ? null : ERROR.outputUnreadable,
     });

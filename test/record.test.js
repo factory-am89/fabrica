@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { RUTA_ESTANDAR } from '../scripts/veredicto.mjs';
-import { ANSWERS, ERRORS, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
+import { CHECKED_BY, FIELDS, ID_PARTS, ID_SOURCE, readQuestions } from '../scripts/lib/questions.mjs';
+import { ANSWERS, ERRORS, answersSummary, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
 
 const SHA = 'a'.repeat(40);
 const base = { repo: 'o/r', pr: 2, sha: SHA, standard: 'standards/code.md', veredicto: { ok: false, fallos: ['C5: no'] }, respuestas: { answers: { C1: 'sí', C5: 'no', C6: 'no aplica', C7: null }, invalid: 0 }, run: { id: 99, attempt: 1 } };
@@ -140,4 +141,29 @@ test('aggregate: counters per error come from ERRORS, so a new error is counted 
   const a = aggregate([r, reg(1, false, { C1: 'no' })], ANSWERS, nuevo);
   assert.deepEqual(a.porPr['o/r#2'], { rondas: 1, ok: 0, no: 0, 'standard-unloadable': 0, 'output-unreadable': 0, 'otro-error': 1 });
   assert.throws(() => aggregate([r]), /error outside the vocabulary/);
+});
+
+test('the question id shape is one constant (questions.mjs): the record, the reader and the judge derive from it', () => {
+  const leer = (f) => readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
+  const cuenta = (texto, trozo) => texto.split(trozo).length - 1;
+  assert.equal(cuenta(leer('scripts/lib/questions.mjs'), '[A-Z]'), 1);
+  assert.equal(cuenta(leer('scripts/lib/record.mjs'), '[A-Z]'), 0);
+  assert.equal(cuenta(leer('scripts/veredicto.mjs'), '[A-Z]'), 0);
+  assert.equal(cuenta(leer('scripts/veredicto.mjs'), String.raw`C\d+`), 0, 'the judge does not carry its own id regex');
+  assert.equal(cuenta(leer('scripts/lib/record.mjs'), String.raw`/^\d+$/`), 1, 'DIGITS is written once');
+  assert.equal(ID_SOURCE, ID_PARTS.prefix + ID_PARTS.number);
+  for (const id of ['C1', 'P12']) {
+    assert.ok(readQuestions(`### ${id} — t\nQuién: ${CHECKED_BY.reviewer}\n`).length === 1);
+    assert.doesNotThrow(() => buildRecord({ ...base, respuestas: { answers: { [id]: 'sí' }, invalid: 0 } }));
+  }
+  for (const id of ['c1', 'CC1', 'C', 'C1x', 'ghs_X']) {
+    assert.throws(() => readQuestions(`### ${id} — t\nQuién: ${CHECKED_BY.reviewer}\n`));
+    assert.throws(() => buildRecord({ ...base, respuestas: { answers: { [id]: 'sí' }, invalid: 0 } }));
+  }
+});
+
+test('who checks a question is one constant (CHECKED_BY), and the record answers shape is built by answersSummary', () => {
+  assert.deepEqual(FIELDS.checkedBy.values, Object.values(CHECKED_BY));
+  assert.deepEqual(answersSummary(), { answers: {}, invalid: 0 });
+  assert.deepEqual(answersSummary({ C1: 'sí' }, 2), { answers: { C1: 'sí' }, invalid: 2 });
 });

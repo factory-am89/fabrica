@@ -2,6 +2,8 @@
 // scripts/veredicto.mjs writes one into the `output.text` of each `revisor` check-run (one JSON line in a ```json block);
 // scripts/records.mjs reads them back. The schema and its version live here and nowhere else.
 // Everything throws on anything unexpected: a broken record is never read as an empty one.
+import { ID_SOURCE } from './questions.mjs';
+
 export const RECORD_VERSION = 1;
 export const ANSWER = { yes: 'sí', no: 'no', notApplicable: 'no aplica' };
 export const ANSWERS = Object.values(ANSWER);
@@ -15,7 +17,10 @@ const SHA = /^[0-9a-f]{40}$/;
 // The shape of a standard path, written once: scripts/veredicto.mjs builds its STANDARD check from it too.
 export const STANDARD_SOURCE = String.raw`standards/[a-z0-9-]+\.md`;
 const STANDARD = new RegExp(`^${STANDARD_SOURCE}$`);
-const ID = /^[A-Z]\d+$/;
+const ID = new RegExp(`^${ID_SOURCE}$`);
+const DIGITS = /^\d+$/;
+// The shape of the answers part of a record (and of what `decidir` returns for it); the one place `{answers, invalid}` is written.
+export const answersSummary = (answers = {}, invalid = 0) => ({ answers, invalid });
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 const isPosInt = (n) => Number.isInteger(n) && n > 0;
 const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -49,7 +54,7 @@ export function buildRecord({ repo, pr, sha, standard, veredicto, respuestas, ru
   return check({
     v: RECORD_VERSION,
     repo,
-    pr: typeof pr === 'string' && /^\d+$/.test(pr) ? Number(pr) : pr,
+    pr: typeof pr === 'string' && DIGITS.test(pr) ? Number(pr) : pr,
     sha,
     standard: standard ?? null,
     ok: veredicto?.ok,
@@ -74,7 +79,7 @@ export function parseRecord(text) {
 export function runFromEnv(env) {
   const { GITHUB_RUN_ID: id, GITHUB_RUN_ATTEMPT: attempt } = env;
   if (!id && !attempt) return null;
-  if (!/^\d+$/.test(id ?? '') || !/^\d+$/.test(attempt ?? '')) throw new Error('GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT must both be numbers or both absent');
+  if (!DIGITS.test(id ?? '') || !DIGITS.test(attempt ?? '')) throw new Error('GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT must both be numbers or both absent');
   return { id: Number(id), attempt: Number(attempt) };
 }
 
