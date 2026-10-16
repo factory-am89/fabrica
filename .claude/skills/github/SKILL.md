@@ -40,7 +40,7 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 |---|---|---|
 | Abrir un PR como la App | `node scripts/token.mjs -- gh pr create --fill` | la URL del PR |
 | Armar la fusión automática | `node scripts/token.mjs -- gh pr merge <n> --auto --squash` | `will be automatically merged` |
-| Checks de un PR (una vez, al final) | `gh pr checks <n>` | `tests` y `revisor` en `pass`, o `fail` con enlace |
+| Checks de un PR (una vez, al final) | `gh api repos/<repo>/commits/<sha>/check-runs --jq '.check_runs[] | "(.name) (.conclusion)"'` | `tests` y `revisor` en `success`, o `failure` |
 | Solo lo que falló | `gh run view <run> --log-failed` | el error: fichero y regla, o nombre del test |
 | Relanzar | `gh run rerun <run> --failed` | el run vuelve a `in_progress` |
 | Reglas que aplican a `main` | `gh api repos/<repo>/rules/branches/main` | `pull_request` y `required_status_checks` con `tests` y `revisor` |
@@ -57,7 +57,7 @@ nothing else). A bare `gh` is not counted.
 - **MenuPlan's facts, unverified here.** 5,000 points per hour per identity, and per API: REST (core) and GraphQL are
   different quotas; the App token and a person's token each have their own. `gh api rate_limit` shows only REST; read
   GraphQL with `gh api graphql -f query='{ rateLimit { limit remaining resetAt } }'`. The `resetAt` is the one that counts.
-- **Who uses which.** Almost all `gh issue`, `gh pr` and `gh label` use GraphQL; `gh run`, `gh workflow`, `gh secret` and `gh api repos/...` are REST.
+- **Who uses which.** The table of which `gh` command spends which quota lives in `SUBCOMANDOS` (`scripts/lib/registro-gh.mjs`).
 - **Cost.** A GraphQL query costs about (requests needed for its nested lists)/100, minimum 1, and GitHub charges for
   what is requested (`first:`), not for what comes back. Measure by adding `rateLimit { cost remaining }`. Ask for the minimum fields.
 - **Rules for agents.** Check CI once, at the end, never in a loop, over REST:
