@@ -5,6 +5,7 @@
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
 // scripts/lib/cache-token.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
 // Read budget: before each read it counts the last hour's reads (all scripts); at PRESUPUESTO_LECTURAS it does not read and exits with its code in MOTIVOS.
+// gh calls: every `gh` run leaves one line in the gh log (api and result, nothing else; path: rutaDeRegistroGh in scripts/lib/registro-gh.mjs); count with `npm run llamadas-gh`.
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
 // scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
@@ -15,6 +16,7 @@ import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, protegerFichero, rutaDeCache } from './lib/cache-token.mjs';
 import { lecturasRecientes, registrarLectura, rutaDeRegistro } from './lib/registro-op.mjs';
+import { clasificarApi, registrarLlamada, resultadoDe } from './lib/registro-gh.mjs';
 import { REPO, CLIENT_ID_CONSTRUCTOR } from './lib/repo.mjs';
 
 export function clientId(env = process.env) {
@@ -248,13 +250,35 @@ export async function obtenerToken({ env = process.env, leer = (e) => clavePriva
   });
 }
 
+export const esGh = (cmd) => /^gh(\.exe)?$/i.test(win32.basename(cmd[0]));
+
+// A failing gh log must be seen, but it must never block nor change the result of the command that ran.
+function anotarLlamada(registrar, args, status, stderr) {
+  try {
+    registrar({ caller: 'token.mjs', api: clasificarApi(args), resultado: resultadoDe(status, stderr) });
+  } catch (e) {
+    console.error(`gh-calls log not written: ${e.message}`);
+  }
+}
+
+// Runs the command with the token and returns its exit status. For `gh` only, stderr is captured (to tell a rate
+// limit from another failure), passed on to this process's stderr afterwards, and the call is logged.
+export function lanzar(cmd, token, { spawn = spawnSync, registrar = registrarLlamada, env = process.env, pasarStderr = (s) => process.stderr.write(s) } = {}) {
+  const gh = esGh(cmd);
+  const r = spawn(cmd[0], cmd.slice(1), { stdio: gh ? ['inherit', 'inherit', 'pipe'] : 'inherit', encoding: 'utf8', env: entornoHijo(cmd, token, env) });
+  if (gh) {
+    if (r.stderr) pasarStderr(r.stderr);
+    anotarLlamada(registrar, cmd.slice(1), r.error ? 1 : r.status, r.stderr ?? '');
+  }
+  if (r.error) throw new Error(`No pude lanzar «${cmd[0]}»: ${r.error.message}`);
+  return r.status ?? 1;
+}
+
 async function main() {
   const cmd = orden(process.argv.slice(2));
   const { token, aviso } = await obtenerToken();
   if (aviso) console.error(aviso);
-  const r = spawnSync(cmd[0], cmd.slice(1), { stdio: 'inherit', env: entornoHijo(cmd, token) });
-  if (r.error) throw new Error(`No pude lanzar «${cmd[0]}»: ${r.error.message}`);
-  process.exit(r.status ?? 1);
+  process.exit(lanzar(cmd, token));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
