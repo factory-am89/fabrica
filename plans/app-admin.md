@@ -18,7 +18,7 @@ Manifiesto (mismo formato que `apps/crear-apps.html`), `public: false`, `default
 | `administration` | write | Crear repos en la org (`POST /orgs/factory-am89/repos`), ajustes (`allow_auto_merge`, `delete_branch_on_merge`), crear el environment `revisor` y su política de ramas, crear el ruleset de `main`. Es el permiso peligroso: también permite borrar el repo y quitar rulesets; no se puede partir. |
 | `contents` | write | Subir los ficheros iniciales directo a `main` ANTES de proteger (en un repo recién creado no hay PR posible con revisor). Y abrir la rama del PR de humo. |
 | `workflows` | write | Los ficheros iniciales incluyen `.github/workflows/*.yml`; sin él GitHub rechaza el commit entero (pasó el 15 oct, skill github). |
-| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (y leer su clave pública para cifrarlos). SIN COMPROBAR si la API de secretos de environment pide `environments` o `secrets`; se comprueba en el trozo 6 y se pide solo el que haga falta. |
+| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (y leer su clave pública para cifrarlos). SIN COMPROBAR si la API de secretos de environment pide `environments` o `secrets`; se comprueba en el trozo 5 y se pide solo el que haga falta. |
 | `pull_requests` | write | Abrir el PR de humo y armar su fusión automática. |
 | `checks` | read | Leer el nombre real del check de tests y el resultado del PR de humo. |
 | `actions` | read | Leer el run de `tests` en `main` del repo nuevo. |
@@ -32,7 +32,7 @@ Ninguno en la primera versión.
 
 - `organization_secrets` (secretos de organización): no se usan (ver punto 4); tenerlo sería una vía para sacar secretos a todos los repos.
 - `organization_administration`: solo haría falta para rulesets de organización, que no se usan (y en plan gratuito, sin comprobar si existen).
-- `members`, `organization_user_blocking`, `organization_hooks`, `repository_hooks`, `pages`, `deployments`, `issues`, `secrets` (de repo, salvo que el trozo 6 demuestre que hace falta): nada del flujo los usa.
+- `members`, `organization_user_blocking`, `organization_hooks`, `repository_hooks`, `pages`, `deployments`, `issues`, `secrets` (de repo, salvo que el trozo 5 demuestre que hace falta): nada del flujo los usa.
 - Ningún evento (webhook): la App no escucha; solo la usa el workflow.
 - No puede (ninguna App puede): crear Apps, ampliar sus propios permisos, generar claves privadas, instalar Apps. Eso sigue siendo de Pablo, a propósito.
 
