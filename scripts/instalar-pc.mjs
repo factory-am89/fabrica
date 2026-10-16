@@ -23,6 +23,7 @@ import { huecos, rellenar } from './lib/plantilla.mjs';
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ORIGEN = path.join(RAIZ, 'usuario');
 export const HUELLA = 'fabrica-huella.json'; // dentro de ~/.claude/
+const SOLO_REPO = ['settings.motivos.json']; // viven en usuario/ pero no se instalan
 export const VALORES_POR_DEFECTO = path.join(RAIZ, '..', 'fabrica-privado', 'usuario', 'valores.json');
 
 const hash = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -33,7 +34,7 @@ function listar(dir, rel = '') {
   for (const e of readdirSync(path.join(dir, rel), { withFileTypes: true })) {
     const r = rel ? `${rel}/${e.name}` : e.name;
     if (e.isDirectory()) salida.push(...listar(dir, r));
-    else salida.push(r);
+    else if (!SOLO_REPO.includes(r)) salida.push(r);
   }
   return salida.sort();
 }
