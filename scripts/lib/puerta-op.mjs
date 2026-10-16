@@ -47,7 +47,8 @@ function empiezaRegex(codigo) {
   return /(?:^|[^\w$.])(?:return|typeof|case|in|of|delete|void|throw|new|else|do)$/.test(previo);
 }
 
-export function quitarComentariosJs(texto) {
+// With `blanquearCadenas`, the inside of strings and regexes is blanked too (same length): a skeleton of the code only.
+export function quitarComentariosJs(texto, { blanquearCadenas = false } = {}) {
   let salida = '';
   let i = 0;
   const n = texto.length;
@@ -67,7 +68,7 @@ export function quitarComentariosJs(texto) {
       let j = i + 1;
       while (j < n && texto[j] !== c) j += texto[j] === '\\' ? 2 : 1;
       if (j >= n) throw new Error(`unterminated string starting at offset ${i}`);
-      copiar(j + 1); // template `${...}` bodies are kept as part of the string: good enough to find calls
+      (blanquearCadenas ? blanquear : copiar)(j + 1); // template `${...}` bodies are kept as part of the string: good enough to find calls
     } else if (c === '/' && empiezaRegex(salida)) {
       let j = i + 1;
       let clase = false;
@@ -78,7 +79,7 @@ export function quitarComentariosJs(texto) {
         j++;
       }
       if (texto[j] !== '/') throw new Error(`unterminated regular expression starting at offset ${i}`);
-      copiar(j + 1);
+      (blanquearCadenas ? blanquear : copiar)(j + 1);
     } else {
       copiar(i + 1);
     }
@@ -119,7 +120,7 @@ const OP_SHELL = [{ regla: 'spawns-op', re: /(?:^|[|;&({`]|\$\(|\brun:|\bthen|\b
 const BOVEDA = [{ regla: 'opens-vault', re: /\bPasswordVault\b|\bRetrieve(?:Password|All)?\b/ }];
 const FUNCIONES = [{ regla: 'uses-door-function', re: new RegExp(`\\b(?:${FUNCIONES_PUERTA.join('|')})\\b`) }];
 
-function tipoDe(ruta) {
+export function tipoDe(ruta) {
   const base = ruta.split('/').pop();
   const ext = base.includes('.') ? base.slice(base.lastIndexOf('.')).toLowerCase() : '';
   if (EXTENSIONES.js.includes(ext)) return 'js';
@@ -144,7 +145,7 @@ export function escanearTexto(ruta, texto) {
   return hallazgos;
 }
 
-function ficheros(raiz, dir = raiz, salida = []) {
+export function ficheros(raiz, dir = raiz, salida = []) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (IGNORADOS.has(e.name)) continue;
     const completa = join(dir, e.name);
@@ -155,7 +156,7 @@ function ficheros(raiz, dir = raiz, salida = []) {
 }
 
 // package.json scripts are shell commands.
-function textoDeScripts(texto) {
+export function textoDeScripts(texto) {
   return Object.values(JSON.parse(texto).scripts ?? {}).join('\n');
 }
 

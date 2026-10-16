@@ -40,15 +40,43 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 |---|---|---|
 | Abrir un PR como la App | `node scripts/token.mjs -- gh pr create --fill` | la URL del PR |
 | Armar la fusión automática | `node scripts/token.mjs -- gh pr merge <n> --auto --squash` | `will be automatically merged` |
-| Checks de un PR | `gh pr checks <n>` | `tests` y `revisor` en `pass`, o `fail` con enlace |
+| Checks de un PR (una vez, al final) | `gh pr checks <n>` | `tests` y `revisor` en `pass`, o `fail` con enlace |
 | Solo lo que falló | `gh run view <run> --log-failed` | el error: fichero y regla, o nombre del test |
 | Relanzar | `gh run rerun <run> --failed` | el run vuelve a `in_progress` |
 | Reglas que aplican a `main` | `gh api repos/<repo>/rules/branches/main` | `pull_request` y `required_status_checks` con `tests` y `revisor` |
 | ¿Está en main? | `git fetch origin` y mirar `origin/main` | el commit o su ausencia |
 | Probar un workflow | `npx actionlint .github/workflows/*.yml` | sin salida |
 
+## La cuota de GitHub
+
+Figures here were measured in MenuPlan and are NOT verified for this repo (we do not know how many points the Fábrica
+spends, nor the real quota of the App token). Measure first: `npm run llamadas-gh` counts the calls that went
+through `node scripts/token.mjs -- gh ...` per API and per hour (file of `rutaDeRegistroGh` in `scripts/lib/registro-gh.mjs`: time, caller, api, result;
+nothing else). A bare `gh` is not counted.
+
+- **MenuPlan's facts, unverified here.** 5,000 points per hour per identity, and per API: REST (core) and GraphQL are
+  different quotas; the App token and a person's token each have their own. `gh api rate_limit` shows only REST; read
+  GraphQL with `gh api graphql -f query='{ rateLimit { limit remaining resetAt } }'`. The `resetAt` is the one that counts.
+- **Who uses which.** Almost all `gh issue`, `gh pr` and `gh label` use GraphQL; `gh run`, `gh workflow`, `gh secret` and `gh api repos/...` are REST.
+- **Cost.** A GraphQL query costs about (requests needed for its nested lists)/100, minimum 1, and GitHub charges for
+  what is requested (`first:`), not for what comes back. Measure by adding `rateLimit { cost remaining }`. Ask for the minimum fields.
+- **Rules for agents.** Check CI once, at the end, never in a loop, over REST:
+  `gh api repos/<repo>/commits/<sha>/check-runs`. Never `gh pr checks --watch` (it repeats a GraphQL query for as long as
+  it runs, per session). To read one issue or PR: `gh api repos/<repo>/issues/<n> --jq .body`.
+  `test/gh-quota.test.js` fails on `--watch` with gh or on
+  `gh issue list` / `gh pr list` inside a loop in code, skills and agents (the sections that explain it are exempt).
+- **No snapshot yet.** The issue list here is short: measure before building a published copy of it.
+- The 1Password side of the same quota incident of 2026-10-16: skill `1password`, "Lo que falló".
+
 ## Lo que falló
 
+- **2026-10-10 · from MenuPlan, unverified here: the GraphQL quota hit 0 twice while `gh api rate_limit` showed spare.** Cause: all
+  sessions spent the same token (each startup read all issues, ~320 points; `gh pr checks --watch` kept querying) and
+  `rate_limit` shows only REST. Fix there: caches, waiting for CI over REST, one accounting line per call, ceilings in a
+  test (the rules for agents above). Here: `test/gh-quota.test.js` (no `--watch`, no list in a loop) and `test/registro-gh.test.js` + `test/token-gh.test.js` (the accounting line); no ceiling test yet, first measure.
+- **2026-10-14 · from MenuPlan, unverified here: each full read of the issues cost ~450 points, peak hour 6,108.** Cause, measured there: ~1.08
+  points per requested issue (cost follows `first:`). Fix there: a published snapshot; not needed here yet. Backed here
+  only by `test/gh-quota.test.js` (no list in a loop) and the count of `npm run llamadas-gh`.
 - **2026-10-09 · un PR abierto con `GITHUB_TOKEN` no lanzó `tests.yml`.** Causa: GitHub no dispara
   workflows con ese token. Arreglo: abrir los PR con el token de la App (`scripts/token.mjs`), o lanzarlo con `gh workflow run`.
 - **2026-10-09 · ruleset con la integración de Actions como excepción: 422 «Actor GitHub Actions
