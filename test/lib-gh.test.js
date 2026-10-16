@@ -10,8 +10,8 @@ const ruta = (r) => fileURLToPath(new URL(`../${r}`, import.meta.url));
 const ps = (args) => spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', ...args], { encoding: 'utf8' });
 const hayPs = process.platform === 'win32';
 
-test('arranque.ps1, ruleset.ps1 y lib-gh.ps1 pasan el parser de PowerShell 5.1', { skip: !hayPs }, () => {
-  for (const f of ['arranque', 'ruleset', 'lib-gh']) {
+test('los .ps1 de apps/ pasan el parser de PowerShell 5.1', { skip: !hayPs }, () => {
+  for (const f of ['arranque', 'ruleset', 'lib-gh', 'lib-proyecto', 'proyecto-nuevo']) {
     const cmd = `$e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${ruta(`apps/${f}.ps1`)}',[ref]$null,[ref]$e); if ($e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }`;
     const r = ps(['-Command', cmd]);
     assert.equal(r.status, 0, `${f}.ps1: ${r.stdout}${r.stderr}`);

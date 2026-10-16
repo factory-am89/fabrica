@@ -324,19 +324,7 @@ try {
 
   # ---------- 2. environment revisor limitado a main ----------
   Paso '2 Environment revisor (main)' {
-    $e = Gh @('api', "repos/$Repo/environments/revisor")
-    $existia = ($e.Code -eq 0)
-    $r = Gh @('api', '-X', 'PUT', "repos/$Repo/environments/revisor", '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true')
-    if ($r.Code -ne 0) { throw "No pude crear el environment: $($r.Out)" }
-    $p = Gh @('api', "repos/$Repo/environments/revisor/deployment-branch-policies", '--jq', '.branch_policies[].name')
-    if ($p.Code -ne 0) { throw "No pude leer las ramas permitidas: $($p.Out)" }
-    $nombres = @($p.Out -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($nombres -notcontains 'main') {
-      $n = Gh @('api', '-X', 'POST', "repos/$Repo/environments/revisor/deployment-branch-policies", '-f', 'name=main', '-f', 'type=branch')
-      if ($n.Code -ne 0) { throw "No pude limitar el environment a main: $($n.Out)" }
-    } elseif ($existia) { $script:Estado = 'ya hecho' }
-    $extra = @($nombres | Where-Object { $_ -ne 'main' })
-    if ($extra.Count -gt 0) { Aviso "El environment admite ademas: $($extra -join ', '). Deberia ser solo main." }
+    if ((Asegurar-Environment-Revisor $Repo) -eq 'ya hecho') { $script:Estado = 'ya hecho' }
     Bien 'Environment revisor limitado a la rama main.'
   }
 
