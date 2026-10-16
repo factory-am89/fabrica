@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readQuestions } from './lib/questions.mjs';
-import { ANSWERS, STANDARD_SOURCE, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWER, ANSWERS, ERROR, STANDARD_SOURCE, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
@@ -42,7 +42,7 @@ export function cargarPreguntas(valor, raiz = RAIZ) {
 
 function normalizar(r) {
   const t = String(r ?? '').trim().toLowerCase();
-  return t === 'si' ? 'sí' : t;
+  return t === 'si' ? ANSWER.yes : t;
 }
 
 // salida: texto JSON {respuestas:[{id, respuesta, prueba}]}
@@ -84,7 +84,7 @@ export function decidir(salida, preguntas, ctx = {}) {
     const resp = normalizar(r?.respuesta);
     if (!r) fallos.push(`${p.id}: sin respuesta`);
     else if (!ANSWERS.includes(resp)) fallos.push(`${p.id}: respuesta no válida`);
-    else if (resp === 'no') fallos.push(`${p.id}: no`);
+    else if (resp === ANSWER.no) fallos.push(`${p.id}: no`);
     else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
   }
   // Lo que lee el registro (scripts/lib/record.mjs): las respuestas ya reducidas al vocabulario, de esta misma lectura.
@@ -158,7 +158,7 @@ async function main() {
       repo: REPO, pr: PR, sha: SHA, standard: estandar, veredicto,
       respuestas: resumen ?? { answers: {}, invalid: 0 },
       run: runFromEnv(process.env),
-      error: errorEstandar ? 'standard-unloadable' : resumen ? null : 'output-unreadable',
+      error: errorEstandar ? ERROR.standardUnloadable : resumen ? null : ERROR.outputUnreadable,
     });
   } catch (e) {
     errorRegistro = e;

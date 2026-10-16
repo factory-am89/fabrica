@@ -3,8 +3,11 @@
 // scripts/records.mjs reads them back. The schema and its version live here and nowhere else.
 // Everything throws on anything unexpected: a broken record is never read as an empty one.
 export const RECORD_VERSION = 1;
-export const ANSWERS = ['sí', 'no', 'no aplica'];
-export const ERRORS = ['standard-unloadable', 'output-unreadable'];
+export const ANSWER = { yes: 'sí', no: 'no', notApplicable: 'no aplica' };
+export const ANSWERS = Object.values(ANSWER);
+export const ERROR = { standardUnloadable: 'standard-unloadable', outputUnreadable: 'output-unreadable' };
+export const ERRORS = Object.values(ERROR);
+export const UNANSWERED = 'sin-respuesta'; // aggregate's bucket for a question with a null answer
 const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
@@ -99,23 +102,24 @@ export function readCheckRuns(checkRuns) {
   return { records, unreadable };
 }
 
-// records (and the answer vocabulary, ANSWERS by default) -> { porPr: {"repo#pr": {rondas, ok, no, salida-ilegible, standard-unloadable}}, porPregunta: {id: {sí, no, no aplica, sin-respuesta}} }
+// records (and the answer and error vocabularies, ANSWERS and ERRORS by default) -> { porPr: {"repo#pr": {rondas, ok, no, <one counter per ERRORS value>}}, porPregunta: {id: {<one counter per answer>, sin-respuesta}} }
 // rondas = records of that PR; `no` = a no verdict without error. A record with an error says nothing about the questions.
-export function aggregate(records, answers = ANSWERS) {
+export function aggregate(records, answers = ANSWERS, errors = ERRORS) {
   const porPr = {};
   const porPregunta = {};
   for (const r of records) {
     const k = `${r.repo}#${r.pr}`;
-    const p = (porPr[k] ??= { rondas: 0, ok: 0, no: 0, 'salida-ilegible': 0, 'standard-unloadable': 0 });
+    const p = (porPr[k] ??= { rondas: 0, ok: 0, no: 0, ...Object.fromEntries(errors.map((e) => [e, 0])) });
     p.rondas += 1;
-    if (r.error === 'output-unreadable') p['salida-ilegible'] += 1;
-    else if (r.error === 'standard-unloadable') p['standard-unloadable'] += 1;
-    else if (r.ok) p.ok += 1;
+    if (r.error !== null) {
+      if (!(r.error in p)) throw new Error(`aggregate: error outside the vocabulary in ${r.repo}#${r.pr}`);
+      p[r.error] += 1;
+    } else if (r.ok) p.ok += 1;
     else p.no += 1;
     if (r.error) continue;
     for (const [id, a] of Object.entries(r.answers)) {
-      const q = (porPregunta[id] ??= Object.fromEntries([...answers, 'sin-respuesta'].map((x) => [x, 0])));
-      const clave = a ?? 'sin-respuesta';
+      const q = (porPregunta[id] ??= Object.fromEntries([...answers, UNANSWERED].map((x) => [x, 0])));
+      const clave = a ?? UNANSWERED;
       if (!(clave in q)) throw new Error(`aggregate: answer outside the vocabulary in ${r.repo}#${r.pr}`);
       q[clave] += 1;
     }

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { RUTA_ESTANDAR } from '../scripts/veredicto.mjs';
-import { ANSWERS, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
+import { ANSWERS, ERRORS, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
 
 const SHA = 'a'.repeat(40);
 const base = { repo: 'o/r', pr: 2, sha: SHA, standard: 'standards/code.md', veredicto: { ok: false, fallos: ['C5: no'] }, respuestas: { answers: { C1: 'sí', C5: 'no', C6: 'no aplica', C7: null }, invalid: 0 }, run: { id: 99, attempt: 1 } };
@@ -70,9 +70,9 @@ test('aggregate: rounds per PR, "no" per question, unreadable output apart', () 
     reg(3, false, { C1: null, C5: null }, 'output-unreadable'),
     reg(3, false, { C1: 'no', C5: 'no' }),
   ]);
-  assert.deepEqual(a.porPr['o/r#1'], { rondas: 2, ok: 1, no: 1, 'salida-ilegible': 0, 'standard-unloadable': 0 });
-  assert.deepEqual(a.porPr['o/r#2'], { rondas: 1, ok: 1, no: 0, 'salida-ilegible': 0, 'standard-unloadable': 0 });
-  assert.deepEqual(a.porPr['o/r#3'], { rondas: 2, ok: 0, no: 1, 'salida-ilegible': 1, 'standard-unloadable': 0 });
+  assert.deepEqual(a.porPr['o/r#1'], { rondas: 2, ok: 1, no: 1, 'output-unreadable': 0, 'standard-unloadable': 0 });
+  assert.deepEqual(a.porPr['o/r#2'], { rondas: 1, ok: 1, no: 0, 'output-unreadable': 0, 'standard-unloadable': 0 });
+  assert.deepEqual(a.porPr['o/r#3'], { rondas: 2, ok: 0, no: 1, 'output-unreadable': 1, 'standard-unloadable': 0 });
   assert.deepEqual(a.porPregunta.C1, { sí: 2, no: 1, 'no aplica': 1, 'sin-respuesta': 0 });
   assert.deepEqual(a.porPregunta.C5, { sí: 2, no: 2, 'no aplica': 0, 'sin-respuesta': 0 });
 });
@@ -132,4 +132,12 @@ test('aggregate: counters come from the answer vocabulary, so a new answer never
   const a = aggregate([r, { ...expected, answers: { C1: 'sí' } }], nuevo);
   assert.deepEqual(a.porPregunta.C1, { sí: 1, no: 0, 'no aplica': 0, quizás: 1, 'sin-respuesta': 0 });
   assert.throws(() => aggregate([r]), /vocabulary/);
+});
+
+test('aggregate: counters per error come from ERRORS, so a new error is counted apart (never as a no) and an unknown one throws', () => {
+  const nuevo = [...ERRORS, 'otro-error'];
+  const r = { ...expected, ok: false, error: 'otro-error', answers: {} };
+  const a = aggregate([r, reg(1, false, { C1: 'no' })], ANSWERS, nuevo);
+  assert.deepEqual(a.porPr['o/r#2'], { rondas: 1, ok: 0, no: 0, 'standard-unloadable': 0, 'output-unreadable': 0, 'otro-error': 1 });
+  assert.throws(() => aggregate([r]), /error outside the vocabulary/);
 });
