@@ -30,7 +30,7 @@ test('constructor y revisor piden solo los permisos acordados', () => {
   }
 });
 
-// Lista CERRADA de la App administradora (plan-app-admin, punto 1). Igualdad, no inclusión:
+// Lista CERRADA de la App administradora (plans/app-admin.md, punto 1). Igualdad, no inclusión:
 // añadir un permiso o un evento, o cambiar un nivel, hace fallar este test.
 const PERMISOS_ADMIN = {
   administration: 'write', contents: 'write', workflows: 'write', environments: 'write',

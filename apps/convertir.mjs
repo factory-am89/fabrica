@@ -15,7 +15,7 @@ const REPO = process.env.REPO ?? REPO_FABRICA;
 export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
 
 // Argumentos de `gh secret set` para un secreto del revisor: siempre en su environment.
-export const ENTORNO_ADMIN = 'administrador'; // solo lo lee administrar.yml (plan-app-admin, punto 2)
+export const ENTORNO_ADMIN = 'administrador'; // solo lo lee administrar.yml (plans/app-admin.md, punto 2)
 
 // Argumentos de `gh secret set` para un secreto: siempre en un environment, nunca en el repo.
 export const argsSecreto = (nombre, repo = REPO, entorno = ENTORNO) => ['secret', 'set', nombre, '--repo', repo, '--env', entorno];

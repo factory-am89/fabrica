@@ -22,11 +22,9 @@ Comprobación: `gh api repos/factory-am89/homenu-panel/rules/branches/main` debe
 
 ## App fabrica-administrador (una vez)
 
-La tercera App, la que crea y protege repos sin ti (plan: trozo 1 de 10). Decisión de Pablo, 16 oct 2026. Ella no se crea sola: ninguna App puede crear Apps. Sus secretos viven solo en el environment `administrador` de `factory-am89/fabrica` (limitado a `main`), nunca en 1Password ni en un PC.
+La tercera App, la que crea y protege repos sin ti (trozo 1 de 10 de `plans/app-admin.md`). Decisión de Pablo, 16 oct 2026 (entrada de `intervenciones.md` del 16 oct, PR #63). Ella no se crea sola: ninguna App puede crear Apps. Sus secretos viven solo en el environment `administrador` de `factory-am89/fabrica` (limitado a `main`), nunca en 1Password ni en un PC.
 
 1. Abre `apps/crear-apps.html` (en `C:\dev\fabrica`), pulsa **Crear fabrica-administrador** y en GitHub **Create GitHub App**. Copia lo que va detrás de `code=` en la barra de direcciones (página que no carga) y lanza enseguida `node apps/convertir.mjs EL_CODIGO` con tu sesión de `gh` de administrador: crea el environment `administrador` (solo `main`) y guarda `ADMIN_APP_KEY` y `ADMIN_CLIENT_ID` sin imprimirlos.
 2. Instálala en `factory-am89`, **All repositories** (el script da el enlace `…/installations/new`). No amplíes sus permisos: son exactamente los del manifiesto.
-3. Genera una segunda clave privada de `fabrica-revisor` (Settings de la App, «Generate a private key»; la actual sigue valiendo) y guárdala: `gh secret set REVISOR_APP_KEY --env administrador --repo factory-am89/fabrica < RUTA-DE-LA-CLAVE.pem`. Borra el `.pem`.
-4. Guarda también, cada uno con `gh secret set <NOMBRE> --env administrador --repo factory-am89/fabrica` (el valor lo escribes tú, nunca en la orden): `REVISOR_CLIENT_ID` y `CLAUDE_CODE_OAUTH_TOKEN` (sale de `claude setup-token`).
 
-Nombres que debe haber al final en `administrador`: `ADMIN_APP_KEY`, `ADMIN_CLIENT_ID`, `REVISOR_APP_KEY`, `REVISOR_CLIENT_ID`, `CLAUDE_CODE_OAUTH_TOKEN`. Comprobación: `gh api repos/factory-am89/fabrica/environments/administrador/secrets --jq '.secrets[].name'`.
+Nombres que debe haber al final en `administrador`: `ADMIN_APP_KEY` y `ADMIN_CLIENT_ID`. Los secretos del revisor que esta App copiará a cada repo se te pedirán en el trozo que los use, no antes. Comprobación: `gh api repos/factory-am89/fabrica/environments/administrador/secrets --jq '.secrets[].name'`.
