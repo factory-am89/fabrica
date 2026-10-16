@@ -44,6 +44,16 @@ test('tests.yml exige package-lock (npm ci, cache npm) y un script test, y lo do
   assert.equal(regla?.env?.FABRICA_REPO_A_COMPROBAR, '${{ github.workspace }}');
 });
 
+test('tests.yml re-runs on PR edits and checks the PR body in the Factory only, with the body passed through env', () => {
+  assert.deepEqual(doc.on.pull_request.types, ['opened', 'synchronize', 'reopened', 'edited']);
+  const iFabrica = pasos.findIndex((p) => p.with?.path === '.fabrica');
+  const iBody = pasos.findIndex((p) => typeof p.run === 'string' && p.run.includes('.fabrica/scripts/pr-body.mjs'));
+  assert.ok(iBody > iFabrica && iFabrica > 0, 'the body check must exist and come after the .fabrica checkout');
+  assert.equal(pasos[iBody].if, `github.event_name == 'pull_request' && github.repository == '${REPO}'`);
+  assert.ok(!pasos[iBody].run.includes('${{'), 'run must not interpolate expressions; use env');
+  assert.equal(pasos[iBody].env.PR_BODY, '${{ github.event.pull_request.body }}');
+});
+
 function workflowsDeLlamador(ficheros, variable) {
   const carpeta = mkdtempSync(path.join(tmpdir(), 'llamador-wf-'));
   try {

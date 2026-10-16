@@ -21,6 +21,8 @@ export const GATE_FILES = [
   'test/workflows.test.js', // machine rules (C4) tests.yml runs from .fabrica/
   'scripts/lib/acciones.mjs', // imported by test/workflows.test.js
   'scripts/lib/repo.mjs', // imported by scripts/lib/acciones.mjs
+  'scripts/pr-body.mjs', // PR body check tests.yml runs from .fabrica/
+  'scripts/lib/pr-body.mjs', // imported by scripts/pr-body.mjs
   'package.json', // tests.yml runs `npm ci --prefix .fabrica`
   'package-lock.json', // same: npm ci installs exactly this
 ];
