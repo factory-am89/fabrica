@@ -21,8 +21,17 @@ test('arranque.ps1, ruleset.ps1 y lib-gh.ps1 pasan el parser de PowerShell 5.1',
 test('lib-gh.ps1: login aislado del git y del llavero, permisos del token, comillas del helper y subida de main', { skip: !hayPs }, () => {
   const r = ps(['-ExecutionPolicy', 'Bypass', '-File', ruta('test/lib-gh.prueba.ps1'), '-Lib', ruta('apps/lib-gh.ps1')]);
   const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
-  assert.ok(lineas.length >= 26, `salida inesperada: ${r.stdout}${r.stderr}`);
+  assert.ok(lineas.length >= 42, `salida inesperada: ${r.stdout}${r.stderr}`);
   assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
+});
+
+test('ruleset.ps1 sin -Repo o con un repo mal escrito para antes de tocar gh', { skip: !hayPs }, () => {
+  const r = ps(['-ExecutionPolicy', 'Bypass', '-File', ruta('apps/ruleset.ps1')]);
+  assert.notEqual(r.status, 0);
+  assert.match(`${r.stdout}${r.stderr}`, /Repo/);
+  const mal = ps(['-ExecutionPolicy', 'Bypass', '-File', ruta('apps/ruleset.ps1'), '-Repo', 'sinbarra']);
+  assert.equal(mal.status, 1);
+  assert.match(mal.stdout, /dueno\/nombre/);
 });
 
 // En PowerShell las funciones van antes que los ejecutables y no distinguen mayusculas: una funcion

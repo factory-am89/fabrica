@@ -102,17 +102,55 @@ function Gh([string[]]$A, [string]$Entrada) {
 # GET /apps/<slug> da 404 si la App es privada (aunque sea tuya), asi que un 404 NO prueba que no exista.
 # GET /user/installations (con la sesion de gh) lista las instalaciones con app_id y app_slug.
 # Devuelve Estado, Id, ClientId y Cuenta. Estado: ok | ninguna (la lista no la trae) | dudosa (no se pudo leer).
-function Buscar-App-Instalada([string]$Slug) {
+function Buscar-App-Instalada([string]$Slug, [string]$Cuenta = '') {
   $nada = [pscustomobject]@{ Estado = 'dudosa'; Id = $null; ClientId = $null; Cuenta = $null }
   $r = Gh @('api', '/user/installations?per_page=100')
   if ($r.Code -ne 0) { return $nada }
   try { $j = $r.Out | ConvertFrom-Json } catch { $j = $null }
   if (-not $j) { return $nada }
-  $m = @($j.installations | Where-Object { $_.app_slug -eq $Slug })
+  # Con $Cuenta, solo cuenta la instalacion en esa cuenta (una App puede estar instalada en varias).
+  $m = @($j.installations | Where-Object { $_.app_slug -eq $Slug -and (-not $Cuenta -or $_.account.login -ieq $Cuenta) })
   if ($m.Count -eq 0) { $nada.Estado = 'ninguna'; return $nada }
   $cid = $null
   if ($m[0].PSObject.Properties['client_id'] -and $m[0].client_id) { $cid = [string]$m[0].client_id }
   return [pscustomobject]@{ Estado = 'ok'; Id = [int]$m[0].app_id; ClientId = $cid; Cuenta = [string]$m[0].account.login }
+}
+
+# ---------- ruleset de main (funciones puras: no tocan GitHub) ----------
+# Parte 'dueno/nombre' en Dueno y Nombre; lanza si no tiene esa forma. El dueno del repo (usuario u
+# organizacion) NO es el usuario de la sesion de gh: la sesion solo tiene que ser admin del repo.
+function Partir-Repo([string]$Repo) {
+  if ($Repo -notmatch '^([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)$') { throw "El repo '$Repo' no tiene la forma dueno/nombre." }
+  return [pscustomobject]@{ Dueno = $Matches[1]; Nombre = $Matches[2] }
+}
+
+# Cuerpo del ruleset de main como tabla (el llamador lo pasa a ConvertTo-Json). Sin regla "update" y sin
+# bypass_actors: nadie salta el ruleset. $ContextoTests es el nombre del check de tests tal como lo ve
+# GitHub (un workflow reutilizado puede llamarse distinto, p. ej. 'tests / tests').
+function Cuerpo-Ruleset([string]$Nombre, [string]$ContextoTests, [int]$IdActions, [int]$IdRevisor) {
+  if (-not $ContextoTests) { throw 'Falta el nombre del check de tests (-ContextoTests).' }
+  return [ordered]@{
+    name          = $Nombre
+    target        = 'branch'
+    enforcement   = 'active'
+    conditions    = @{ ref_name = @{ include = @('~DEFAULT_BRANCH'); exclude = @() } }
+    bypass_actors = @()
+    rules         = @(
+      @{ type = 'pull_request'; parameters = @{
+          required_approving_review_count   = 0
+          dismiss_stale_reviews_on_push     = $false
+          require_code_owner_review         = $false
+          require_last_push_approval        = $false
+          required_review_thread_resolution = $false } },
+      @{ type = 'required_status_checks'; parameters = @{
+          strict_required_status_checks_policy = $false
+          required_status_checks = @(
+            @{ context = $ContextoTests; integration_id = $IdActions },
+            @{ context = 'revisor'; integration_id = $IdRevisor }) } },
+      @{ type = 'non_fast_forward' },
+      @{ type = 'deletion' }
+    )
+  }
 }
 
 # ---------- llavero de Windows (PasswordVault, via powershell.exe 5.1) ----------

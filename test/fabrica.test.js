@@ -107,11 +107,20 @@ test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subi
   assert.match(leer('apps/lib-gh.ps1'), /auth login/);
   const ruleset = leer('apps/ruleset.ps1');
   assert.doesNotMatch(ruleset, /check-runs/, 'el check revisor no debe haber corrido antes: solo corre en PR');
-  assert.match(ruleset, /context = 'revisor'; integration_id = \$idRevisor/);
-  assert.match(ruleset, /type = 'non_fast_forward'/);
-  assert.match(ruleset, /type = 'deletion'/);
-  assert.doesNotMatch(ruleset, /type = 'update'/);
-  assert.match(ruleset, /bypass_actors = @\(\)/);
+  // El cuerpo del ruleset vive en Cuerpo-Ruleset (apps/lib-gh.ps1), probado en test/lib-gh.prueba.ps1.
+  assert.match(ruleset, /Cuerpo-Ruleset \$NombreRuleset \$ContextoTests \$IdGitHubActions \$idRevisor/);
+  assert.doesNotMatch(ruleset, /type = '/, 'el cuerpo del ruleset no se repite en ruleset.ps1');
+});
+
+test('ruleset.ps1 sirve a repos de organizacion: -Repo obligatorio, sin repo ni usuario escritos, sesion admin', () => {
+  const ruleset = leer('apps/ruleset.ps1');
+  assert.match(ruleset, /\[Parameter\(Mandatory = \$true\)\]\[string\]\$Repo,/);
+  assert.match(ruleset, /\[string\]\$ContextoTests = 'tests'/);
+  assert.doesNotMatch(ruleset, /pabloam89\/fabrica/, 'repo obsoleto');
+  assert.doesNotMatch(ruleset, /\$Repo = '/, '-Repo no tiene valor por defecto');
+  assert.doesNotMatch(ruleset, /-ne \$Dueno|-ne '\$Dueno'/, 'la sesion no tiene que ser del dueno del repo');
+  assert.match(ruleset, /permissions\.admin/, 'la sesion debe ser admin del repo');
+  assert.match(ruleset, /Buscar-App-Instalada \$AppRevisor \$Dueno/, 'la App debe estar instalada en la cuenta duena');
 });
 
 function manifests() {
