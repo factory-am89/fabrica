@@ -9,7 +9,7 @@ comprobado: 2026-10-15
 
 ## Cómo está montado
 
-- **`main` solo por PR.** Ruleset de `main` (los clics, en `PASOS-PABLO.md`, paso 8): PR obligatorio,
+- **`main` solo por PR.** Ruleset de `main` (lo crea `apps/ruleset.ps1`, que lanza Pablo): PR obligatorio,
   checks `tests` (Actions) y `revisor` (la App `fabrica-revisor`), sin force push ni borrado, **sin**
   «Restrict updates» (impediría empujar ramas) y sin bypass para nadie. Con la fusión automática
   activa, GitHub fusiona cuando los dos checks están en verde; ninguna sesión fusiona ni empuja a `main`.
