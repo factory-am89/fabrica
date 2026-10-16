@@ -1,5 +1,6 @@
 // The ruleset window (scripts/ventana.mjs) against a simulated GitHub (test/fixtures/github-ventana.mjs): no network,
 // no token. The state file is in a temp directory. Each rule has a test that fails if the rule is removed.
+// lesson: ruleset-pause-merges-armed
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
