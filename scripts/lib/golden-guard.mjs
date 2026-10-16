@@ -18,7 +18,7 @@ export const FAULT = { deleted: 'caso borrado', lowered: 'expect rebajado de no 
 const PREFIX = 'corpus dorado';
 const SAFE_ID = /^[A-Za-z0-9_.-]{1,40}$/;
 
-const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+export const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const fault = (what, id) => (id === undefined ? `${PREFIX}: ${what}` : `${PREFIX}: ${what} (${SAFE_ID.test(id) ? id : 'nombre no válido'})`);
 
 // Every path the compare names (new name and, for a rename, the old one).
@@ -46,12 +46,21 @@ function expectedOf(side, label) {
   return side.expected;
 }
 
+// The shape of a floor file, written once: scripts/golden.mjs (belowFloor) validates with it too. Throws with the message it gives.
+export function checkFloorShape(floor) {
+  if (!plain(floor) || Object.keys(floor).sort().join() !== 'deteccion,falsosNo') throw new Error('floor: must have exactly deteccion and falsosNo');
+  const inRange = (x) => typeof x === 'number' && x >= 0 && x <= 1;
+  if (!plain(floor.deteccion) || !inRange(floor.falsosNo) || !Object.values(floor.deteccion).every(inRange)) throw new Error('floor: values must be numbers between 0 and 1');
+  return floor;
+}
+
 function floorOf(side, label) {
   if (side.floor === null) return null;
-  const f = side.floor;
-  const num = (x) => typeof x === 'number' && x >= 0 && x <= 1;
-  if (!plain(f) || !plain(f.deteccion) || !num(f.falsosNo) || !Object.values(f.deteccion).every(num)) throw new Error(`${label}: floor.json is malformed`);
-  return f;
+  try {
+    return checkFloorShape(side.floor);
+  } catch (e) {
+    throw new Error(`${label}: floor.json is malformed (${e.message})`);
+  }
 }
 
 // files: the compare's files. base, head: { expected, floor } read at the base and at the head of the PR.

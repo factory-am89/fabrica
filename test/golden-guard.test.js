@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { CORPUS, CLEAN as CLEAN_OF_SCORER } from '../scripts/golden.mjs';
+import { CORPUS, CLEAN as CLEAN_OF_SCORER, belowFloor } from '../scripts/golden.mjs';
 import { CLEAN, COMPARE_FILE_LIMIT, EXPECTED_FILE, FAULT, FLOOR_FILE, GOLDEN_DIR, checkGolden, goldenFaults, touchesCorpus } from '../scripts/lib/golden-guard.mjs';
 import { decidir } from '../scripts/veredicto.mjs';
 import { buenas, ctx, preguntas } from './apoyo/fabrica.mjs';
@@ -115,4 +115,14 @@ test('decidir: the brake reasons fail the verdict even when every answer is sí;
   const v = decidir(output, preguntas, ctx({ golden: [reason(FAULT.deleted, 'caso-03')] }));
   assert.equal(v.ok, false);
   assert.deepEqual(v.fallos, [reason(FAULT.deleted, 'caso-03')]);
+});
+
+test('one floor schema: the guard and the scorer reject the same shapes (an extra key included)', () => {
+  const good = { deteccion: { C5: 0.5 }, falsosNo: 0.1 };
+  const informe = { deteccion: { C5: { tasa: 1 } }, falsosNo: { tasa: 0 } };
+  assert.deepEqual(belowFloor(informe, good), []);
+  for (const bad of [{ ...good, extra: 1 }, { deteccion: good.deteccion }, { deteccion: { C5: 2 }, falsosNo: 0 }, []]) {
+    assert.throws(() => belowFloor(informe, bad), /floor:/);
+    assert.throws(() => run(copy(), { floorBase: bad, floorHead: null }), /malformed/);
+  }
 });
