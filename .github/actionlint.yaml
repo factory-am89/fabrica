@@ -1,0 +1,6 @@
+# actionlint 1.7.12 aun no conoce job.workflow_sha, que GitHub documenta en el contexto `job`
+# (docs.github.com, "Contexts", tabla del contexto job). Se ignora SOLO ese mensaje y SOLO en revisor.yml.
+paths:
+  .github/workflows/revisor.yml:
+    ignore:
+      - 'property "workflow_sha" is not defined in object type'
