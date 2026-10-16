@@ -18,7 +18,7 @@ const motivoDe = (w, todas, fusionados, cwd) => motivoDeQuedarse(w, { todas, cwd
 function ramasRemotas(cwd) {
   const r = git(['ls-remote', '--heads', 'origin'], cwd);
   if (r.status !== 0) throw new Error(`No pude listar las ramas de origin: ${r.stderr.trim()}; no se borra nada.`);
-  return new Set(r.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split(/\trefs\/heads\//)[1]));
+  return new Set(r.stdout.split('\n').filter(Boolean).map((l) => l.split('\trefs/heads/')[1]));
 }
 
 // Borra una carpeta paso a paso y cuenta lo que pasó de verdad. Lanza solo si NO llegó a borrar la carpeta

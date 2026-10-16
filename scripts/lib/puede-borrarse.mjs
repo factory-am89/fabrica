@@ -32,13 +32,13 @@ export function prsFusionados(repo, token, cwd) {
 // ¿Hay un PR fusionado con esta punta? Un commit posterior a la fusión no estaría en main.
 export const prFusionado = (punta, { repo = REPO, token = TOKEN, cwd = process.cwd() } = {}) => prsFusionados(repo, token, cwd).has(punta);
 
-export const dentro = (hijo, padre) => {
+const dentro = (hijo, padre) => {
   const rel = path.relative(norm(padre), norm(hijo));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
 
 // Las demás carpetas cuyo node_modules es una unión que acaba dentro de esta: borrarla se lo llevaría.
-export function dependientes(carpeta, todas) {
+function dependientes(carpeta, todas) {
   const nombres = [];
   for (const w of todas) {
     if (norm(w.ruta) === norm(carpeta)) continue;
