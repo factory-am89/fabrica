@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { EXIT, RETIRE_RESULT } from '../scripts/lib/exit.mjs';
 import { CONTRACT_FILE, contractText } from '../scripts/contract.mjs';
+import { DONE_LINE } from '../scripts/done.mjs';
 
 const contract = () => JSON.parse(readFileSync(CONTRACT_FILE, 'utf8'));
 
@@ -18,15 +19,16 @@ test('contract: the committed file equals the EXIT and RETIRE_RESULT constants (
 
 // The agent role file must keep naming the commands and the contract file: it is the reader of --json and of exit-codes.json.
 const CONSTRUCTOR = new URL('../.claude/agents/constructor.md', import.meta.url);
-const REQUIRED_NAMES = ['npm run tarea -- --json', 'npm run retirar -- --json', 'scripts/lib/exit-codes.json'];
+const REQUIRED_NAMES = ['npm run tarea -- --json', 'npm run retirar -- --json', 'scripts/lib/exit-codes.json', 'npm run done', 'DONE_LINE'];
 const missingNames = (text) => REQUIRED_NAMES.filter((n) => !text.includes(n));
 
 // The section must point to the code for the output shape, not copy a field list that can go stale.
 const hasFieldList = (text) => /`ok`\s*,\s*`error`|\bok,\s*error\b/.test(text);
 
-test('constructor.md names tarea and retirar with --json and the contract file, with no hand-written field list (good and bad case)', () => {
+test('constructor.md names tarea, retirar, done and the contract file, with no hand-written field list (good and bad case)', () => {
   const text = readFileSync(CONSTRUCTOR, 'utf8');
   assert.deepEqual(missingNames(text), []);
+  for (const line of Object.values(DONE_LINE)) assert.equal(text.includes(line), false, `constructor.md copies «${line}»: point to DONE_LINE instead`);
   assert.equal(hasFieldList(text), false, 'constructor.md copies the --json fields: point to runCommand instead');
   assert.equal(hasFieldList(`${text}\nfields ok, error, exit`), true);
   assert.equal(hasFieldList(`${text}\nfields \`ok\`, \`error\`, \`exit\``), true);
