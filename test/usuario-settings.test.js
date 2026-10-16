@@ -34,9 +34,11 @@ test('la plantilla y sus motivos no llevan datos personales ni de infraestructur
   }
 });
 
-test('la plantilla no contiene nada con forma de secreto', () => {
-  const texto = readFileSync(path.join(ORIGEN, 'settings.json'), 'utf8');
-  assert.doesNotMatch(texto, /(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_|ops_[A-Za-z0-9]{20,}|-----BEGIN)/);
+test('ni la plantilla ni los motivos contienen nada con forma de secreto', () => {
+  for (const nombre of ['settings.json', 'settings.motivos.json']) {
+    const texto = readFileSync(path.join(ORIGEN, nombre), 'utf8');
+    assert.doesNotMatch(texto, /(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_|ops_[A-Za-z0-9]{20,}|-----BEGIN)/, nombre);
+  }
 });
 
 test('motivos: cada clave de primer y segundo nivel de la plantilla tiene motivo, y no sobra ninguno', () => {
