@@ -120,8 +120,13 @@ test('the `!` format is pinned with lines cut from real Claude Code transcripts 
 test('a `!` of a subagent, an old `!` and an input without session do not log; a missing transcript throws', () => conCasa((casa, h, ruta) => {
   const transcript = join(casa, 'sesion.jsonl');
   writeFileSync(transcript, bang('viejo', { timestamp: '2026-10-15T01:00:00.000Z' }));
-  assert.equal(anotarBangs({ session_id: 'sesion-1234', transcript_path: transcript }, { casa: h, ahora: AHORA }), 0);
-  assert.equal(anotarBangs({ session_id: 'sesion-1234', agent_id: 'a1', transcript_path: transcript }, { casa: h, ahora: AHORA }), 0);
+  assert.equal(anotarBangs({ session_id: 'sesion-1234', transcript_path: transcript }, { casa: h, ahora: AHORA }), 0, 'old');
+  const reciente = join(casa, 'reciente.jsonl');
+  writeFileSync(reciente, bang('nuevo'));
+  assert.equal(anotarBangs({ session_id: 'sesion-5678', agent_id: 'a1', transcript_path: reciente }, { casa: h, ahora: AHORA }), 0, 'subagent input with a recent `!`');
+  const lateral = join(casa, 'lateral.jsonl');
+  writeFileSync(lateral, bang('lateral', { isSidechain: true }));
+  assert.equal(anotarBangs({ session_id: 'sesion-9012', transcript_path: lateral }, { casa: h, ahora: AHORA }), 0, 'sidechain line');
   assert.equal(existsSync(ruta), false);
   assert.throws(() => anotarBangs({ transcript_path: transcript }, { casa: h }), /session_id/);
   assert.throws(() => anotarBangs({ session_id: 'sesion-1234', transcript_path: join(casa, 'no-existe') }, { casa: h }), /transcript_path/);
@@ -189,5 +194,4 @@ test('.claude/settings.json: PermissionRequest, Stop and SessionEnd call interve
   for (const evento of ['Stop', 'SessionEnd']) assert.ok(ordenes(evento).some((c) => c.includes('scripts/intervenciones.mjs') && c.endsWith(' bang')), evento);
   assert.ok(ordenes('SessionStart').length > 0);
   assert.ok(ordenes('PreToolUse').some((c) => c.includes('carpeta-principal.mjs')));
-  assert.ok(existsSync(join(AQUI, '..', 'scripts', 'intervenciones.mjs')));
 });
