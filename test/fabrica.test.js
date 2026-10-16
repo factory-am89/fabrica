@@ -8,6 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
+import { accionFijada, accionesDe } from '../scripts/lib/acciones.mjs';
+import { REPO } from '../scripts/lib/repo.mjs';
 
 const leer = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8');
 const preguntas = leerPreguntas(leer('estandares/codigo.md'));
@@ -50,16 +52,52 @@ test('los workflows declaran permisos y fijan cada acción por SHA (C4)', () => 
     const texto = leer(`.github/workflows/${f}`);
     assert.match(texto, /^permissions:/m, `${f} sin permissions`);
     assert.doesNotMatch(texto, /permissions:\s*write-all/, `${f} con write-all`);
-    for (const [, accion] of texto.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)) {
-      assert.match(accion, /@[0-9a-f]{40}$/, `${f}: ${accion} sin SHA`);
+    for (const accion of accionesDe(texto)) {
+      assert.ok(accionFijada(accion), `${f}: ${accion} sin SHA`);
     }
   }
+});
+
+test('C4: la única excepción al SHA es un workflow de la Fábrica con @main, y nada más', () => {
+  const sha = 'a'.repeat(40);
+  for (const bien of [`actions/checkout@${sha}`, `${REPO}/.github/workflows/tests.yml@main`, `${REPO}/.github/workflows/revisor.yml@main`]) {
+    assert.equal(accionFijada(bien), true, bien);
+  }
+  for (const mal of [
+    'actions/checkout@v7', 'actions/checkout@main', // una acción de otro repo, sin SHA
+    'otro/fabrica/.github/workflows/tests.yml@main', // otro repo
+    `${REPO}x/.github/workflows/tests.yml@main`, // repo con el mismo prefijo
+    `${REPO}/.github/workflows/tests.yml@v1`, // otra referencia
+    `${REPO}/.github/workflows/tests.yml@master`,
+    `${REPO}/.github/actions/x@main`, // otra ruta
+    `${REPO}/scripts/x.yml@main`,
+    `${REPO}/.github/workflows/../../x.yml@main`, // salida de la carpeta
+    `${REPO}/.github/workflows/sub/x.yml@main`,
+    './.github/workflows/tests.yml', // local, sin referencia
+  ]) {
+    assert.equal(accionFijada(mal), false, mal);
+  }
+});
+
+test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio commit', () => {
+  const texto = leer('.github/workflows/revisor.yml');
+  assert.match(texto, /^ {2}workflow_call:/m, 'sin workflow_call no se puede llamar desde otro repo');
+  const checkout = texto.split(/^ {6}- /m).find((b) => b.includes('path: .fabrica'));
+  assert.ok(checkout, 'falta el checkout de la Fábrica en .fabrica/');
+  assert.ok(checkout.includes(`repository: ${REPO}`), 'el checkout de .fabrica no fija repository: la Fábrica');
+  assert.match(checkout, /ref: \$\{\{ job\.workflow_sha \}\}/, 'la Fábrica debe bajarse en el commit del workflow llamado');
+  assert.match(texto, /node \.fabrica\/scripts\/veredicto\.mjs/);
+  assert.match(texto, /\.fabrica\/\.claude\/agents\/revisor\.md/);
+  assert.match(texto, /\.fabrica\/estandares\/codigo\.md/);
+  assert.doesNotMatch(texto, /node scripts\/veredicto/, 'la ruta sin .fabrica/ bajaría el repo que llama');
 });
 
 test('revisor.yml usa pull_request_target, no baja el código del PR y guarda los secretos en el environment revisor', () => {
   const texto = leer('.github/workflows/revisor.yml');
   assert.match(texto, /^on:\s*\n(\s*#.*\n)*\s+pull_request_target:/m);
-  assert.doesNotMatch(texto, /^\s*ref:/m, 'un checkout con ref: traería el código del PR');
+  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha); ninguno trae el código del PR.
+  const refs = [...texto.matchAll(/^\s*ref:\s*(.*)$/gm)].map((m) => m[1].trim());
+  assert.deepEqual(refs, ['${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR');
   assert.match(texto, /^ {4}environment: revisor$/m, 'sin environment revisor los secretos serían del repo');
 });
 
