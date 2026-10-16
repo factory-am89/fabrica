@@ -20,6 +20,7 @@ function Nuevo-Estado {
     enRama = @(); ramaCreada = $false; prAbierto = $false
     checks = @('tests / tests')
     rulesets = @(); cuerpoRuleset = $null
+    rompe = @{}   # patron de ruta -> @{ Texto; Codigo }: respuesta ilegible o llamada fallida
   }
 }
 
@@ -38,6 +39,7 @@ function gh.exe {
   $jq = $a -contains '--jq'
   function Falla([string]$t) { $global:LASTEXITCODE = 1; $t }
   if ($a[0] -eq 'auth') { return }
+  foreach ($k in @($e.rompe.Keys)) { if ($ruta -like $k -and -not $jq) { $global:LASTEXITCODE = $e.rompe[$k].Codigo; return $e.rompe[$k].Texto } }
   if ($ruta -eq 'user' -and $a -contains '-i') { return "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo, workflow`r`n`r`n{}" }
   if ($ruta -eq 'user') { return 'pablo' }
   if ($ruta -eq "repos/$RP" -and $metodo -eq 'PATCH') { $e.auto = $true; $e.borrar = $true; return '{}' }
@@ -145,3 +147,22 @@ Prueba 'sin check de tests observado: para sin crear el ruleset' ($r.Code -eq 1 
 $e = Nuevo-Estado; $e.checks = @()
 $r = Lanza $e @{ ContextoTests = 'tests' }
 Prueba '-ContextoTests manda sobre lo observado' ($r.Code -eq 0 -and $e.cuerpoRuleset -match '"context":\s+"tests"')
+# 10. Respuestas ilegibles o llamadas fallidas: se para con el motivo real y la salida de gh, nunca en silencio.
+$e = Nuevo-Estado; $e.enMain = @(); $e.rompe["repos/$RP/pulls?*"] = @{ Texto = '<html>Bad gateway</html>'; Codigo = 0 }
+$r = Lanza $e
+Prueba 'lista de PR ilegible: sale 1 con el motivo y la salida de gh' ($r.Code -eq 1 -and $r.Out -match 'los PR abiertos' -and $r.Out -match 'Bad[ 
+]+gateway')
+Prueba 'lista de PR ilegible: no crea rama ni PR' (-not $e.ramaCreada -and -not $e.prAbierto -and $e.enRama.Count -eq 0)
+$e = Nuevo-Estado; $e.rompe["repos/$RP"] = @{ Texto = '<html>Bad gateway</html>'; Codigo = 0 }
+$r = Lanza $e
+Prueba 'repo ilegible: dice que no es JSON con la salida y no culpa a los permisos' ($r.Code -eq 1 -and $r.Out -match 'no es JSON' -and $r.Out -match 'Bad[ 
+]+gateway' -and $r.Out -notmatch 'no es administradora')
+$e = Nuevo-Estado; $e.rompe["repos/$RP"] = @{ Texto = 'gh: Server Error (HTTP 500)'; Codigo = 1 }
+$r = Lanza $e
+Prueba 'llamada al repo fallida: la salida de gh llega al mensaje' ($r.Code -eq 1 -and $r.Out -match 'HTTP 500' -and $r.Out -notmatch 'no es administradora')
+$e = Nuevo-Estado; $e.rompe['/user/installations?per_page*'] = @{ Texto = '<html>nope</html>'; Codigo = 0 }
+$r = Lanza $e
+Prueba 'instalaciones ilegibles: el pendiente lleva el motivo y no se crea el ruleset' ($r.Code -eq 1 -and $r.Out -match 'nope' -and -not $e.cuerpoRuleset)
+$e = Nuevo-Estado; $e.rompe["repos/$RP/environments/revisor/secrets"] = @{ Texto = '<html>x500</html>'; Codigo = 0 }
+$r = Lanza $e
+Prueba 'secretos ilegibles: para con el motivo' ($r.Code -eq 1 -and $r.Out -match 'x500' -and $r.Out -match 'los secretos')

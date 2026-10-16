@@ -70,7 +70,8 @@ try {
 
   Paso '2 Repo' {
     $j = Leer-Repo $Repo
-    if (-not $j.permissions -or $j.permissions.admin -ne $true) { throw "La sesion de '$Usuario' no es administradora de $Repo (hace falta para ajustes, environment y ruleset)." }
+    if (-not $j.permissions) { throw "GitHub no devolvio los permisos de la sesion sobre $Repo (respuesta sin 'permissions'); no puedo saber si '$Usuario' es admin." }
+    if ($j.permissions.admin -ne $true) { throw "La sesion de '$Usuario' no es administradora de $Repo (hace falta para ajustes, environment y ruleset)." }
     if ($Dueno -ne 'factory-am89') { throw "La ficha .fabrica.json usa la identidad fabrica-constructor, que solo vale en repos de factory-am89; $Repo no vale." }
     $b = Gh @('api', "repos/$Repo/branches/$Base", '--jq', '.name')
     if ($b.Code -ne 0) { throw "La rama $Base de $Repo no existe todavia: sube antes un primer commit." }

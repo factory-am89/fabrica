@@ -15,7 +15,15 @@ $script:ArchivosProyecto = @(
   @{ Ruta = '.fabrica.json'; Plantilla = 'ficha.json' }
 )
 
-function Json-De($r) { try { return ($r.Out | ConvertFrom-Json) } catch { return $null } }
+# JSON de una respuesta de gh. Lanza con el motivo real y la salida de gh si la llamada fallo o no es JSON:
+# nunca devuelve $null en silencio. Una lista vacia ([]) devuelve un array vacio.
+function Json-De($r, [string]$Que) {
+  if ($r.Code -ne 0) { throw "No pude leer ${Que}: $($r.Out)" }
+  if ($r.Out.Trim() -eq '[]') { return @() }
+  try { $j = $r.Out | ConvertFrom-Json } catch { throw "La respuesta de $Que no es JSON ($($_.Exception.Message)): $($r.Out)" }
+  if ($null -eq $j) { throw "La respuesta de $Que viene vacia: '$($r.Out)'" }
+  return $j
+}
 
 # Para si el plan de la cuenta no admite rulesets en este repo (privado y plan gratuito: 403). No cambia nada.
 function Comprobar-Rulesets-Disponibles([string]$Repo) {
@@ -28,19 +36,17 @@ function Comprobar-Rulesets-Disponibles([string]$Repo) {
 }
 
 function Leer-Repo([string]$Repo) {
-  $g = Gh @('api', "repos/$Repo")
-  if ($g.Code -ne 0) { throw "No pude leer el repo ${Repo}: $($g.Out)" }
-  return (Json-De $g)
+  return (Json-De (Gh @('api', "repos/$Repo")) "el repo $Repo")
 }
 
 # Fusion automatica y borrado de ramas al fusionar. Devuelve 'ok' o 'ya hecho'; lanza si no quedan activados.
 function Asegurar-Ajustes-Repo([string]$Repo) {
   $j = Leer-Repo $Repo
-  if ($j -and $j.allow_auto_merge -eq $true -and $j.delete_branch_on_merge -eq $true) { return 'ya hecho' }
+  if ($j.allow_auto_merge -eq $true -and $j.delete_branch_on_merge -eq $true) { return 'ya hecho' }
   $p = Gh @('api', '-X', 'PATCH', "repos/$Repo", '-F', 'allow_auto_merge=true', '-F', 'delete_branch_on_merge=true')
   if ($p.Code -ne 0) { throw "No pude activar la fusion automatica y el borrado de ramas: $($p.Out)" }
   $j = Leer-Repo $Repo
-  if (-not $j -or $j.allow_auto_merge -ne $true) { throw 'La fusion automatica sigue desactivada tras activarla.' }
+  if ($j.allow_auto_merge -ne $true) { throw 'La fusion automatica sigue desactivada tras activarla.' }
   if ($j.delete_branch_on_merge -ne $true) { throw 'El borrado de ramas al fusionar sigue desactivado tras activarlo.' }
   return 'ok'
 }
@@ -50,17 +56,14 @@ function Asegurar-Ajustes-Repo([string]$Repo) {
 #         otros (instalada en la cuenta pero sin este repo) | ninguna | dudosa (no se pudo leer; Detalle dice por que).
 function Estado-App-En-Repo([string]$Slug, [string]$Repo) {
   $p = Partir-Repo $Repo
-  $r = Gh @('api', '/user/installations?per_page=100')
-  if ($r.Code -ne 0) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = "gh no pudo listar las instalaciones: $($r.Out)" } }
-  $j = Json-De $r
-  if (-not $j) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = 'la lista de instalaciones no es JSON' } }
+  # 'dudosa' lleva siempre el motivo real (salida de gh incluida) en Detalle; el paso 6 la muestra y para.
+  try { $j = Json-De (Gh @('api', '/user/installations?per_page=100')) 'las instalaciones de Apps' }
+  catch { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = $_.Exception.Message } }
   $m = @($j.installations | Where-Object { $_.app_slug -eq $Slug -and $_.account.login -ieq $p.Dueno })
   if ($m.Count -eq 0) { return [pscustomobject]@{ Estado = 'ninguna'; Detalle = '' } }
   if ($m[0].repository_selection -eq 'all') { return [pscustomobject]@{ Estado = 'todos'; Detalle = '' } }
-  $r2 = Gh @('api', "/user/installations/$($m[0].id)/repositories?per_page=100")
-  $j2 = $null
-  if ($r2.Code -eq 0) { $j2 = Json-De $r2 }
-  if (-not $j2) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = "no pude leer los repos de la instalacion: $($r2.Out)" } }
+  try { $j2 = Json-De (Gh @('api', "/user/installations/$($m[0].id)/repositories?per_page=100")) 'los repos de la instalacion' }
+  catch { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = $_.Exception.Message } }
   $esta = @($j2.repositories | Where-Object { [string]$_.full_name -ieq $Repo })
   if ($esta.Count -gt 0) { return [pscustomobject]@{ Estado = 'repo'; Detalle = '' } }
   return [pscustomobject]@{ Estado = 'otros'; Detalle = '' }
@@ -79,10 +82,7 @@ function Clic-App-Que-Falta([string]$Slug, $Estado, [string]$Repo) {
 
 # Nombres de secretos del environment `revisor` que faltan (solo nombres; el valor no se pide a GitHub).
 function Secretos-Que-Faltan([string]$Repo) {
-  $r = Gh @('api', "repos/$Repo/environments/revisor/secrets")
-  if ($r.Code -ne 0) { throw "No pude listar los secretos del environment revisor: $($r.Out)" }
-  $j = Json-De $r
-  if (-not $j) { throw 'La lista de secretos del environment revisor no es JSON.' }
+  $j = Json-De (Gh @('api', "repos/$Repo/environments/revisor/secrets")) 'los secretos del environment revisor'
   $hay = @($j.secrets | ForEach-Object { [string]$_.name })
   return @($script:SecretosRevisor | Where-Object { $hay -notcontains $_ })
 }
@@ -123,13 +123,11 @@ function Archivos-Que-Faltan([string]$Repo, [string]$Base) {
 function Abrir-Pr-Inicial([string]$Repo, [string]$Base, [string]$Rama, [string]$Carpeta, [string[]]$Faltan) {
   $p = Partir-Repo $Repo
   $l = Gh @('api', "repos/$Repo/pulls?state=open&head=$($p.Dueno):$Rama")
-  if ($l.Code -ne 0) { throw "No pude listar los PR abiertos: $($l.Out)" }
-  $abiertos = @(Json-De $l)
+  $abiertos = @(Json-De $l 'los PR abiertos')
   if ($abiertos.Count -gt 0 -and $abiertos[0].html_url) { return [pscustomobject]@{ Url = [string]$abiertos[0].html_url; Estado = 'ya abierto' } }
   $s = Gh @('api', "repos/$Repo/git/ref/heads/$Base")
-  $sj = $null
-  if ($s.Code -eq 0) { $sj = Json-De $s }
-  if (-not $sj -or -not $sj.object.sha) { throw "No pude leer la punta de ${Base}: $($s.Out)" }
+  $sj = Json-De $s "la punta de $Base"
+  if (-not $sj.object.sha) { throw "La punta de ${Base} no trae sha: $($s.Out)" }
   $b = Gh @('api', '-X', 'POST', "repos/$Repo/git/refs", '-f', "ref=refs/heads/$Rama", '-f', "sha=$($sj.object.sha)")
   if ($b.Code -ne 0 -and $b.Out -notmatch 'Reference already exists') { throw "No pude crear la rama ${Rama}: $($b.Out)" }
   foreach ($a in ($script:ArchivosProyecto | Where-Object { $Faltan -contains $_.Ruta })) {
@@ -141,9 +139,8 @@ function Abrir-Pr-Inicial([string]$Repo, [string]$Base, [string]$Rama, [string]$
   }
   $cuerpo = "Deja el repo trabajando con la Fabrica (https://github.com/factory-am89/fabrica): los workflows que llaman a los reutilizables, un CLAUDE.md minimo y la ficha .fabrica.json.`n`nLo abre apps/proyecto-nuevo.ps1. Los checks tests y revisor aun no son obligatorios: el ruleset de main se crea al relanzar el script cuando este PR este fusionado."
   $n = Gh @('api', '-X', 'POST', "repos/$Repo/pulls", '-f', 'title=Trabajar con la Fabrica', '-f', "head=$Rama", '-f', "base=$Base", '-f', "body=$cuerpo")
-  $nj = $null
-  if ($n.Code -eq 0) { $nj = Json-De $n }
-  if (-not $nj -or -not $nj.html_url) { throw "No pude abrir el PR: $($n.Out)" }
+  $nj = Json-De $n 'la respuesta al abrir el PR'
+  if (-not $nj.html_url) { throw "GitHub no devolvio la direccion del PR: $($n.Out)" }
   return [pscustomobject]@{ Url = [string]$nj.html_url; Estado = 'nuevo' }
 }
 
@@ -151,9 +148,7 @@ function Abrir-Pr-Inicial([string]$Repo, [string]$Base, [string]$Rama, [string]$
 # Devuelve el nombre o $null si aun no hay ninguno (el workflow no ha corrido en esa rama).
 function Contexto-Tests-Observado([string]$Repo, [string]$Base) {
   $r = Gh @('api', "repos/$Repo/commits/$Base/check-runs?per_page=100")
-  if ($r.Code -ne 0) { throw "No pude leer los checks de ${Base}: $($r.Out)" }
-  $j = Json-De $r
-  if (-not $j) { throw 'Los checks de la rama base no son JSON.' }
+  $j = Json-De $r "los checks de $Base"
   $n = @($j.check_runs | ForEach-Object { [string]$_.name } | Where-Object { $_ -match '^tests( / tests)?$' })
   if ($n.Count -eq 0) { return $null }
   return $n[0]
@@ -162,9 +157,7 @@ function Contexto-Tests-Observado([string]$Repo, [string]$Base) {
 # Comprueba lo que de verdad aplica GitHub a la rama: exige $ContextoTests y revisor. Lanza si no.
 function Comprobar-Reglas-De-Main([string]$Repo, [string]$Base, [string]$ContextoTests) {
   $r = Gh @('api', "repos/$Repo/rules/branches/$Base")
-  if ($r.Code -ne 0) { throw "No pude leer las reglas de ${Base}: $($r.Out)" }
-  $j = Json-De $r
-  if (-not $j) { throw 'Las reglas de la rama no son JSON.' }
+  $j = Json-De $r "las reglas de $Base"
   $ctx = @($j | Where-Object { $_.type -eq 'required_status_checks' } | ForEach-Object { $_.parameters.required_status_checks } | ForEach-Object { [string]$_.context })
   foreach ($c in @($ContextoTests, 'revisor')) {
     if ($ctx -notcontains $c) { throw "GitHub no exige el check '$c' en ${Base} (exige: $($ctx -join ', '))." }
