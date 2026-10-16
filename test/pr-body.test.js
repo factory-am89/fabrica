@@ -62,6 +62,8 @@ test('prBodyFaults: files that is not an array throws', () => {
 test('template: headings are exactly SECTIONS and the untouched template has 3 faults', () => {
   const headings = [...template.matchAll(/^## (.*)$/gm)].map((m) => m[1]);
   assert.deepEqual(headings, SECTIONS.map((s) => s.name));
+  const hints = [...template.matchAll(/<!-- (.*?) -->/g)].map((m) => m[1]);
+  assert.deepEqual(hints, SECTIONS.map((s) => s.hint));
   const faults = prBodyFaults(template, []);
   assert.equal(faults.length, 3);
   for (const name of ['What changes', 'Evidence', 'Not verified']) {
