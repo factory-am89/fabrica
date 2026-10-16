@@ -1,16 +1,17 @@
 // Lo común de las carpetas de trabajo (worktrees): git, la carpeta principal y los nombres.
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { ExitError } from './exit.mjs';
 
 export function git(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
-  if (r.error) throw new Error(`No pude lanzar git: ${r.error.message}`);
+  if (r.error) throw new ExitError('GIT_FAILED', `No pude lanzar git: ${r.error.message}`);
   return r;
 }
 
 export function gitOk(args, cwd) {
   const r = git(args, cwd);
-  if (r.status !== 0) throw new Error(`git ${args.join(' ')} falló: ${r.stderr.trim()}`);
+  if (r.status !== 0) throw new ExitError('GIT_FAILED', `git ${args.join(' ')} falló: ${r.stderr.trim()}`);
   return r.stdout.trim();
 }
 
@@ -41,7 +42,7 @@ export const principal = (cwd) => worktrees(cwd)[0].ruta;
 // feat/<nombre>, fix/<nombre> u ops/<nombre>, en minúsculas y con guiones; devuelve <nombre>.
 export function nombreDeRama(rama) {
   const m = /^(?:feat|fix|ops)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(rama ?? '');
-  if (!m) throw new Error(`La rama «${rama}» no vale: feat/, fix/ u ops/ y un nombre en minúsculas y con guiones.`);
+  if (!m) throw new ExitError('INVALID_BRANCH', `La rama «${rama}» no vale: feat/, fix/ u ops/ y un nombre en minúsculas y con guiones.`);
   return m[1];
 }
 
