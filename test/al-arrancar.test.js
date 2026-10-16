@@ -58,7 +58,7 @@ test('al-arrancar: lanzado de verdad fuera de un repo, el fallo sale por stdout,
 });
 
 test('al-arrancar: PASOS lleva la limpieza y settings.json lanza solo este script', () => {
-  assert.deepEqual(PASOS.map((p) => p.nombre), ['al-dia', 'limpiar', 'hora']);
+  assert.deepEqual(PASOS.map((p) => p.nombre), ['al-dia', 'limpiar', 'sesiones', 'hora']);
   const comandos = ajustes.hooks.SessionStart.flatMap((g) => g.hooks.map((h) => h.command));
   assert.deepEqual(comandos, ['node "$CLAUDE_PROJECT_DIR/scripts/al-arrancar.mjs"']);
 });
