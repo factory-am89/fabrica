@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHECKED_BY } from './lib/questions.mjs';
+import { CHECKED_BY, ID_SOURCE } from './lib/questions.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
@@ -73,13 +73,15 @@ export function loadOutputs(dir, cases, trials) {
   return outputs;
 }
 
-// One output -> { <question id>: 'sí'|'no'|'no aplica' } through decidir. Throws when the text is unreadable or when any reviewer
-// question has no usable answer (missing, repeated, not in the vocabulary): an empty answer is never read as "no no".
+// One output -> { <question id>: 'sí'|'no'|'no aplica' } through decidir. Throws when the text is unreadable or when decidir finds
+// anything wrong other than a plain «Cn: no» (missing, repeated, unknown or invalid answer, a sí without proof): the real judge
+// would turn those into a verdict no, so a measurement taken from them would be false. Nothing is read as «no no».
+const PLAIN_NO = new RegExp(`^${ID_SOURCE}: ${ANSWER.no}$`);
 export function answersOf(text, preguntas, label) {
   const v = decidir(text, preguntas, CTX);
   if (v.respuestas === null) throw new Error(`unreadable output: ${label}`);
-  const sinRespuesta = Object.entries(v.respuestas.answers).filter(([, a]) => a === null).map(([id]) => id);
-  if (sinRespuesta.length) throw new Error(`incomplete output: ${label} has no usable answer for ${sinRespuesta.join(', ')}`);
+  const rejected = v.fallos.filter((f) => !PLAIN_NO.test(f));
+  if (rejected.length) throw new Error(`rejected output: ${label} (${rejected.join('; ')})`);
   return v.respuestas.answers;
 }
 
@@ -126,7 +128,8 @@ export function belowFloor(informe, floor) {
     if (!d) throw new Error(`floor: ${id} has no case in the corpus`);
     if (d.tasa < min) faults.push(`${id}: detection ${d.tasa} under the floor ${min}`);
   }
-  if (informe.falsosNo.tasa !== null && informe.falsosNo.tasa > floor.falsosNo) faults.push(`false no ${informe.falsosNo.tasa} over the floor ${floor.falsosNo}`);
+  if (informe.falsosNo.tasa === null) throw new Error('floor: the corpus has no clean case to measure false no');
+  if (informe.falsosNo.tasa > floor.falsosNo) faults.push(`false no ${informe.falsosNo.tasa} over the floor ${floor.falsosNo}`);
   return faults;
 }
 

@@ -91,12 +91,13 @@ test('una salida ilegible sale 1: no cuenta como respuesta vacía', () => {
   assert.equal(cli('--outputs', outputs).status, 1);
 });
 
-test('una salida que es JSON pero viene vacía o incompleta sale 1: sin respuesta no es «no hay no»', () => {
+test('una salida que el juez no acepta (vacía, incompleta, inválida o un sí sin prueba) sale 1: no es «no hay no»', () => {
   const incompleta = JSON.stringify({ respuestas: [{ id: 'C5', respuesta: 'sí', prueba: 'x' }] });
-  const sinPrueba = JSON.stringify({ respuestas: reviewerIds.map((id) => ({ id, respuesta: 'basura', prueba: 'x' })) });
-  for (const texto of ['{}', '{"respuestas":[]}', incompleta, sinPrueba]) {
+  const invalida = JSON.stringify({ respuestas: reviewerIds.map((id) => ({ id, respuesta: 'basura', prueba: 'x' })) });
+  const sinPrueba = JSON.stringify({ respuestas: reviewerIds.map((id) => ({ id, respuesta: 'sí', prueba: '' })) });
+  for (const texto of ['{}', '{"respuestas":[]}', incompleta, invalida, sinPrueba]) {
     const outputs = escribir((c) => (c.id === 'caso-07' ? texto : perfecto(c)));
-    assert.throws(() => run({ outputs }), /incomplete output: caso-07\/1\.json/, texto);
+    assert.throws(() => run({ outputs }), /rejected output: caso-07\/1\.json/, texto);
     assert.equal(cli('--outputs', outputs).status, 1, texto);
   }
 });
@@ -109,11 +110,16 @@ test('con 3 intentos manda la mayoría: 2 de 3 detectan, 1 de 3 no', () => {
   assert.throws(() => run({ outputs: dos, trials: 4 }), /missing outputs \(9\)/);
 });
 
-test('answersOf lee por decidir: un id repetido no vale como respuesta y uno ajeno no cambia nada', () => {
+test('answersOf lee por decidir: un no es un no, y un id repetido o ajeno lo rechaza el juez', () => {
   const respuestas = (extra) => JSON.stringify({ respuestas: [...reviewerIds.map((id) => ({ id, respuesta: id === 'C6' ? 'no' : 'sí', prueba: 'x' })), ...extra] });
-  const ajeno = { id: 'P1', respuesta: 'no', prueba: 'x' };
-  assert.equal(answersOf(respuestas([ajeno]), preguntas, 'x').C6, 'no');
-  assert.throws(() => answersOf(respuestas([{ id: 'C6', respuesta: 'sí', prueba: 'x' }]), preguntas, 'x'), /no usable answer for C6/);
+  assert.equal(answersOf(respuestas([]), preguntas, 'x').C6, 'no');
+  assert.throws(() => answersOf(respuestas([{ id: 'P1', respuesta: 'no', prueba: 'x' }]), preguntas, 'x'), /rejected output: x \(1 ids desconocidos\)/);
+  assert.throws(() => answersOf(respuestas([{ id: 'C6', respuesta: 'sí', prueba: 'x' }]), preguntas, 'x'), /rejected output: x \(C6: id repetido\)/);
+});
+
+test('un suelo de falsos no sobre un corpus sin casos limpios lanza, como el de detección', () => {
+  const informe = { deteccion: { C6: { tasa: 1 } }, falsosNo: { limpios: 0, falsos: 0, tasa: null } };
+  assert.throws(() => belowFloor(informe, { deteccion: { C6: 1 }, falsosNo: 0 }), /floor: the corpus has no clean case/);
 });
 
 test('un corpus roto falla en alto: carpeta sin expectativa, pregunta que no es del revisor, fichero vacío', () => {
