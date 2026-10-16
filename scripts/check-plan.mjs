@@ -1,6 +1,7 @@
 // node scripts/check-plan.mjs (--file <plan> | --compare-file <json>) [--json] [--closed-paths <list>] [--gate-files <list>]
-// Form check only: runs nothing from the plan. Lists are one path (or prefix ending in "/") per line;
-// without the flags the real lists are used (standards/intervention.md and GATE_FILES).
+// Form check only: runs nothing from the plan. --gate-files: one path (or prefix ending in "/") per line;
+// --closed-paths: one glob per line (apps/**, CLAUDE.md), as standards/intervention.md writes them.
+// Without the flags the real lists are used (standards/intervention.md and GATE_FILES).
 // --compare-file: the compare JSON of a PR. No file under plans/ -> ok (not a plan PR); otherwise the PR
 // shape is checked first (planPrFaults) and then the one plan file, read from the current directory.
 import { readFileSync } from 'node:fs';

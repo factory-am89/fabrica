@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadClosedPaths } from '../scripts/lib/intervention.mjs';
 import { PLAN_FIELDS, PLAN_FAULTS, parsePlan, planFaults, checkPlan } from '../scripts/lib/plan.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -29,7 +30,7 @@ const cut = (startMark, endMark) => (text) => {
 const compose = (...fns) => (text) => fns.reduce((t, f) => f(t), text);
 
 const EXTRA_DECISIONS = ['B', 'C', 'D'].map((id) => `### ${id}. Another question?\n1. One (recommended)\n2. Two\n3. Three\n\n`).join('');
-const CLOSED = { closedPaths: ['apps/'] };
+const CLOSED = { closedPaths: ['apps/**'] };
 const TOUCH_APPS = swap('Files: `src/parser.js`, `test/parser.test.js`', 'Files: `apps/web/x.js`');
 const FIELD_LINES = {
   files: 'Files: `src/parser.js`, `test/parser.test.js`\n',
@@ -127,6 +128,13 @@ test('a chunk touching closedPaths needs Blocked by a real decision; then it is 
   assert.deepEqual(blocked.chunks[1].needsPablo, []);
 });
 
+test('the real closed list (globs, as standards/intervention.md writes it) catches apps/ and workflows', () => {
+  const touch = swap('Files: `src/parser.js`, `test/parser.test.js`', 'Files: `apps/ruleset.ps1`, `.github/workflows/x.yml`');
+  const r = checkPlan(touch(GOOD), { closedPaths: loadClosedPaths() });
+  assert.deepEqual(r.chunks[0].needsPablo, ['apps/ruleset.ps1', '.github/workflows/x.yml']);
+  assert.deepEqual(r.faults.map((f) => f.code), [PLAN_FAULTS.CLOSED_WITHOUT_DECISION]);
+});
+
 test('gate is derived from gateFiles: exact paths and prefixes ending in /', () => {
   assert.deepEqual(checkPlan(GOOD, { gateFiles: ['src/command.js'] }).chunks.map((c) => c.gate), [false, true]);
   assert.deepEqual(checkPlan(GOOD, { gateFiles: ['src/'] }).chunks.map((c) => c.gate), [true, true]);
@@ -200,7 +208,7 @@ test('CLI: --json on a bad plan gives one parseable object with ok:false and exi
 });
 
 test('CLI: --json on the good plan gives ok:true; list files feed gate and needsPablo', () => {
-  const closed = write('closed.txt', 'src/\n');
+  const closed = write('closed.txt', 'src/**\n');
   const gate = write('gate.txt', 'src/command.js\n');
   const out = JSON.parse(run(['--file', GOOD_PATH, '--json', '--gate-files', gate]).stdout);
   assert.equal(out.ok, true);

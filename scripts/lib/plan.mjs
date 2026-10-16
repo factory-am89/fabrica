@@ -1,6 +1,7 @@
 // Form check for architect plans: pure functions, no disk, no network, no git.
 // PLAN_FIELDS and PLAN_FAULTS are the single definition of the plan shape; a future standards/plan.md cites them.
 import { COMPARE_LIMIT } from './pr-body.mjs';
+import { touchesClosedList } from './intervention.mjs';
 
 export const PLAN_FIELDS = Object.freeze({
   files: 'Files',
@@ -252,7 +253,7 @@ export function checkPlan(text, { gateFiles = [], closedPaths = [] } = {}) {
       n: c.n,
       title: c.title,
       gate: files.some((f) => matchesAny(f, gateFiles)),
-      needsPablo: files.filter((f) => matchesAny(f, closedPaths)),
+      needsPablo: files.filter((f) => touchesClosedList(f, [...closedPaths])),
     };
   });
   plan.chunks.forEach((c, i) => {
