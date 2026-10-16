@@ -7,15 +7,14 @@ import { dirname, join } from 'node:path';
 
 export const rutaDeRegistro = (casa = homedir) => join(casa(), '.fabrica', 'op-reads.jsonl');
 
-// A name (`fabrica-constructor.pem`), not a value: no spaces, newlines or quotes can get through.
+// The script and what it read are names (a file or document name), never values: no spaces, newlines or quotes.
 const FORMA_NOMBRE = /^[A-Za-z0-9._-]{1,80}$/;
-const FORMA_SCRIPT = /^[A-Za-z0-9._-]{1,80}$/;
 // `ok` or a reason of MOTIVOS (token.mjs); the shape is checked here, the list lives in one place.
 const FORMA_RESULTADO = /^[a-z][a-z0-9-]{0,40}$/;
 
 // Appends one line. Throws if a field has the wrong shape or the disk refuses: the caller decides what to say.
 export function registrarLectura({ script, nombre, resultado, ruta = rutaDeRegistro(), fs = fsReal, reloj = Date.now }) {
-  if (!FORMA_SCRIPT.test(String(script)) || !FORMA_NOMBRE.test(String(nombre)) || !FORMA_RESULTADO.test(String(resultado))) {
+  if (!FORMA_NOMBRE.test(String(script)) || !FORMA_NOMBRE.test(String(nombre)) || !FORMA_RESULTADO.test(String(resultado))) {
     throw new Error('read log: field with a wrong shape (a name and a reason are expected, never a value)');
   }
   fs.mkdirSync(dirname(ruta), { recursive: true, mode: 0o700 });

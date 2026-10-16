@@ -127,10 +127,13 @@ function ejecutarOp(args, env) {
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
+// The 1Password document that holds the App key: what is read and what the read log records.
+export const DOCUMENTO_CLAVE = 'fabrica-constructor.pem';
+
 // A failing log must be seen, but it must not hide the read that did happen.
 function anotarLectura(registrar, resultado) {
   try {
-    registrar({ script: 'token.mjs', nombre: 'fabrica-constructor.pem', resultado });
+    registrar({ script: 'token.mjs', nombre: DOCUMENTO_CLAVE, resultado });
   } catch (e) {
     console.error(`op-reads log not written: ${e.message}`);
   }
@@ -140,7 +143,7 @@ function anotarLectura(registrar, resultado) {
 // Rate limited ("Too many requests") is its own reason and is NOT retried nor tried in another vault.
 // Every read leaves one line in the read log (its name and result, no values).
 export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar = registrarLectura) {
-  const args = ['document', 'get', 'fabrica-constructor.pem', '--vault', env.OP_VAULT ?? 'Fabrica'];
+  const args = ['document', 'get', DOCUMENTO_CLAVE, '--vault', env.OP_VAULT ?? 'Fabrica'];
   const r = ejecutar(args, { ...env, OP_SERVICE_ACCOUNT_TOKEN: tokenServicio(env) });
   const limitado = r.status !== 0 && LIMITE_OP.test(r.stderr);
   const sinClave = r.status !== 0 || !r.stdout.includes('PRIVATE KEY');
@@ -149,7 +152,7 @@ export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar
     throw new ErrorToken('limite-de-1password', '1Password is rate limiting this account (Too many requests); not retrying.');
   }
   if (sinClave) {
-    throw new ErrorToken('sin-clave', 'No pude leer fabrica-constructor.pem de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.');
+    throw new ErrorToken('sin-clave', `No pude leer ${DOCUMENTO_CLAVE} de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.`);
   }
   return r.stdout;
 }
