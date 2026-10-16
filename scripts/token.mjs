@@ -4,6 +4,7 @@
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
 // scripts/lib/cache-token.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
+// Read budget: before each read it counts the last hour's reads (all scripts); at PRESUPUESTO_LECTURAS it does not read and exits with its code in MOTIVOS.
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
 // scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
@@ -13,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, protegerFichero, rutaDeCache } from './lib/cache-token.mjs';
-import { registrarLectura } from './lib/registro-op.mjs';
+import { lecturasRecientes, registrarLectura, rutaDeRegistro } from './lib/registro-op.mjs';
 import { REPO, CLIENT_ID_CONSTRUCTOR } from './lib/repo.mjs';
 
 export function clientId(env = process.env) {
@@ -110,7 +111,7 @@ export function entornoHijo(cmd, token, env = process.env) {
 
 // Closed list of failure reasons with a distinct exit code each; any other failure exits 1.
 // This is the only place that lists them.
-export const MOTIVOS = { 'sin-clave': 2, 'limite-de-1password': 3, 'bloqueo-ocupado': 4 };
+export const MOTIVOS = { 'sin-clave': 2, 'limite-de-1password': 3, 'bloqueo-ocupado': 4, 'presupuesto-de-lecturas': 5 };
 
 export class ErrorToken extends Error {
   constructor(motivo, mensaje) {
@@ -142,7 +143,34 @@ function anotarLectura(registrar, resultado) {
 // Reads the .pem from 1Password once. The error never carries op's output (it could hold values).
 // Rate limited ("Too many requests") is its own reason and is NOT retried nor tried in another vault.
 // Every read leaves one line in the read log (its name and result, no values).
-export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar = registrarLectura) {
+// Read budget: `op` reads allowed per rolling hour, all scripts together (the 1Password quota is the account's,
+// not the session's). With the token cache a normal hour needs only a read or two (one exchange per token), so
+// the budget leaves a wide margin for normal use and stays far below the account's hourly quota, which other
+// projects share. At the budget nothing is read and it fails loudly.
+export const PRESUPUESTO_LECTURAS = 60;
+// Only tests override it, by this variable; an invalid value throws instead of falling back to the default.
+export const VARIABLE_PRESUPUESTO = 'FABRICA_PRESUPUESTO_LECTURAS';
+
+export function presupuestoDe(env = process.env) {
+  const crudo = env[VARIABLE_PRESUPUESTO];
+  if (crudo === undefined) return PRESUPUESTO_LECTURAS;
+  if (!/^[1-9][0-9]{0,5}$/.test(crudo)) throw new Error(`${VARIABLE_PRESUPUESTO} must be a positive integer, got "${crudo}"`);
+  return Number(crudo);
+}
+
+// Throws ErrorToken('presupuesto-de-lecturas') when the last hour already holds the budget. A log line that
+// cannot be read is reported on stderr (it counts as a read) and never crashes nor lets a read through.
+export function comprobarPresupuesto(env = process.env, contar = () => lecturasRecientes()) {
+  const presupuesto = presupuestoDe(env);
+  const { total, porScript, corruptas } = contar();
+  if (corruptas.length > 0) console.error(`op-reads log: unreadable line(s) ${corruptas.join(', ')} counted as reads; fix or delete them in ${rutaDeRegistro()}`);
+  if (total < presupuesto) return;
+  const desglose = Object.entries(porScript).map(([s, n]) => `${s}=${n}`).join(', ');
+  throw new ErrorToken('presupuesto-de-lecturas', `${total} reads in the last hour (budget ${presupuesto}); per script: ${desglose}`);
+}
+
+export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar = registrarLectura, contar = undefined) {
+  comprobarPresupuesto(env, contar);
   const args = ['document', 'get', DOCUMENTO_CLAVE, '--vault', env.OP_VAULT ?? 'Fabrica'];
   const r = ejecutar(args, { ...env, OP_SERVICE_ACCOUNT_TOKEN: tokenServicio(env) });
   const limitado = r.status !== 0 && LIMITE_OP.test(r.stderr);
@@ -156,6 +184,9 @@ export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar
   }
   return r.stdout;
 }
+
+// Reasons for which no key could be read; a saved token that is still alive may stand in for the exchange.
+const SIN_LECTURA = ['limite-de-1password', 'presupuesto-de-lecturas'];
 
 const minutos = (ms) => Math.floor(ms / 60000);
 
@@ -210,8 +241,8 @@ export async function obtenerToken({ env = process.env, leer = (e) => clavePriva
         if (guardada !== MOTIVO.ok) avisar(guardada);
         return { token: t.token };
       } catch (e) {
-        if (!(e instanceof ErrorToken && e.motivo === 'limite-de-1password' && previa.motivo === MOTIVO.ok)) throw e;
-        return { token: previa.entrada.token, aviso: `limite-de-1password: using the saved token (${minutos(previa.restanteMs)} min left).` };
+        if (!(e instanceof ErrorToken && SIN_LECTURA.includes(e.motivo) && previa.motivo === MOTIVO.ok)) throw e;
+        return { token: previa.entrada.token, aviso: `${e.motivo}: using the saved token (${minutos(previa.restanteMs)} min left).` };
       }
     },
   });

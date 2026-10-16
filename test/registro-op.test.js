@@ -9,6 +9,7 @@ import { clavePrivada, MOTIVOS } from '../scripts/token.mjs';
 
 const PEM = '-----BEGIN RSA PRIVATE KEY-----\nVALOR-SECRETO-DE-PRUEBA\n-----END RSA PRIVATE KEY-----\n';
 const AHORA = Date.UTC(2026, 9, 16, 10, 0, 0);
+const LIBRE = () => ({ total: 0, porScript: {}, corruptas: [] }); // an empty budget count: never read the real read log
 
 function conRegistro(fn) {
   const dir = mkdtempSync(join(tmpdir(), 'fabrica-registro-'));
@@ -58,9 +59,9 @@ test('clavePrivada: every op read leaves exactly one line: ok, rate limited and 
   const lineas = [];
   const registrar = (l) => lineas.push(l);
   const env = { OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' };
-  clavePrivada(env, () => ({ status: 0, stdout: PEM, stderr: '' }), registrar);
-  assert.throws(() => clavePrivada(env, () => ({ status: 1, stdout: '', stderr: 'Too many requests' }), registrar));
-  assert.throws(() => clavePrivada(env, () => ({ status: 1, stdout: '', stderr: 'denied' }), registrar));
+  clavePrivada(env, () => ({ status: 0, stdout: PEM, stderr: '' }), registrar, LIBRE);
+  assert.throws(() => clavePrivada(env, () => ({ status: 1, stdout: '', stderr: 'Too many requests' }), registrar, LIBRE));
+  assert.throws(() => clavePrivada(env, () => ({ status: 1, stdout: '', stderr: 'denied' }), registrar, LIBRE));
   assert.deepEqual(lineas.map((l) => l.resultado), ['ok', 'limite-de-1password', 'sin-clave']);
   assert.ok(lineas.every((l) => l.script === 'token.mjs' && l.nombre === 'fabrica-constructor.pem'));
   assert.ok(!JSON.stringify(lineas).includes('SECRETO'));
@@ -69,7 +70,7 @@ test('clavePrivada: every op read leaves exactly one line: ok, rate limited and 
 test('clavePrivada: a log that cannot be written is reported on stderr and does not hide the read', (t) => {
   const avisos = [];
   t.mock.method(console, 'error', (m) => avisos.push(m));
-  const pem = clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, () => ({ status: 0, stdout: PEM, stderr: '' }), () => { throw new Error('disk full'); });
+  const pem = clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, () => ({ status: 0, stdout: PEM, stderr: '' }), () => { throw new Error('disk full'); }, LIBRE);
   assert.equal(pem, PEM);
   assert.deepEqual(avisos, ['op-reads log not written: disk full']);
 });
