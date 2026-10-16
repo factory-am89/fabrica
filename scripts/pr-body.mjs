@@ -2,9 +2,7 @@
 //   node scripts/pr-body.mjs --body-file <path> (--files-file <path> | --compare-file <json>)
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { prBodyFaults } from './lib/pr-body.mjs';
-
-const COMPARE_LIMIT = 300; // the compare endpoint truncates at 300 files
+import { prBodyFaults, COMPARE_LIMIT } from './lib/pr-body.mjs';
 
 function parseArgs(argv) {
   const opts = {};

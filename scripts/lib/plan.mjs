@@ -1,5 +1,6 @@
 // Form check for architect plans: pure functions, no disk, no network, no git.
 // PLAN_FIELDS and PLAN_FAULTS are the single definition of the plan shape; a future standards/plan.md cites them.
+import { COMPARE_LIMIT } from './pr-body.mjs';
 
 export const PLAN_FIELDS = Object.freeze({
   files: 'Files',
@@ -274,4 +275,48 @@ export function checkPlan(text, { gateFiles = [], closedPaths = [] } = {}) {
 
 export function planFaults(text, lists) {
   return checkPlan(text, lists).faults;
+}
+
+// PR-level shape: a PR that touches plans/ changes exactly one plans/<slug>.md and nothing else.
+export const PLAN_DIR = 'plans/';
+const PLAN_FILE = /^plans\/[a-z0-9-]+\.md$/;
+const PLAN_STATUSES = ['added', 'modified'];
+
+export const PLAN_PR_FAULTS = Object.freeze(
+  Object.fromEntries([
+    'PR_TRUNCATED',
+    'PR_OUTSIDE_PLANS',
+    'PR_NOT_ONE_PLAN',
+    'PR_BAD_PLAN_NAME',
+    'PR_BAD_STATUS',
+    'PR_PREVIOUS_OUTSIDE',
+  ].map((c) => [c, c])),
+);
+
+// files: the compare endpoint's list of {filename, previous_filename?, status}. No file under plans/ means
+// this is not a plan PR and there is no fault. Returns [{code, where, message}].
+export function planPrFaults(files) {
+  if (!Array.isArray(files)) throw new TypeError('planPrFaults: files must be an array');
+  const faults = [];
+  const add = (code, where, message) => faults.push({ code, where, message });
+  if (files.length >= COMPARE_LIMIT) {
+    add(PLAN_PR_FAULTS.PR_TRUNCATED, 'pr', `the comparison has ${files.length} files; the endpoint truncates at ${COMPARE_LIMIT}`);
+    return faults;
+  }
+  const inPlans = (name) => typeof name === 'string' && name.startsWith(PLAN_DIR);
+  const touchesPlans = (f) => inPlans(f.filename) || inPlans(f.previous_filename);
+  if (!files.some(touchesPlans)) return faults;
+  const plans = files.filter(touchesPlans);
+  for (const f of files.filter((x) => !touchesPlans(x))) {
+    add(PLAN_PR_FAULTS.PR_OUTSIDE_PLANS, f.filename, 'a PR that touches plans/ must change nothing else');
+  }
+  if (plans.length !== 1) add(PLAN_PR_FAULTS.PR_NOT_ONE_PLAN, 'pr', `${plans.length} files under plans/; exactly one is required`);
+  for (const f of plans) {
+    if (!PLAN_FILE.test(f.filename)) add(PLAN_PR_FAULTS.PR_BAD_PLAN_NAME, f.filename, 'expected plans/<slug>.md with a slug of a-z, 0-9 and hyphens');
+    if (!PLAN_STATUSES.includes(f.status)) add(PLAN_PR_FAULTS.PR_BAD_STATUS, f.filename, `status "${f.status}" is not one of ${PLAN_STATUSES.join(', ')}`);
+    if (f.previous_filename !== undefined && !inPlans(f.previous_filename)) {
+      add(PLAN_PR_FAULTS.PR_PREVIOUS_OUTSIDE, f.filename, `renamed from ${f.previous_filename}, which is outside plans/`);
+    }
+  }
+  return faults;
 }

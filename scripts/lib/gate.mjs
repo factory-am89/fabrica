@@ -25,6 +25,10 @@ export const GATE_FILES = [
   'scripts/lib/repo.mjs', // imported by scripts/lib/acciones.mjs
   'scripts/pr-body.mjs', // PR body check tests.yml runs from .fabrica/
   'scripts/lib/pr-body.mjs', // imported by scripts/pr-body.mjs
+  'scripts/check-plan.mjs', // plan PR check tests.yml runs from .fabrica/
+  'scripts/lib/plan.mjs', // imported by scripts/check-plan.mjs
+  'scripts/lib/intervention.mjs', // imported by scripts/check-plan.mjs: the closed list of paths
+  'scripts/lib/gate.mjs', // imported by scripts/check-plan.mjs: this list
   'package.json', // tests.yml runs `npm ci --prefix .fabrica`
   'package-lock.json', // same: npm ci installs exactly this
 ];
