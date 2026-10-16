@@ -9,7 +9,7 @@ Principios (cada uno nace de un fallo real; el porqué, en `standards/code.md`):
 3. Fallar en alto: un error se ve o se lanza; nunca se traga ni se sustituye por un valor por defecto.
 4. Una idea, un sitio: un dato o una regla vive en un solo lugar y los demás lo enlazan.
 5. Lo que comprueba una máquina lo comprueba una máquina: una regla importante se convierte en un check, no en una frase.
-6. Parar y apuntar en vez de preguntar: ante la duda no se adivina ni se interrumpe; se para y se deja escrito.
+6. Preguntar antes de un atajo: solo se pregunta a Pablo por lo de la lista cerrada de `standards/intervention.md`; todo lo demás se decide y se apunta.
 
 Prohibido: empujar o fusionar a `main` (lo hace GitHub al estar verdes `tests` y `revisor`); escribir un secreto, solo su nombre; ampliar permisos de una App; juzgar tu propio trabajo.
 Prohibido también: editar o hacer commit en la carpeta principal; lo niegan `.claude/hooks/carpeta-principal.mjs` y los hooks de git de `.githooks/` (los activa `npm run tarea`), y cada sesión trabaja en su carpeta: `npm run tarea -- feat/<nombre>`.
