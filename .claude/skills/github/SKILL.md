@@ -27,8 +27,8 @@ comprobado: 2026-10-15
 
 ## Identidad del constructor
 
-`node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora, un token por
-uso), lo pone en `GH_TOKEN` solo para esa orden y no lo imprime ni lo guarda. Necesita
+`node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora), lo pone en `GH_TOKEN` solo para esa orden y no lo imprime. Lo reutiliza de
+`%LOCALAPPDATA%Fabrica	oken-cache.json` hasta 15 minutos antes de caducar (solo el token, nunca la clave). Necesita
 `FABRICA_CONSTRUCTOR_CLIENT_ID` (el client id, no es secreto) y una sesión de `op` abierta: la clave
 privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo.
 
