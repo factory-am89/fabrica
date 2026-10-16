@@ -1,0 +1,17 @@
+name: senal-review
+
+# Solo despierta a anulacion.yml cuando alguien envía una review en un PR. No hace nada más y no recibe
+# secretos: `pull_request_review` ejecuta la versión de este fichero que trae el PR (no la de main), así que
+# lo que valga algo se decide en anulacion.yml, que corre desde main y lo comprueba todo por la API.
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions: {}
+
+jobs:
+  senal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "review enviada; anulacion.yml la comprueba"

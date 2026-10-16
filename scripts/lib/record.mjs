@@ -9,6 +9,8 @@ export const ANSWER = { yes: 'sí', no: 'no', notApplicable: 'no aplica' };
 export const ANSWERS = Object.values(ANSWER);
 export const ERROR = { standardUnloadable: 'standard-unloadable', outputUnreadable: 'output-unreadable' };
 export const ERRORS = Object.values(ERROR);
+// Title of the check-run that scripts/veredicto.mjs publishes when Pablo's approval overrides a no; it has no record (the round it overrides has its own).
+export const OVERRIDE_TITLE = 'override by Pablo';
 export const UNANSWERED = 'sin-respuesta'; // aggregate's bucket for a question with a null answer
 const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
 
@@ -93,18 +95,24 @@ export function extractRecord(text) {
   return parseRecord(blocks[0][1]);
 }
 
-// check-runs (GitHub API objects) -> { records, unreadable: [{index, reason}] }. Nothing is skipped silently.
+// check-runs (GitHub API objects) -> { records, overrides, unreadable: [{index, reason}] }. Override check-runs are counted, not read.
+// Nothing else is skipped silently.
 export function readCheckRuns(checkRuns) {
   const records = [];
   const unreadable = [];
+  let overrides = 0;
   checkRuns.forEach((c, index) => {
+    if (c?.output?.title === OVERRIDE_TITLE) {
+      overrides += 1;
+      return;
+    }
     try {
       records.push(extractRecord(c?.output?.text));
     } catch (e) {
       unreadable.push({ index, reason: e.message });
     }
   });
-  return { records, unreadable };
+  return { records, overrides, unreadable };
 }
 
 // records (and the answer and error vocabularies, ANSWERS and ERRORS by default) -> { porPr: {"repo#pr": {rondas, ok, no, <one counter per ERRORS value>}}, porPregunta: {id: {<one counter per answer>, sin-respuesta}} }

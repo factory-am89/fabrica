@@ -1,4 +1,4 @@
-// What this list covers: the two gate workflows (revisor.yml and tests.yml), everything they take from
+// What this list covers: the gate workflows (revisor.yml, tests.yml, anulacion.yml and its trigger senal-review.yml), everything they take from
 // .fabrica/ (scripts, the standard, the reviewer role, the lint config, package files; run, env, with,
 // claude_args and prompt), and the relative imports of those scripts. test/gate-files.test.js derives
 // that set from the workflows and requires this list to equal it plus ADMIN_GATE_FILES below.
@@ -13,6 +13,8 @@
 // on pull_request, so in this repo it runs as the PR has it. Both are listed because both define a check.
 const BASE = [
   '.github/workflows/revisor.yml', // defines the `revisor` check and downloads the judge
+  '.github/workflows/anulacion.yml', // the owner override: publishes the `revisor` check from main when Pablo approves the head
+  '.github/workflows/senal-review.yml', // wakes anulacion.yml on a review; inert, no secrets
   '.github/workflows/tests.yml', // defines the `tests` check (also reusable by other repos)
   'scripts/veredicto.mjs', // turns the reviewer output into the verdict; run from .fabrica/
   'scripts/lib/questions.mjs', // imported by scripts/veredicto.mjs: the only reader of the questions
