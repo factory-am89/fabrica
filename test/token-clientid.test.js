@@ -25,7 +25,9 @@ test('clientId: token.mjs lo importa de scripts/lib/repo.mjs y no lo escribe a m
 });
 
 // Sincronía del client id: la fuente es CLIENT_ID_CONSTRUCTOR. Lo que comprueba una máquina (principio 5):
-// ningún fichero escribe otro valor Iv23li..., y los textos que nombran la variable remiten a la constante.
+// ningún fichero escribe otro valor Iv23li..., y los textos de instrucciones (.md, .ps1, .html) que nombran la
+// variable remiten a la constante. El código y los tests (.mjs, .js) sí pueden nombrarla: la usan como entrada.
+const INSTRUCCIONES = /\.(md|ps1|html)$/;
 export function incoherencias(ficheros, constante) {
   const malos = [];
   for (const [f, src] of Object.entries(ficheros)) {
@@ -33,7 +35,7 @@ export function incoherencias(ficheros, constante) {
       for (const m of linea.matchAll(/Iv23li[A-Za-z0-9]+/g)) {
         if (m[0] !== constante) malos.push(`${f}:${i + 1} escribe el client id ${m[0]} y la fuente dice ${constante}`);
       }
-      if (linea.includes('FABRICA_CONSTRUCTOR_CLIENT_ID') && !linea.includes('CLIENT_ID_CONSTRUCTOR')) {
+      if (INSTRUCCIONES.test(f) && linea.includes('FABRICA_CONSTRUCTOR_CLIENT_ID') && !linea.includes('CLIENT_ID_CONSTRUCTOR')) {
         malos.push(`${f}:${i + 1} nombra FABRICA_CONSTRUCTOR_CLIENT_ID sin remitir a CLIENT_ID_CONSTRUCTOR`);
       }
     });
@@ -45,6 +47,7 @@ test('client id: el verificador acepta lo bueno y señala fichero:línea de lo m
   const C = 'Iv23liAAAA';
   assert.deepEqual(incoherencias({ 'a.md': 'x\nusa CLIENT_ID_CONSTRUCTOR y Iv23liAAAA' }, C), []);
   assert.deepEqual(incoherencias({ 'a.md': 'x\ny Iv23liBBBB' }, C), ['a.md:2 escribe el client id Iv23liBBBB y la fuente dice Iv23liAAAA']);
+  assert.deepEqual(incoherencias({ 'c.mjs': 'env.FABRICA_CONSTRUCTOR_CLIENT_ID = 1' }, C), []); // el código la usa como entrada
   assert.deepEqual(incoherencias({ 'b.ps1': 'ok\nok\nFABRICA_CONSTRUCTOR_CLIENT_ID = 1' }, C),
     ['b.ps1:3 nombra FABRICA_CONSTRUCTOR_CLIENT_ID sin remitir a CLIENT_ID_CONSTRUCTOR']);
 });

@@ -27,8 +27,10 @@ comprobado: 2026-10-15
 
 ## Identidad del constructor
 
-`node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora, un token por
-uso), lo pone en `GH_TOKEN` solo para esa orden y no lo imprime ni lo guarda. Necesita
+`node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora), lo pone en
+`GH_TOKEN` solo para esa orden y no lo imprime. Lo reutiliza del fichero de `rutaDeCache`
+(`scripts/lib/cache-token.mjs`) hasta el margen de `MARGEN_MS` antes de caducar: solo el token, nunca la clave. Si la
+caché falla, sigue como antes y avisa con una línea `cache: <motivo>` (motivos en `MOTIVO`). Necesita
 el client id (por defecto `CLIENT_ID_CONSTRUCTOR` de `scripts/lib/repo.mjs`; `FABRICA_CONSTRUCTOR_CLIENT_ID` solo lo sustituye) y una sesión de `op` abierta: la clave
 privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo.
 
