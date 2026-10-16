@@ -1,4 +1,4 @@
-// Claude Code hook that logs human interventions (scripts/lib/registro-intervenciones.mjs). Two modes, chosen by the
+// Claude Code hook that logs human interventions (scripts/lib/intervention-log.mjs). Two modes, chosen by the
 // first argument; the hook JSON comes on stdin:
 //   permiso  PermissionRequest hook: Claude Code is about to ask Pablo for permission -> one `aviso-de-permiso` line.
 //            Documented event (https://code.claude.com/docs/en/hooks, section PermissionRequest). Nothing of the tool call
@@ -14,7 +14,7 @@ import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SIN_HORA, registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/registro-intervenciones.mjs';
+import { SIN_HORA, registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/intervention-log.mjs';
 
 // A `!` with a readable time older than this is not logged: it belongs to a resumed session, not to now.
 const MAX_EDAD_MS = 6 * 60 * 60 * 1000;

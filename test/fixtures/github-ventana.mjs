@@ -1,5 +1,5 @@
 // A simulated GitHub for the ruleset window: the PRs (armed or not, their `revisor` check), the ruleset of `main`
-// and a log of every call. `run(args)` has the shape scripts/lib/ventana.mjs expects (args after `gh`).
+// and a log of every call. `run(args)` has the shape scripts/lib/pause-window.mjs expects (args after `gh`).
 // `onCall(call, sim)` lets a test act in the middle (a PR armed by someone else while the window is open).
 export const REPO = 'factory-am89/fabrica';
 

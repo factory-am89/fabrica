@@ -3,16 +3,16 @@
 // Una sola consulta REST por pasada (los últimos 100 PR cerrados), por scripts/token.mjs. Si GitHub no
 // responde, falla en alto y no borra nada. Lo que no se pudo borrar se dice siempre.
 // Sirve para cualquier repo: lo que necesita saber (repo, rama base, identidad) está en su .fabrica.json
-// (scripts/lib/ficha.mjs); sin ficha, error. Desde fuera de la carpeta del repo: --repo <carpeta>.
+// (scripts/lib/repo-card.mjs); sin ficha, error. Desde fuera de la carpeta del repo: --repo <carpeta>.
 //   npm run limpiar -- [--ensayo] [--repo <carpeta>] [--ficha <fichero>]
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git, gitOk, worktrees } from './lib/carpetas.mjs';
 import { quitarUnion } from './retirar.mjs';
-import { leerFicha } from './lib/ficha.mjs';
-import { identidadDe } from './lib/identidades.mjs';
-import { conToken, motivoDeQuedarse, prsFusionados } from './lib/puede-borrarse.mjs';
+import { leerFicha } from './lib/repo-card.mjs';
+import { identidadDe } from './lib/identities.mjs';
+import { conToken, motivoDeQuedarse, prsFusionados } from './lib/can-delete.mjs';
 
 // Por qué una carpeta se queda, o null si se puede borrar: la regla común, con solo PR fusionado como prueba.
 const motivoDe = (w, todas, fusionados, cwd) => motivoDeQuedarse(w, { todas, cwd, fusionada: (punta) => fusionados.has(punta) })?.text ?? null;

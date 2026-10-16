@@ -52,13 +52,13 @@ Se pasa por tubería (stdin) entre dos procesos.
 - **2026-10-16 · «Too many requests» again, now from the Fábrica's `scripts/token.mjs` (the same failure as MenuPlan
   on 2026-10-10).** Cause: every gh/git call read `fabrica-constructor.pem` from 1Password, so several agents in a
   loop spent the service account's hourly quota; the quota belongs to the account, not to the session. Fix:
-  `scripts/lib/cache-token.mjs` keeps only the installation token (path: `rutaDeCache`, user-only ACL) until
+  `scripts/lib/token-cache.mjs` keeps only the installation token (path: `rutaDeCache`, user-only ACL) until
   the margin `MARGEN_MS` (same file) before it expires, with a lock so two sessions do not exchange at once. On "Too many requests"
   `token.mjs` does not retry nor try another vault: it prints `limite-de-1password`, uses the saved token if it is
   still alive and otherwise exits with the code of `MOTIVOS`. Count with
   `node --test test/token-lecturas.test.js`: it runs a batch of calls and asserts the .pem was read once.
   Two guards keep it from coming back: `test/presupuesto-lecturas.test.js` (the read budget `PRESUPUESTO_LECTURAS` in `token.mjs`, with its own
-  reason in `MOTIVOS`) and `test/op-door.test.js` (only the files in `PUERTAS`, `scripts/lib/puerta-op.mjs`, may spawn `op` or open the vault).
+  reason in `MOTIVOS`) and `test/op-door.test.js` (only the files in `PUERTAS`, `scripts/lib/op-door.mjs`, may spawn `op` or open the vault).
 - **2026-10-11 · la `ssh` falla con «communication with agent failed».** Causa: nadie contestó la ventana de
   aprobar; no era el agente ni la llave. Arreglo: avisar a Pablo antes de conectar y esperar su sí, sin
   reintentar en bucle.

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXIT, RETIRE_RESULT, ExitError, runCommand } from '../scripts/lib/exit.mjs';
 import { cliRetirar } from '../scripts/retirar.mjs';
-import { prFusionado } from '../scripts/lib/puede-borrarse.mjs';
+import { prFusionado } from '../scripts/lib/can-delete.mjs';
 import { git as gitRaw } from '../scripts/lib/carpetas.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
 import { git, repo as baseRepo } from './apoyo/repo.mjs';

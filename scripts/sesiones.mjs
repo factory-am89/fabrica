@@ -1,4 +1,4 @@
-// Live sessions of Claude on this PC (register in scripts/lib/registro-sesiones.mjs) and the split of work (reparto.json).
+// Live sessions of Claude on this PC (register in scripts/lib/session-log.mjs) and the split of work (reparto.json).
 //   npm run sesiones [-- --json]   lists the registered sessions; one without activity for ACTIVA_H hours shows as inactive.
 //   sesiones.mjs tocar|fin         hook modes (hook JSON on stdin), wired in .claude/settings.json:
 //     tocar  UserPromptSubmit and PostToolBatch: the session did something -> its `ultima` is updated (a session that has
@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { git, principal } from './lib/carpetas.mjs';
 import {
   ACTIVA_H, CADUCA_H, SIN_RAMA, idValido, apuntarSesion, leerFicha, leerSesiones, purgarViejas, quitarSesion, rutaDeSesiones,
-} from './lib/registro-sesiones.mjs';
-import { choques, leerReparto, reservasVivasAjenas } from './lib/reparto.mjs';
+} from './lib/session-log.mjs';
+import { choques, leerReparto, reservasVivasAjenas } from './lib/work-split.mjs';
 
 // The branch of a folder; a detached HEAD is SIN_RAMA. A folder that is not a repo throws.
 export function ramaDe(carpeta) {

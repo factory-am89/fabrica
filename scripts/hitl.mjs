@@ -1,10 +1,10 @@
 // Prints how many human interventions there were, per class and per origin, from the log
-// (rutaDeRegistroIntervenciones in scripts/lib/registro-intervenciones.mjs).
+// (rutaDeRegistroIntervenciones in scripts/lib/intervention-log.mjs).
 //   npm run hitl            readable lines
 //   npm run hitl -- --json  { registro, total, porClase, porOrigen, corruptas } (the contract other sessions read)
 // Exit 1 when the log has lines that cannot be read (they are in `corruptas` and in `total`): a count that skips them would be wrong.
 import { fileURLToPath } from 'node:url';
-import { contarIntervenciones, rutaDeRegistroIntervenciones } from './lib/registro-intervenciones.mjs';
+import { contarIntervenciones, rutaDeRegistroIntervenciones } from './lib/intervention-log.mjs';
 
 export function informe({ json = false, ruta = rutaDeRegistroIntervenciones() } = {}) {
   const c = contarIntervenciones({ ruta });

@@ -3,11 +3,11 @@
 //   node scripts/instalar-pc.mjs instalar --ampliar    igual, aunque settings.json amplíe permisos: SOLO desde una
 //                                                      terminal interactiva y tecleando AMPLIAR (solo Pablo)
 //   node scripts/instalar-pc.mjs comprobar             sale con 1 y nombra cada fichero que no coincide
-// Si el settings.json nuevo AMPLÍA permisos respecto al instalado (scripts/lib/ampliacion-settings.mjs), instalar sale
+// Si el settings.json nuevo AMPLÍA permisos respecto al instalado (scripts/lib/settings-widening.mjs), instalar sale
 // con 1 sin escribir NADA. --ampliar no basta: sin terminal (las sesiones de Claude no la tienen) o sin la
 // confirmación, sale con 1 igual. Quitar permisos se aplica solo.
 // HOME inyectable: FABRICA_HOME (o el parámetro `home`); origen: FABRICA_USUARIO (o `origen`). Sin ellas, los reales.
-// usuario/settings.json puede ser una PLANTILLA pública: lo privado son huecos {{nombre}} (scripts/lib/plantilla.mjs).
+// usuario/settings.json puede ser una PLANTILLA pública: lo privado son huecos {{nombre}} (scripts/lib/template.mjs).
 // Los valores viven en un repo privado, clonado aparte: fichero JSON nombre -> valor en FABRICA_VALORES, o por defecto
 // <carpeta de los repos>/fabrica-privado/usuario/valores.json (C:\dev\fabrica-privado\usuario\valores.json).
 // Sin fichero, hueco sin valor o valor sobrante: error y no se escribe nada. Se instala y se comprueba el resultado RELLENO.
@@ -17,8 +17,8 @@ import { existsSync, mkdirSync, readFileSync, readSync, readdirSync, writeFileSy
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ampliaciones } from './lib/ampliacion-settings.mjs';
-import { huecos, rellenar } from './lib/plantilla.mjs';
+import { ampliaciones } from './lib/settings-widening.mjs';
+import { huecos, rellenar } from './lib/template.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ORIGEN = path.join(RAIZ, 'usuario');

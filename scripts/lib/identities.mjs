@@ -1,5 +1,5 @@
 // Las identidades con las que se habla a GitHub: UN solo mapa, del que salen la validación de la ficha
-// (lib/ficha.mjs), el lanzador de las órdenes y si se pueden borrar ramas remotas (limpiar.mjs).
+// (lib/repo-card.mjs), el lanzador de las órdenes y si se pueden borrar ramas remotas (limpiar.mjs).
 //   lanzador      script que lanza `-- gh api <ruta>` / `-- git ...` con esa identidad
 //   borraRemotas  si con ella se pueden borrar ramas remotas
 //   dueno         el único dueño de repos donde vale (null: cualquiera)
@@ -11,8 +11,8 @@ export const TOKEN = fileURLToPath(new URL('../token.mjs', import.meta.url));
 
 export const IDENTIDADES = {
   'fabrica-constructor': { lanzador: TOKEN, borraRemotas: true, dueno: REPO.split('/')[0] },
-  // Sin credencial: solo lectura de un repo público (lib/gh-publico.mjs).
-  ninguna: { lanzador: fileURLToPath(new URL('./gh-publico.mjs', import.meta.url)), borraRemotas: false, dueno: null },
+  // Sin credencial: solo lectura de un repo público (lib/gh-public.mjs).
+  ninguna: { lanzador: fileURLToPath(new URL('./gh-public.mjs', import.meta.url)), borraRemotas: false, dueno: null },
 };
 
 export const NOMBRES_IDENTIDAD = Object.keys(IDENTIDADES);

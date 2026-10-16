@@ -1,4 +1,4 @@
-// La regla «¿se puede borrar esta carpeta?» vive en un solo sitio (scripts/lib/puede-borrarse.mjs).
+// La regla «¿se puede borrar esta carpeta?» vive en un solo sitio (scripts/lib/can-delete.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
@@ -8,14 +8,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { retirar } from '../scripts/retirar.mjs';
-import { prFusionado } from '../scripts/lib/puede-borrarse.mjs';
+import { prFusionado } from '../scripts/lib/can-delete.mjs';
 
 const fuente = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
 
 test('retirar y limpiar usan la misma regla y ninguno la repite', () => {
   for (const f of ['retirar.mjs', 'limpiar.mjs']) {
     const s = fuente(f);
-    assert.match(s, /from '\.\/lib\/puede-borrarse\.mjs'/, `${f} importa la regla común`);
+    assert.match(s, /from '\.\/lib\/can-delete\.mjs'/, `${f} importa la regla común`);
     assert.doesNotMatch(s, /status', '--porcelain'/, `${f} no repite la comprobación de cambios sin guardar`);
     assert.doesNotMatch(s, /spawnSync\('gh'/, `${f} no lanza gh a pelo`);
   }

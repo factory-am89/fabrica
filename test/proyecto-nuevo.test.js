@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { REPO } from '../scripts/lib/repo.mjs';
-import { leerFicha } from '../scripts/lib/ficha.mjs';
+import { leerFicha } from '../scripts/lib/repo-card.mjs';
 
 const FABRICA = path.resolve(import.meta.dirname, '..');
 const PLANTILLAS = path.join(FABRICA, 'apps', 'proyecto-nuevo');

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import yaml from 'js-yaml';
-import { accionFijada } from '../scripts/lib/acciones.mjs';
+import { accionFijada } from '../scripts/lib/actions.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 import { leer } from './apoyo/fabrica.mjs';
 

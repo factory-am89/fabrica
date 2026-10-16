@@ -1,7 +1,7 @@
 // Register of live sessions: one small JSON file per session in ~/.fabrica/sesiones/<id>.json, outside the repo, so every
 // folder (worktree) of this PC sees the others. A file holds: id, carpeta, rama, inicio, ultima (ISO times). Nothing else:
 // no prompt, no tool name, no free text. The shapes below are the only place that lists them.
-// A session writes only its own file (it is overwritten, so anexarLinea of registro-op.mjs does not fit; the directory
+// A session writes only its own file (it is overwritten, so anexarLinea of op-log.mjs does not fit; the directory
 // mode and the "no file means nothing" rule are the same as in the other logs).
 import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ampliaciones, CLAVES_SEGURAS } from '../scripts/lib/ampliacion-settings.mjs';
+import { ampliaciones, CLAVES_SEGURAS } from '../scripts/lib/settings-widening.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const base = () => JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'settings-base.json'), 'utf8'));

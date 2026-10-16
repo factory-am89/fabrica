@@ -23,8 +23,8 @@ const BASE = [
   '.claude/agents/revisor.md', // the reviewer role the revisor.yml prompt tells Claude to follow
   'eslint.config.js', // lint rules tests.yml applies from .fabrica/ (C1, C3)
   'test/workflows.test.js', // machine rules (C4) tests.yml runs from .fabrica/
-  'scripts/lib/acciones.mjs', // imported by test/workflows.test.js
-  'scripts/lib/repo.mjs', // imported by scripts/lib/acciones.mjs
+  'scripts/lib/actions.mjs', // imported by test/workflows.test.js
+  'scripts/lib/repo.mjs', // imported by scripts/lib/actions.mjs
   'scripts/pr-body.mjs', // PR body check tests.yml runs from .fabrica/
   'scripts/lib/pr-body.mjs', // imported by scripts/pr-body.mjs
   'scripts/check-plan.mjs', // plan PR check tests.yml runs from .fabrica/

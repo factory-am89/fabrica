@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ORIGEN, instalar, confirmarEnTerminal } from '../scripts/instalar-pc.mjs';
-import { huecos, rellenar } from '../scripts/lib/plantilla.mjs';
+import { huecos, rellenar } from '../scripts/lib/template.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');

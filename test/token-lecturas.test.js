@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { contarLecturas, rutaDeRegistro } from '../scripts/lib/registro-op.mjs';
+import { contarLecturas, rutaDeRegistro } from '../scripts/lib/op-log.mjs';
 
 const LLAMADAS = 10;
 const raiz = (r) => fileURLToPath(new URL(r, import.meta.url));
