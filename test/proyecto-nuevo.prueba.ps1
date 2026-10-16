@@ -55,9 +55,9 @@ function gh.exe {
     return (Json @($e.rulesets | ForEach-Object { @{ name = $_; enforcement = 'active' } }))
   }
   if ($ruta -eq "repos/$RP/environments/revisor" -and $metodo -eq 'PUT') { $e.env = $true; return '{}' }
-  if ($ruta -eq "repos/$RP/environments/revisor") { if ($e.env) { return '{}' }; return (Falla 'Not Found') }
-  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies" -and $metodo -eq 'POST') { $e.policies += 'main'; return '{}' }
-  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies") { return ($e.policies -join "`n") }
+  if ($ruta -eq "repos/$RP/environments/revisor") { if ($e.env) { return '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' }; return (Falla 'Not Found') }
+  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies" -and $metodo -eq 'POST') { if (-not $e.politicaIgnorada) { $e.policies += 'main' }; return '{}' }
+  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies") { return (Json @{ branch_policies = @($e.policies | ForEach-Object { @{ name = $_; type = 'branch' } }) }) }
   if ($ruta -eq "repos/$RP/environments/revisor/secrets") { return (Json @{ secrets = @($e.secretos | ForEach-Object { @{ name = $_ } }) }) }
   if ($ruta -like '/user/installations?per_page*') { return (Json @{ installations = $e.instalaciones }) }
   if ($ruta -match '^/user/installations/(\d+)/repositories') { return (Json @{ repositories = @($e.reposDe[[int]$Matches[1]] | ForEach-Object { @{ full_name = $_ } }) }) }
@@ -164,3 +164,6 @@ Prueba 'instalaciones ilegibles: el pendiente lleva el motivo y no se crea el ru
 $e = Nuevo-Estado; $e.rompe["repos/$RP/environments/revisor/secrets"] = @{ Texto = '<html>x500</html>'; Codigo = 0 }
 $r = Lanza $e
 Prueba 'secretos ilegibles: para con el motivo' ($r.Code -eq 1 -and $r.Out -match 'x500' -and $r.Out -match 'los secretos')
+$e = Nuevo-Estado; $e.politicaIgnorada = $true
+$r = Lanza $e
+Prueba 'environment que no queda limitado a main: sale 1 y lo dice (se lee de vuelta, no se cree al POST)' ($r.Code -eq 1 -and $r.Out -match 'NO queda limitado a main')
