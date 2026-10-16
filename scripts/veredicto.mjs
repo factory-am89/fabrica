@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
-import { OWNER_LOGIN } from './lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG } from './lib/repo.mjs';
 import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
@@ -123,7 +123,8 @@ async function api(token, metodo, ruta, cuerpo) {
 const DECISIVAS = ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'];
 export function aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN) {
   if (!/^[0-9a-f]{40}$/.test(String(cabeza))) return null;
-  const suyas = (Array.isArray(reviews) ? reviews : []).filter(
+  if (!Array.isArray(reviews)) throw new Error('reviews: la API no devolvió una lista');
+  const suyas = reviews.filter(
     (r) => typeof r?.user?.login === 'string' && r.user.login.toLowerCase() === dueno.toLowerCase() && DECISIVAS.includes(r.state)
   );
   const ultima = suyas.at(-1);
@@ -132,7 +133,8 @@ export function aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN) {
 
 // Resumen del check de anulación: quién, sobre qué cabeza y qué hallazgos del revisor se anulan.
 export function resumenAnulacion(review, cabeza, hallazgos) {
-  const lista = hallazgos.length ? hallazgos.map((f) => `- ${f}`).join('\n') : '- (ninguno recogido)';
+  if (hallazgos.length === 0) throw new Error('resumenAnulacion: sin hallazgos que anular');
+  const lista = hallazgos.map((f) => `- ${f}`).join('\n');
   return `Anulado por la aprobación de ${review.user.login} (review ${review.id}) sobre ${cabeza}.\nHallazgos que se anulan:\n${lista}`;
 }
 
@@ -140,6 +142,7 @@ async function reviewsDe({ repo, pr, token }) {
   const todas = [];
   for (let pagina = 1; ; pagina += 1) {
     const lote = await api(token, 'GET', `/repos/${repo}/pulls/${pr}/reviews?per_page=100&page=${pagina}`);
+    if (!Array.isArray(lote)) throw new Error(`reviews: la página ${pagina} no es una lista`);
     todas.push(...lote);
     if (lote.length < 100) return todas;
   }
@@ -174,10 +177,11 @@ async function anular({ REPO, PR, TOKEN }) {
   const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
   if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
   const { check_runs: checks } = await api(TOKEN, 'GET', `/repos/${REPO}/commits/${ctx.cabeza}/check-runs?check_name=revisor`);
-  const ultimo = checks.filter((c) => c.status === 'completed' && c.app?.slug === 'fabrica-revisor').sort((a, b) => b.id - a.id)[0];
+  const ultimo = checks.filter((c) => c.status === 'completed' && c.app?.slug === REVISOR_APP_SLUG).sort((a, b) => b.id - a.id)[0];
   if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
   if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
-  const hallazgos = String(ultimo.output?.summary ?? '').split('\n').map((l) => l.replace(/^- /, '')).filter(Boolean);
+  if (typeof ultimo.output?.summary !== 'string' || !ultimo.output.summary.trim()) throw new Error(`el check revisor ${ultimo.id} no trae resumen: no se sabe qué hallazgos se anulan`);
+  const hallazgos = ultimo.output.summary.split('\n').map((l) => l.replace(/^- /, '')).filter(Boolean);
   await publicarCheck(REPO, ctx.cabeza, TOKEN, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, ctx.cabeza, hallazgos) });
   console.log(TITULO_ANULACION);
 }

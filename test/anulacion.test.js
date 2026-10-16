@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
-import { OWNER_LOGIN } from '../scripts/lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
 import { buenas, SHA, leer } from './apoyo/fabrica.mjs';
 
@@ -147,4 +147,29 @@ test('records: un check «override by Pablo» se cuenta aparte y no es un regist
   assert.equal(r.overrides, 1);
   assert.deepEqual(r.unreadable, []);
   assert.equal(readCheckRuns([{ output: { title: 'otro' } }]).unreadable.length, 1);
+});
+
+test('aprobacionDePablo: una lista de reviews que no es una lista lanza, no cuenta como «sin reviews»', () => {
+  for (const mala of [undefined, null, {}, 'x']) assert.throws(() => aprobacionDePablo(mala, SHA), /lista/, String(mala));
+});
+
+test('anulación: un check rojo sin resumen falla en alto y no publica nada', () => {
+  for (const output of [{ title: 'Veredicto: no' }, { title: 'Veredicto: no', summary: '  ' }, undefined]) {
+    const { r, checks } = anula(reviews(review()), [previo({ output })]);
+    assert.equal(r.status, 1, JSON.stringify(output));
+    assert.match(r.stderr, /resumen/);
+    assert.deepEqual(checks, []);
+  }
+});
+
+test('anulación: una página de reviews que no es una lista falla en alto', () => {
+  const { r, checks } = anula('{"message":"x"}', [previo()]);
+  assert.equal(r.status, 1);
+  assert.deepEqual(checks, []);
+});
+
+test('REVISOR_APP_SLUG es la App que crean apps/crear-apps.html y apps/convertir.mjs', () => {
+  assert.ok(leer('apps/crear-apps.html').includes(`<h2>2. ${REVISOR_APP_SLUG}</h2>`), 'crear-apps.html no crea la App con ese nombre');
+  assert.ok(leer('apps/convertir.mjs').includes(`startsWith('${REVISOR_APP_SLUG}')`), 'convertir.mjs no reconoce ese nombre');
+  assert.doesNotMatch(leer('scripts/veredicto.mjs'), /['"]fabrica-revisor['"]/, 'el slug va en la constante, no escrito a mano');
 });
