@@ -79,6 +79,10 @@ test('C4: la única excepción al SHA es un workflow de la Fábrica con @main, y
   }
 });
 
+test('el estándar escribe la excepción de C4 con el repo de scripts/lib/repo.mjs', () => {
+  assert.ok(leer('estandares/codigo.md').includes(`${REPO}/.github/workflows/<fichero>.yml@main`), 'la excepción del estándar no coincide con REPO');
+});
+
 test('revisor.yml es reutilizable y baja la Fábrica a .fabrica/ en su propio commit', () => {
   const texto = leer('.github/workflows/revisor.yml');
   assert.match(texto, /^ {2}workflow_call:/m, 'sin workflow_call no se puede llamar desde otro repo');
