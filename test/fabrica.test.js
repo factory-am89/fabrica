@@ -297,6 +297,25 @@ test('veredicto de punta a punta: answers del registro es lo mismo que respuesta
   assert.deepEqual(extractRecord(check(publicado).output.text).answers, v.respuestas.answers);
 });
 
+// The judge knows one prefix (PREFIJO_DEL_JUEZ). A standard whose questions have another prefix must give the same verdict
+// as on main: its answers are unknown ids and the verdict is no. The script runs from a temporary copy of scripts/ so STANDARD resolves there.
+test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocidos» y no, como en main (el juez solo conoce un prefijo)', () => {
+  const raiz = mkdtempSync(path.join(tmpdir(), 'juez-p-'));
+  mkdirSync(path.join(raiz, 'scripts', 'lib'), { recursive: true });
+  mkdirSync(path.join(raiz, 'standards'));
+  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
+  writeFileSync(path.join(raiz, 'standards', 'p.md'), '### P1 — First question\nQuién: revisor\n\n### P2 — Second question\nQuién: revisor\n');
+  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
+  const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });
+  const r = spawnSync(process.execPath, ['--import', precarga, path.join(raiz, 'scripts', 'veredicto.mjs')], {
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: salida, STANDARD: 'standards/p.md' },
+  });
+  const c = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10))).find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+  assert.equal(c.conclusion, 'failure', r.stderr);
+  assert.deepEqual(sinRegistro(c), { title: 'Veredicto: no', summary: '- 2 ids desconocidos\n- P1: sin respuesta\n- P2: sin respuesta' });
+});
+
 test('veredicto de punta a punta: salida ilegible y estándar que no carga también dejan registro, con error', () => {
   const ilegible = check(corre({ STANDARD: 'standards/code.md', SALIDA: '{no json' }).publicado);
   assert.deepEqual(sinRegistro(ilegible), { title: 'Veredicto: no', summary: '- salida ilegible' });

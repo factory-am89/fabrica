@@ -149,7 +149,8 @@ test('the question id shape is one constant (questions.mjs): the record, the rea
   assert.equal(cuenta(leer('scripts/lib/questions.mjs'), '[A-Z]'), 1);
   assert.equal(cuenta(leer('scripts/lib/record.mjs'), '[A-Z]'), 0);
   assert.equal(cuenta(leer('scripts/veredicto.mjs'), '[A-Z]'), 0);
-  assert.equal(cuenta(leer('scripts/veredicto.mjs'), String.raw`C\d+`), 0, 'the judge does not carry its own id regex');
+  assert.equal(cuenta(leer('scripts/veredicto.mjs'), String.raw`C\d+`), 0, 'the judge builds its id check from ID_SOURCE and PREFIJO_DEL_JUEZ, not from a literal');
+  assert.match(leer('scripts/veredicto.mjs'), /new RegExp\(`\^\(\?=\$\{ID_SOURCE\}\$\)\$\{PREFIJO_DEL_JUEZ\}`\)/);
   assert.equal(cuenta(leer('scripts/lib/record.mjs'), String.raw`/^\d+$/`), 1, 'DIGITS is written once');
   assert.equal(ID_SOURCE, ID_PARTS.prefix + ID_PARTS.number);
   for (const id of ['C1', 'P12']) {
