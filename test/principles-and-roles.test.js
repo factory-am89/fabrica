@@ -14,6 +14,18 @@ test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
   });
 });
 
+test('el principio 6 conserva las obligaciones del viejo: no adivinar, no interrumpir, parar y apuntar sin evidencia (C13)', () => {
+  const linea = leer('CLAUDE.md').split('\n').find((l) => l.startsWith('6. '));
+  assert.ok(linea, 'falta la línea del principio 6');
+  for (const frase of ['no se adivina', 'ni se interrumpe', 'se para y se deja escrito', 'standards/intervention.md']) {
+    assert.ok(linea.includes(frase), `el principio 6 perdió: ${frase}`);
+  }
+  const arquitecto = leer('.claude/agents/arquitecto.md');
+  for (const frase of ['no preguntes ni adivines', 'marca el trozo como bloqueado', 'standards/intervention.md']) {
+    assert.ok(arquitecto.includes(frase), `el arquitecto perdió: ${frase}`);
+  }
+});
+
 test('los tres roles tienen su modelo y el revisor no escribe', () => {
   const modelos = { arquitecto: 'opus', constructor: 'sonnet', revisor: 'opus' };
   for (const [rol, modelo] of Object.entries(modelos)) {
