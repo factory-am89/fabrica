@@ -3,10 +3,10 @@
 //   repo       owner/name en GitHub
 //   base       rama a la que se fusionan los PR (main, staging)
 //   identidad  con quién se habla a GitHub:
-//              las del mapa de scripts/lib/identidades.mjs (la única lista)
+//              las del mapa de scripts/lib/identities.mjs (la única lista)
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { NOMBRES_IDENTIDAD, IDENTIDADES } from './identidades.mjs';
+import { NOMBRES_IDENTIDAD, IDENTIDADES } from './identities.mjs';
 
 const CLAVES = ['repo', 'base', 'identidad'];
 export const NOMBRE_FICHA = '.fabrica.json';

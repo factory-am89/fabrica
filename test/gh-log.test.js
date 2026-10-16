@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { APIS, CAMPOS, RESULTADOS, SUBCOMANDOS, clasificarApi, contarLlamadas, registrarLlamada, resultadoDe, rutaDeRegistroGh } from '../scripts/lib/registro-gh.mjs';
+import { APIS, CAMPOS, RESULTADOS, SUBCOMANDOS, clasificarApi, contarLlamadas, registrarLlamada, resultadoDe, rutaDeRegistroGh } from '../scripts/lib/gh-log.mjs';
 
 const AHORA = Date.UTC(2026, 9, 16, 10, 30, 0);
 

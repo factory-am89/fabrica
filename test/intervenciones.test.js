@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CAMPOS, CLASES, ORIGENES, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/registro-intervenciones.mjs';
+import { CAMPOS, CLASES, ORIGENES, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
 import { anotarBangs, anotarPermiso, bangsDe } from '../scripts/intervenciones.mjs';
 import { informe } from '../scripts/hitl.mjs';
 

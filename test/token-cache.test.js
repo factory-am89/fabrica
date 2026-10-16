@@ -8,7 +8,7 @@ import * as fsReal from 'node:fs';
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BLOQUEO_VIEJO_MS, conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
+import { BLOQUEO_VIEJO_MS, conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/token-cache.mjs';
 import { avisoCache, clavePrivada, DOCUMENTO_CLAVE, ErrorToken, MOTIVOS, obtenerToken } from '../scripts/token.mjs';
 
 const TOKEN = `ghs_${'a1B2c3D4'.repeat(5)}`;

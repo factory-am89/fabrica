@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../scripts/ventana.mjs';
-import { EXIT } from '../scripts/lib/ventana.mjs';
+import { EXIT } from '../scripts/lib/pause-window.mjs';
 import { makeGithub, REPO } from './fixtures/github-ventana.mjs';
 
 function go(argv, sim, path) {

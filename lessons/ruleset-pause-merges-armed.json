@@ -2,6 +2,6 @@
   "v": 1,
   "class": "none",
   "source": "intervenciones.md:26",
-  "mechanism": "test/ventana.test.js",
+  "mechanism": "test/pause-window.test.js",
   "origin": "pablo"
 }

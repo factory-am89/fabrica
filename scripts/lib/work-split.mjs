@@ -4,7 +4,7 @@
 // (active) session is on that branch and until `hasta`.
 import * as fsReal from 'node:fs';
 import { join } from 'node:path';
-import { FORMA_RAMA } from './registro-sesiones.mjs';
+import { FORMA_RAMA } from './session-log.mjs';
 
 export const FICHERO_REPARTO = 'reparto.json';
 const FORMA_FICHERO = /^[\w./@-]{1,200}$/;

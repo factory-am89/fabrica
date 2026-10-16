@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { contarLecturas, registrarLectura, rutaDeRegistro } from '../scripts/lib/registro-op.mjs';
+import { contarLecturas, registrarLectura, rutaDeRegistro } from '../scripts/lib/op-log.mjs';
 import { clavePrivada, MOTIVOS } from '../scripts/token.mjs';
 
 const PEM = '-----BEGIN RSA PRIVATE KEY-----\nVALOR-SECRETO-DE-PRUEBA\n-----END RSA PRIVATE KEY-----\n';

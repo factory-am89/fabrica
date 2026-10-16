@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 export const rutaDeRegistro = (casa = homedir) => join(casa(), '.fabrica', 'op-reads.jsonl');
 
 // The script and what it read are names (a file or document name), never values: no spaces, newlines or quotes.
-// The gh calls log (registro-gh.mjs) uses the same shape for its caller.
+// The gh calls log (gh-log.mjs) uses the same shape for its caller.
 export const FORMA_NOMBRE = /^[A-Za-z0-9._-]{1,80}$/;
 // `ok` or a reason of MOTIVOS (token.mjs); the shape is checked here, the list lives in one place.
 const FORMA_RESULTADO = /^[a-z][a-z0-9-]{0,40}$/;

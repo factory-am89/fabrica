@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { escanear, escanearTexto, PROPIOS, SECCIONES_EXPLICATIVAS } from '../scripts/lib/cuota-gh.mjs';
+import { escanear, escanearTexto, PROPIOS, SECCIONES_EXPLICATIVAS } from '../scripts/lib/gh-quota.mjs';
 
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 

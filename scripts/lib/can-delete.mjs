@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { gitOk, norm } from './carpetas.mjs';
 import { REPO } from './repo.mjs';
-import { TOKEN } from './identidades.mjs';
+import { TOKEN } from './identities.mjs';
 import { ExitError } from './exit.mjs';
 
 // Lanza una orden con token de App (token.mjs es la única puerta; gh a pelo no tiene sesión en este PC).

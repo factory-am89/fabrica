@@ -29,7 +29,7 @@ comprobado: 2026-10-15
 
 `node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora), lo pone en
 `GH_TOKEN` solo para esa orden y no lo imprime. Lo reutiliza del fichero de `rutaDeCache`
-(`scripts/lib/cache-token.mjs`) hasta el margen de `MARGEN_MS` antes de caducar: solo el token, nunca la clave. Si la
+(`scripts/lib/token-cache.mjs`) hasta el margen de `MARGEN_MS` antes de caducar: solo el token, nunca la clave. Si la
 caché falla, sigue como antes y avisa con una línea `cache: <motivo>` (motivos en `MOTIVO`). Necesita
 el client id (por defecto `CLIENT_ID_CONSTRUCTOR` de `scripts/lib/repo.mjs`; `FABRICA_CONSTRUCTOR_CLIENT_ID` solo lo sustituye) y una sesión de `op` abierta: la clave
 privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo.
@@ -51,13 +51,13 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 
 Figures here were measured in MenuPlan and are NOT verified for this repo (we do not know how many points the Fábrica
 spends, nor the real quota of the App token). Measure first: `npm run llamadas-gh` counts the calls that went
-through `node scripts/token.mjs -- gh ...` per API and per hour (file of `rutaDeRegistroGh` in `scripts/lib/registro-gh.mjs`: time, caller, api, result;
+through `node scripts/token.mjs -- gh ...` per API and per hour (file of `rutaDeRegistroGh` in `scripts/lib/gh-log.mjs`: time, caller, api, result;
 nothing else). A bare `gh` is not counted.
 
 - **MenuPlan's facts, unverified here.** 5,000 points per hour per identity, and per API: REST (core) and GraphQL are
   different quotas; the App token and a person's token each have their own. `gh api rate_limit` shows only REST; read
   GraphQL with `gh api graphql -f query='{ rateLimit { limit remaining resetAt } }'`. The `resetAt` is the one that counts.
-- **Who uses which.** The table of which `gh` command spends which quota lives in `SUBCOMANDOS` (`scripts/lib/registro-gh.mjs`).
+- **Who uses which.** The table of which `gh` command spends which quota lives in `SUBCOMANDOS` (`scripts/lib/gh-log.mjs`).
 - **Cost.** A GraphQL query costs about (requests needed for its nested lists)/100, minimum 1, and GitHub charges for
   what is requested (`first:`), not for what comes back. Measure by adding `rateLimit { cost remaining }`. Ask for the minimum fields.
 - **Rules for agents.** Check CI once, at the end, never in a loop, over REST:
@@ -76,12 +76,12 @@ nothing else). A bare `gh` is not counted.
   armed inside the window. Fix: `npm run ventana -- abrir` right before Pablo pauses the ruleset (saves the armed PRs,
   disarms all, fails if any stays armed; repeat it just before the pause) and `npm run ventana -- cerrar` after it is
   back (re-arms only if the ruleset is `active`, never a PR with `revisor` red, and names any armed PR born inside the
-  window). It never touches the ruleset: that is Pablo's action (`scripts/lib/ventana.mjs`, `test/ventana.test.js`).
+  window). It never touches the ruleset: that is Pablo's action (`scripts/lib/pause-window.mjs`, `test/pause-window.test.js`).
   The findings of #20 went to PR #23.
 - **2026-10-10 · from MenuPlan, unverified here: the GraphQL quota hit 0 twice while `gh api rate_limit` showed spare.** Cause: all
   sessions spent the same token (each startup read all issues, ~320 points; `gh pr checks --watch` kept querying) and
   `rate_limit` shows only REST. Fix there: caches, waiting for CI over REST, one accounting line per call, ceilings in a
-  test (the rules for agents above). Here: `test/gh-quota.test.js` (no `--watch`, no list in a loop) and `test/registro-gh.test.js` + `test/token-gh.test.js` (the accounting line); no ceiling test yet, first measure.
+  test (the rules for agents above). Here: `test/gh-quota.test.js` (no `--watch`, no list in a loop) and `test/gh-log.test.js` + `test/token-gh.test.js` (the accounting line); no ceiling test yet, first measure.
 - **2026-10-14 · from MenuPlan, unverified here: each full read of the issues cost ~450 points, peak hour 6,108.** Cause, measured there: ~1.08
   points per requested issue (cost follows `first:`). Fix there: a published snapshot; not needed here yet. Backed here
   only by `test/gh-quota.test.js` (no list in a loop) and the count of `npm run llamadas-gh`.

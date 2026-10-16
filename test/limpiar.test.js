@@ -8,9 +8,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { limpiar, opciones, imprimir } from '../scripts/limpiar.mjs';
-import { leerFicha } from '../scripts/lib/ficha.mjs';
-import { IDENTIDADES, identidadDe } from '../scripts/lib/identidades.mjs';
-import { consultar, rutaDe } from '../scripts/lib/gh-publico.mjs';
+import { leerFicha } from '../scripts/lib/repo-card.mjs';
+import { IDENTIDADES, identidadDe } from '../scripts/lib/identities.mjs';
+import { consultar, rutaDe } from '../scripts/lib/gh-public.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));

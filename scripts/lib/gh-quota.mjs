@@ -12,7 +12,7 @@
 //    agent runs live in tables and code blocks of the other sections, which are scanned.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ficheros, quitarComentariosJs, quitarComentariosShell, textoDeScripts, tipoDe } from './puerta-op.mjs';
+import { ficheros, quitarComentariosJs, quitarComentariosShell, textoDeScripts, tipoDe } from './op-door.mjs';
 
 export const SECCIONES_EXPLICATIVAS = ['Lo que falló', 'La cuota de GitHub'];
 

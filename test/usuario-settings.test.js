@@ -7,8 +7,8 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/instalar-pc.mjs';
-import { ampliaciones } from '../scripts/lib/ampliacion-settings.mjs';
-import { huecos, rellenar } from '../scripts/lib/plantilla.mjs';
+import { ampliaciones } from '../scripts/lib/settings-widening.mjs';
+import { huecos, rellenar } from '../scripts/lib/template.mjs';
 
 const leer = (nombre) => JSON.parse(readFileSync(path.join(ORIGEN, nombre), 'utf8'));
 const plantilla = () => leer('settings.json');

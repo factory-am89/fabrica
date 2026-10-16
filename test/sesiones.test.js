@@ -9,10 +9,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   ACTIVA_H, CADUCA_H, apuntarSesion, leerSesiones, purgarViejas, rutaDeSesiones,
-} from '../scripts/lib/registro-sesiones.mjs';
+} from '../scripts/lib/session-log.mjs';
 import {
   choques, leerReparto, reservasVivasAjenas, solapan, validarReparto,
-} from '../scripts/lib/reparto.mjs';
+} from '../scripts/lib/work-split.mjs';
 import { fin, listado, pasoSesiones, tocar } from '../scripts/sesiones.mjs';
 import { arrancar } from '../scripts/al-arrancar.mjs';
 

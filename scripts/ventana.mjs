@@ -1,12 +1,12 @@
 // The ruleset window around Pablo's pause of `main`. Usage: node scripts/ventana.mjs abrir|cerrar [--json]
 //   abrir   BEFORE pausing: saves the PRs with auto-merge armed, disarms them all, and fails if any stays armed.
 //   cerrar  AFTER the ruleset is back: only if it is «active», re-arms the saved PRs (never one with `revisor` red).
-// It never lifts or edits the ruleset. Exit codes per class: EXIT in lib/ventana.mjs. Needs the App session (scripts/token.mjs).
+// It never lifts or edits the ruleset. Exit codes per class: EXIT in lib/pause-window.mjs. Needs the App session (scripts/token.mjs).
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { TOKEN } from './lib/identidades.mjs';
+import { TOKEN } from './lib/identities.mjs';
 import { REPO } from './lib/repo.mjs';
-import { abrir, cerrar, EXIT, VentanaError } from './lib/ventana.mjs';
+import { abrir, cerrar, EXIT, VentanaError } from './lib/pause-window.mjs';
 
 const COMMANDS = { abrir, cerrar };
 

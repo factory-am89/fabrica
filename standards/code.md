@@ -46,7 +46,7 @@ Mal: una función de 300 líneas que lee, valida y escribe.
 Quién: máquina (`test/workflows.test.js`, que `tests.yml` lanza también sobre el repo que lo llama).
 Bien: `uses: actions/checkout@<40 hex> # v7.0.1` y `permissions: contents: read`.
 Mal: `uses: actions/checkout@v7` (una etiqueta se puede mover) o un workflow sin `permissions`.
-Excepción, una sola y comprobada por máquina (`accionFijada` en `scripts/lib/acciones.mjs`, probada en `test/revisor-workflow.test.js`): `uses: factory-am89/fabrica/.github/workflows/<fichero>.yml@main`, el juez reutilizable de la Fábrica, que los repos de la organización llaman siempre en su versión actual. Ningún otro repo, ruta ni referencia sin SHA.
+Excepción, una sola y comprobada por máquina (`accionFijada` en `scripts/lib/actions.mjs`, probada en `test/revisor-workflow.test.js`): `uses: factory-am89/fabrica/.github/workflows/<fichero>.yml@main`, el juez reutilizable de la Fábrica, que los repos de la organización llaman siempre en su versión actual. Ningún otro repo, ruta ni referencia sin SHA.
 Aplica también al repo que llama: sus workflows pasan por la misma comprobación, sin «no aplica».
 
 ### C5 — ¿Todo fallo se ve, se lanza o se registra, y nada lo sustituye por un valor por defecto?

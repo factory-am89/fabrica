@@ -5,7 +5,7 @@
 import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { anexarLinea } from './registro-op.mjs';
+import { anexarLinea } from './op-log.mjs';
 
 export const CLASES = [
   'aprobar-puerta', 'alta-de-credencial', 'ampliar-permisos', 'traspaso-de-propiedad', 'aviso-de-permiso',

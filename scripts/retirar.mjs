@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExitError, RETIRE_RESULT, runCommand, finish } from './lib/exit.mjs';
 import { git, gitOk, norm, principal, worktrees, carpetaDe, tieneOrigin } from './lib/carpetas.mjs';
-import { motivoDeQuedarse, prFusionado } from './lib/puede-borrarse.mjs';
+import { motivoDeQuedarse, prFusionado } from './lib/can-delete.mjs';
 
 // Si node_modules es una unión o un enlace se quita ella sola: borrar en recursivo a través de
 // una unión vacía la carpeta de destino (se perdió así un node_modules el 8 oct).

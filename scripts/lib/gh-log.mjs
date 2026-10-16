@@ -5,7 +5,7 @@
 import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { anexarLinea, FORMA_NOMBRE } from './registro-op.mjs';
+import { anexarLinea, FORMA_NOMBRE } from './op-log.mjs';
 
 export const APIS = ['rest', 'graphql', 'unknown'];
 export const RESULTADOS = ['ok', 'limited', 'error'];

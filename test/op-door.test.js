@@ -1,5 +1,5 @@
 // One door to 1Password and to the Windows credential vault: no code file outside the closed allow-list
-// (PUERTAS in scripts/lib/puerta-op.mjs) spawns `op`, opens the vault or calls the functions that do.
+// (PUERTAS in scripts/lib/op-door.mjs) spawns `op`, opens the vault or calls the functions that do.
 // Why: on 2026-10-16 agents in a loop spent the shared 1Password quota from places nobody was counting.
 // No real `op` and no real vault are touched: the fixtures are text in a temp directory.
 import { test } from 'node:test';
@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { escanear, escanearTexto, FUNCIONES_PUERTA, PUERTAS } from '../scripts/lib/puerta-op.mjs';
+import { escanear, escanearTexto, FUNCIONES_PUERTA, PUERTAS } from '../scripts/lib/op-door.mjs';
 
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 

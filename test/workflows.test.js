@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { accionFijada, accionesDe } from '../scripts/lib/acciones.mjs';
+import { accionFijada, accionesDe } from '../scripts/lib/actions.mjs';
 
 // Una variable puesta pero vacía es un error, no «la Fábrica»: no se sustituye en silencio.
 const RAIZ = process.env.FABRICA_REPO_A_COMPROBAR === undefined

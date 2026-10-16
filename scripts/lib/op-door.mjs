@@ -20,9 +20,9 @@ export const PUERTAS = {
     'test/lib-gh.prueba.ps1': 'reads a vault entry that cannot exist, to see the failure path of lib-gh.ps1',
     'test/token-servicio.test.js': 'tokenServicio with an injected vault',
     'test/token-cache.test.js': 'obtenerToken/clavePrivada with an injected op and a service-account token in the env',
-    'test/registro-op.test.js': 'clavePrivada with an injected op and read log',
+    'test/op-log.test.js': 'clavePrivada with an injected op and read log',
     'test/presupuesto-lecturas.test.js': 'clavePrivada with an injected op and read log; the real process runs under the fake op preload',
-    'scripts/lib/puerta-op.mjs': 'the guard itself: it spells out the names it looks for',
+    'scripts/lib/op-door.mjs': 'the guard itself: it spells out the names it looks for',
     'test/op-door.test.js': 'test of this guard: its fixtures are strings that spawn op on purpose',
   },
 };

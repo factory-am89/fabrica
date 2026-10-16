@@ -82,7 +82,7 @@ test('el mecanismo sirve para subcarpetas (hooks/) cuando usuario/ las tenga', (
   assert.deepEqual(comprobar({ home, origen }).map((c) => `${c.fichero} ${c.estado}`), ['hooks/h.mjs editado-a-mano']);
 });
 
-// --- settings.json: solo se aplica si NO amplía permisos (la regla de qué es ampliar, en ampliacion-settings.test.js) ---
+// --- settings.json: solo se aplica si NO amplía permisos (la regla de qué es ampliar, en settings-widening.test.js) ---
 
 const base = () => JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'settings-base.json'), 'utf8'));
 const ajustes = (home) => claude(home, 'settings.json');
