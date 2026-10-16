@@ -2,10 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { decidir, leerPreguntas } from '../scripts/veredicto.mjs';
+import { decidir, leerPreguntas, rutaEstandar, cargarPreguntas } from '../scripts/veredicto.mjs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import yaml from 'js-yaml';
 import { destino, argsSecreto } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
 import { accionFijada } from '../scripts/lib/acciones.mjs';
@@ -233,18 +236,72 @@ test('veredicto: si la cabeza del PR ya no es el SHA juzgado, es no', () => {
 // Recorre el script entero como lo corre el workflow (variables de entorno y llamadas a la API),
 // con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
 // de Pablo y con todas las respuestas en «sí». VEREDICTO_RUTA permite apuntarlo a otra copia del script.
-test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo, con todo sí, da sí y publica la aprobación', () => {
+const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }) },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
   });
-  assert.equal(r.status, 0, r.stderr);
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
+  return { r, publicado };
+};
+
+test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo, con todo sí, da sí y publica la aprobación', () => {
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md' });
+  assert.equal(r.status, 0, r.stderr);
   assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'success', r.stdout);
   assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE', 'falta la aprobación de la App');
   assert.match(r.stdout, /^veredicto: sí/);
+});
+
+test('veredicto de punta a punta: STANDARD con el prefijo .fabrica/ (como en el workflow) da lo mismo que sin él', () => {
+  const { r } = corre({ STANDARD: '.fabrica/standards/code.md' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^veredicto: sí/);
+});
+
+// Sin STANDARD, o con uno inválido, el script falla en alto: sale con 1, publica un no (nunca un sí) y no aprueba.
+for (const [nombre, extra] of [['falta', {}], ['vacío', { STANDARD: '' }], ['con ../', { STANDARD: '../x.md' }], ['con subcarpeta', { STANDARD: 'standards/a/b.md' }], ['inexistente', { STANDARD: 'standards/no-existe.md' }]]) {
+  test(`veredicto de punta a punta: STANDARD ${nombre} falla en alto y publica un no`, () => {
+    const { r, publicado } = corre(extra);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /STANDARD/);
+    assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'failure');
+    assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews')), undefined, 'no debe aprobar');
+  });
+}
+
+test('rutaEstandar: acepta standards/<nombre>.md con o sin .fabrica/ y rechaza el resto', () => {
+  const raiz = path.resolve('/r');
+  assert.equal(rutaEstandar('standards/code.md', raiz), path.join(raiz, 'standards', 'code.md'));
+  assert.equal(rutaEstandar('.fabrica/standards/plans.md', raiz), path.join(raiz, 'standards', 'plans.md'));
+  for (const mala of [undefined, '', '../x.md', 'standards/../x.md', 'standards/a/b.md', '/standards/code.md', 'standards/code.MD', 'standards/code.md\n', '.fabrica/.fabrica/standards/code.md', 'plans/x.md']) {
+    assert.throws(() => rutaEstandar(mala, raiz), /STANDARD/, String(mala));
+  }
+});
+
+test('cargarPreguntas: un estándar sin ninguna pregunta del revisor falla; el real carga', () => {
+  const raiz = mkdtempSync(path.join(tmpdir(), 'est-'));
+  mkdirSync(path.join(raiz, 'standards'));
+  writeFileSync(path.join(raiz, 'standards', 'solo.md'), '### C1 — Pregunta de máquina\nQuién: máquina\n');
+  assert.throws(() => cargarPreguntas('standards/solo.md', raiz), /revisor/);
+  assert.ok(cargarPreguntas('standards/code.md').some((p) => p.quien === 'revisor'));
+});
+
+test('decidir: sin ninguna pregunta del revisor es no, aunque la salida sea perfecta (nunca sí por vacío)', () => {
+  const soloMaquina = [{ id: 'C1', pregunta: 'x', quien: 'máquina' }];
+  for (const lista of [[], soloMaquina]) {
+    const v = decidir(JSON.stringify({ respuestas: [] }), lista, ctx());
+    assert.equal(v.ok, false);
+    assert.match(v.fallos.join(), /sin preguntas del revisor/);
+  }
+});
+
+test('revisor.yml: el paso del veredicto define STANDARD con el estándar de código', () => {
+  const pasos = Object.values(yaml.load(leer('.github/workflows/revisor.yml')).jobs).flatMap((j) => j.steps);
+  const paso = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  assert.equal(paso?.env?.STANDARD, '.fabrica/standards/code.md');
 });
 
 test('veredicto: sin una respuesta del revisor sigue siendo no', () => {
