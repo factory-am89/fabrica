@@ -109,7 +109,7 @@ test('cerrar with the ruleset not active fails and re-arms nothing', () => withS
 
 test('cerrar re-arms the saved PRs, skips merged, closed and revisor-red ones, and reports each', () => withState((path) => {
   const sim = makeGithub({
-    prs: [{ number: 5, armed: true }, { number: 6, armed: true }, { number: 7, armed: true }, { number: 8, armed: true, revisor: 'failure' }, { number: 9, armed: true, revisor: 'success' }],
+    prs: [{ number: 5, armed: true, revisor: 'success' }, { number: 6, armed: true }, { number: 7, armed: true }, { number: 8, armed: true, revisor: 'failure' }, { number: 9, armed: true, revisor: 'success' }],
   });
   go(['abrir'], sim, path);
   sim.prs.get(6).merged = true;
@@ -167,3 +167,36 @@ test('every exit class has its own distinct, non-zero code', () => {
   assert.equal(new Set(codes).size, codes.length);
   assert.ok(codes.every((c) => c >= 2));
 });
+
+test('cerrar never re-arms a PR with no revisor check at all: «no verdict from the revisor»', () => withState((path) => {
+  const sim = makeGithub({ prs: [{ number: 5, armed: true }, { number: 6, armed: true, revisor: 'success' }] });
+  go(['abrir'], sim, path);
+  const r = go(['cerrar'], sim, path);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(sim.armed(), [6]);
+  assert.match(r.out, /skipped #5: no verdict from the revisor/);
+}));
+
+test('cerrar fails loud, re-arming nothing, on a check-runs answer of an unknown shape', () => withState((path) => {
+  for (const rawChecks of [{}, { check_runs: 'x' }, { check_runs: [{ id: 1 }] }, null, []]) {
+    const sim = makeGithub({ prs: [{ number: 5, armed: true, rawChecks }] });
+    go(['abrir'], sim, path);
+    const r = go(['cerrar'], sim, path);
+    assert.equal(r.code, EXIT.github, JSON.stringify(rawChecks));
+    assert.match(r.err, /unexpected shape/);
+    assert.deepEqual(sim.armed(), []);
+    rmSync(path);
+  }
+}));
+
+test('cerrar fails loud when the check-runs page is full (the revisor could be on the next page)', () => withState((path) => {
+  const sim = makeGithub({ prs: [{ number: 5, armed: true, revisor: 'success', fillerChecks: 97 }] });
+  go(['abrir'], sim, path);
+  assert.equal(go(['cerrar'], sim, path).code, 0, '99 check-runs fit in the page');
+  const full = makeGithub({ prs: [{ number: 5, armed: true, revisor: 'success', fillerChecks: 98 }] });
+  go(['abrir'], full, path);
+  const r = go(['cerrar'], full, path);
+  assert.equal(r.code, EXIT.github);
+  assert.match(r.err, /one page is not enough/);
+  assert.deepEqual(full.armed(), []);
+}));

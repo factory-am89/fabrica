@@ -109,14 +109,23 @@ function assertRulesetActive(run, repo) {
   if (main.enforcement !== 'active') throw new VentanaError('ruleset-not-active', `the ruleset «main» is «${main.enforcement}», not «active»: nothing was re-armed. Ask Pablo to restore it`);
 }
 
+// The newest `revisor` check of a check-runs answer, or undefined when the PR has none. A shape we do not know, or a page
+// that may hide more checks, throws: it must never read as «not red».
+function latestRevisor(answer, n) {
+  const runs = answer?.check_runs;
+  if (!Array.isArray(runs) || !runs.every((c) => c && typeof c.name === 'string')) throw new VentanaError('github', `check-runs of #${n}: unexpected shape`);
+  if (runs.length >= PAGE) throw new VentanaError('github', `#${n} has ${runs.length} check-runs: one page is not enough to find the revisor; paginate before trusting this`);
+  return runs.filter((c) => c.name === 'revisor').sort((x, y) => y.id - x.id)[0];
+}
+
 // Why a saved PR must not be re-armed, or null when it can be.
 function reasonToSkip(run, repo, n) {
   const pr = getJson(run, `repos/${repo}/pulls/${n}`);
   if (pr.merged || pr.merged_at) return 'already merged';
   if (pr.state !== 'open') return 'closed';
-  const checks = getJson(run, `repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=${PAGE}`).check_runs ?? [];
-  const revisor = checks.filter((c) => c.name === 'revisor').sort((a, b) => b.id - a.id)[0];
-  if (revisor && RED.has(revisor.conclusion)) return `check revisor is red (${revisor.conclusion})`;
+  const revisor = latestRevisor(getJson(run, `repos/${repo}/commits/${pr.head?.sha}/check-runs?per_page=${PAGE}`), n);
+  if (!revisor) return 'no verdict from the revisor';
+  if (RED.has(revisor.conclusion)) return `check revisor is red (${revisor.conclusion})`;
   return null;
 }
 

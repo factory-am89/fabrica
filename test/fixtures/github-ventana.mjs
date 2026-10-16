@@ -28,7 +28,9 @@ export function makeGithub({ prs = [], enforcement = 'active', onCall = () => {}
     m = line.match(/\/commits\/sha(\d+)\/check-runs/);
     if (m) {
       const p = sim.prs.get(Number(m[1]));
-      return ok({ check_runs: p.revisor ? [{ id: 1, name: 'revisor', conclusion: p.revisor }, { id: 2, name: 'tests', conclusion: 'success' }] : [] });
+      if (p.rawChecks !== undefined) return ok(p.rawChecks);
+      const filler = Array.from({ length: p.fillerChecks ?? 0 }, (_, i) => ({ id: 100 + i, name: `other-${i}`, conclusion: 'success' }));
+      return ok({ check_runs: p.revisor ? [...filler, { id: 1, name: 'revisor', conclusion: p.revisor }, { id: 2, name: 'tests', conclusion: 'success' }] : filler });
     }
     m = line.match(/^pr merge (\d+) --repo \S+ (--disable-auto|--auto --squash)$/);
     if (m) {
