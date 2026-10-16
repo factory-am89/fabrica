@@ -304,6 +304,17 @@ test('revisor.yml: el paso del veredicto define STANDARD con el estándar de có
   assert.equal(paso?.env?.STANDARD, '.fabrica/standards/code.md');
 });
 
+// The reviewer model answers the questions of the standard named in the prompt and the judge checks
+// them against STANDARD: both must name the same file (C8).
+test('revisor.yml: el estándar del prompt es el mismo que STANDARD', () => {
+  const pasos = Object.values(yaml.load(leer('.github/workflows/revisor.yml')).jobs).flatMap((j) => j.steps);
+  const standard = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'))?.env?.STANDARD;
+  const prompt = pasos.map((p) => p.with?.prompt).find((x) => typeof x === 'string');
+  assert.ok(standard && prompt, 'falta STANDARD o el prompt');
+  const nombrados = [...new Set(prompt.match(/\.fabrica\/standards\/[a-z0-9-]+\.md/g) ?? [])];
+  assert.deepEqual(nombrados, [standard]);
+});
+
 test('veredicto: sin una respuesta del revisor sigue siendo no', () => {
   assert.equal(juzga(buenas().slice(1)).ok, false);
 });
