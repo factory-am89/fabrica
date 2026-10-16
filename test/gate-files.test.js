@@ -81,7 +81,16 @@ test('fabricaPaths: finds paths in run, env, with and claude_args (good), nothin
   assert.deepEqual(fabricaPaths('jobs:\n  a:\n    steps:\n      - run: echo hola\n'), []);
 });
 
-test('relativeRefs: static (also multi-line), dynamic and new URL references (good), packages ignored (bad)', () => {
-  const src = "import a from './a.mjs';\nimport {\n  b,\n} from '../b.js';\nconst c = await import('./c.mjs');\nconst d = new URL('../d.md', import.meta.url);\nimport x from 'node:fs';\nimport y from 'js-yaml';\n";
-  assert.deepEqual(relativeRefs(src).sort(), ['../b.js', '../d.md', './a.mjs', './c.mjs']);
+test('relativeRefs: static (also multi-line), dynamic, new URL and side-effect imports (good), packages ignored (bad)', () => {
+  const src = "import a from './a.mjs';\nimport {\n  b,\n} from '../b.js';\nconst c = await import('./c.mjs');\nconst d = new URL('../d.md', import.meta.url);\nimport './side.mjs';\nimport x from 'node:fs';\nimport y from 'js-yaml';\n";
+  assert.deepEqual(relativeRefs(src).sort(), ['../b.js', '../d.md', './a.mjs', './c.mjs', './side.mjs']);
+});
+
+// Known limit: a relative `working-directory` would change what the `.fabrica/...` paths mean and is
+// not followed. No gate workflow uses it today; this test fails if one starts to, so the limit is not silent.
+test('no gate workflow uses working-directory (its paths would not be derived)', () => {
+  for (const w of WORKFLOWS) {
+    const text = readFileSync(path.join(ROOT, w), 'utf8');
+    assert.doesNotMatch(text, /^\s*(?:-\s*)?working-directory:/m, `${w} uses working-directory`);
+  }
 });

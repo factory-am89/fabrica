@@ -1,6 +1,10 @@
-// Files whose change alters the merge gate (the `tests` and `revisor` checks). The list is checked
-// against its sources by test/gate-files.test.js: both workflows, every .fabrica/ path they use, and
-// the imports of those. Paths are relative to the repo root.
+// What this list covers: the two gate workflows (revisor.yml and tests.yml), everything they take from
+// .fabrica/ (scripts, the standard, the reviewer role, the lint config, package files; run, env, with,
+// claude_args and prompt), and the relative imports of those scripts. test/gate-files.test.js derives
+// that set from the workflows and requires this list to equal it.
+// What it does NOT cover: the test files that `npm test` runs in this repo (only test/workflows.test.js,
+// which tests.yml runs from .fabrica/, is listed), nor paths built at run time or under a relative
+// `working-directory`. Paths are relative to the repo root.
 //
 // Readers: the brake against changes to the gate (next piece: a PR must not fetch questions or tests
 // of the gate from its own branch) and piece 5. Nothing reads it yet.
