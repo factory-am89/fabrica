@@ -212,6 +212,12 @@ test('veredicto: ids duplicados son no, aunque uno diga sí', () => {
   assert.equal(juzga([...r, { ...r[0] }]).ok, false);
 });
 
+test('veredicto: un id desconocido es no, y el fallo dice cuántos sin escribir el id del modelo', () => {
+  const v = juzga([...buenas(), { id: 'C999', respuesta: 'sí', prueba: 'x.js:1' }]);
+  assert.equal(v.ok, false);
+  assert.deepEqual(v.fallos, ['1 ids desconocidos']);
+});
+
 test('veredicto: si la cabeza del PR ya no es el SHA juzgado, es no', () => {
   assert.equal(juzga(buenas(), ctx({ cabeza: 'b'.repeat(40) })).ok, false);
   assert.equal(decidir(JSON.stringify({ respuestas: buenas() }), preguntas, {}).ok, false);
