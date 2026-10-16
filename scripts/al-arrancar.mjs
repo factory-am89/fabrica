@@ -6,6 +6,7 @@
 // Si un paso falla, la primera línea lo dice sin ambigüedad y luego va el detalle: la sesión debe enterarse.
 import { fileURLToPath } from 'node:url';
 import { limpiar, imprimir } from './limpiar.mjs';
+import { pasoAlDia } from './al-dia.mjs';
 import { pasoHora } from './hora.mjs';
 
 export const pasoLimpiar = (limpiarFn = limpiar) => ({
@@ -17,7 +18,7 @@ export const pasoLimpiar = (limpiarFn = limpiar) => ({
   },
 });
 
-export const PASOS = [pasoLimpiar(), pasoHora()];
+export const PASOS = [pasoLimpiar(), pasoAlDia(), pasoHora()];
 
 // Devuelve cuántos pasos fallaron. Los titulares de fallo van primero y luego el informe de cada paso.
 export function arrancar(pasos = PASOS, escribir = console.log) {
