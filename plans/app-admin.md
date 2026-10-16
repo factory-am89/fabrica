@@ -1,6 +1,6 @@
 # Plan: App «fabrica-administrador» (tercera App) y proyecto nuevo sin Pablo
 
-Fecha: 16 oct 2026. Base leída: `origin/main` en 2466f51 (incluye #52, proyecto-nuevo.ps1 y lib-proyecto.ps1); los «Existing:» se volvieron a comprobar con `git grep` sobre esa base.
+Fecha: 16 oct 2026. Base leída: `origin/main` en b7f5c46 (incluye #52 y #63); los «Existing:» se volvieron a comprobar con `git grep` sobre esa base.
 Estado: plan; el trozo T2 ya está fusionado (#57), el resto sin código. Ningún valor de secreto se ha leído ni impreso.
 
 Verdict: viable y recomendable, pero la clave administradora es un superpoder (puede borrar repos y quitar protecciones); su única frontera real es lo que entra en `main` de fabrica, así que la «ventana» (pausar el ruleset) deja de ser un riesgo menor y pasa a ser el agujero principal: con esta App, la ventana debe desaparecer, no automatizarse.
@@ -238,9 +238,10 @@ Hace: el workflow pide los permisos de escritura y aplica el resto del plan a ho
 Files: `.github/workflows/administrar.yml`
 Depends on: 5
 Blocked by: A, B
-Existing: el ruleset de homenu-panel hoy lo crean a mano los scripts de PowerShell; en Node solo `scripts/ventana.mjs` lo pausa y lo rearma (no lo crea).
+Existing: el ruleset de homenu-panel hoy lo crean a mano los scripts de PowerShell; en Node solo `scripts/ventana.mjs` lo pausa y lo rearma (no lo crea); `.github/workflows/anulacion.yml` solo lo nombra en un comentario.
 ```
 $ git grep -il "ruleset" -- apps scripts .github
+.github/workflows/anulacion.yml
 apps/arranque.ps1
 apps/lib-gh.ps1
 apps/lib-proyecto.ps1
@@ -330,7 +331,7 @@ npm test
 ## Decisions for Pablo
 
 ### A. Con esta App, cada ventana (pausar el ruleset) expone la clave administradora: ¿qué se hace con la ventana? (antes D1)
-Decidida solo en parte, y no con estas opciones: `intervenciones.md:26` (16 oct 2026; la tomó la sesión coordinadora con la delegación de Pablo, no una frase suya) prohíbe pausar el ruleset «como práctica», pero deja `npm run ventana` para emergencias. Así que la ventana sigue existiendo y el agujero principal del punto 2 sigue abierto mientras haya una emergencia posible. Con la anulación de #61 (cuando entre), un juez roto ya no necesita la ventana, porque basta el Approve de Pablo. Queda por decidir qué pasa con la clave en una emergencia; hasta entonces, ningún trozo que instale la clave empieza.
+Decidida solo en parte, y no con estas opciones: `intervenciones.md:26` (16 oct 2026; la tomó la sesión coordinadora con la delegación de Pablo, no una frase suya) prohíbe pausar el ruleset «como práctica», pero deja `npm run ventana` para emergencias. Así que la ventana sigue existiendo y el agujero principal del punto 2 sigue abierto mientras haya una emergencia posible. Con la anulación de #61 (ya en `main`, b7f5c46), un juez roto ya no necesita la ventana, porque basta el Approve de Pablo. Queda por decidir qué pasa con la clave en una emergencia; hasta entonces, ningún trozo que instale la clave empieza.
 1. Prohibir la ventana: un juez roto se arregla con un PR que el juez viejo pueda aprobar, y si no puede, Pablo hace el arreglo como dueño sin pausar el ruleset para todos (recommended)
 2. Mantener la ventana pero desactivar antes el environment `administrador` (un clic más de Pablo cada vez)
 3. Aceptar el riesgo y apuntarlo
