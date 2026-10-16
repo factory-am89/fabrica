@@ -29,7 +29,7 @@ comprobado: 2026-10-15
 
 `node scripts/token.mjs -- <orden>` canjea un token de instalación de la App (dura 1 hora), lo pone en
 `GH_TOKEN` solo para esa orden y no lo imprime. Lo reutiliza del fichero de `rutaDeCache`
-(`scripts/lib/cache-token.mjs`) hasta 15 minutos antes de caducar: solo el token, nunca la clave. Si la
+(`scripts/lib/cache-token.mjs`) hasta el margen de `MARGEN_MS` antes de caducar: solo el token, nunca la clave. Si la
 caché falla, sigue como antes y avisa con una línea `cache: <motivo>` (motivos en `MOTIVO`). Necesita
 `FABRICA_CONSTRUCTOR_CLIENT_ID` (el client id, no es secreto) y una sesión de `op` abierta: la clave
 privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo.

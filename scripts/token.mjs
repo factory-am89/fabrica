@@ -3,7 +3,7 @@
 // Saca la clave privada de 1Password (bóveda Fabrica) en memoria, firma un JWT, canjea un
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
-// scripts/lib/cache-token.mjs, hasta 15 minutos antes de caducar (una lectura de 1Password por hora).
+// scripts/lib/cache-token.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de la App, no es secreto; lo imprime
 // convertir.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';

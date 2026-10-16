@@ -8,7 +8,7 @@ import * as fsReal from 'node:fs';
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
+import { BLOQUEO_VIEJO_MS, conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
 import { avisoCache, obtenerToken } from '../scripts/token.mjs';
 
 const TOKEN = `ghs_${'a1B2c3D4'.repeat(5)}`;
@@ -16,12 +16,12 @@ const CLIENT = 'Iv_test_client';
 const HORA = 60 * 60 * 1000;
 const { privateKey: PEM } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
 
-// Every cache reason observed during this file; the last test checks the whole vocabulary was seen.
-const vistos = new Set();
-
-// A clock that only moves when the test says so (sleeping in the lock loop moves it too).
+// A fixed instant in the past (so the lock files the tests really create, stamped with the real time, never
+// look older than the fake clock) and a clock that only moves when the test says so (sleeping in the lock
+// loop moves it too).
+const INSTANTE = Date.parse('2020-01-01T00:00:00Z');
 function relojFalso() {
-  const r = { desfase: 0, ahora: () => Date.now() + r.desfase, avanzar: (ms) => { r.desfase += ms; } };
+  const r = { desfase: 0, ahora: () => INSTANTE + r.desfase, avanzar: (ms) => { r.desfase += ms; } };
   return r;
 }
 
@@ -47,7 +47,7 @@ function entorno({ cliente = CLIENT } = {}) {
   const e = { dir, reloj, github, lecturas: 0, ruta: join(dir, 'Fabrica', 'token-cache.json') };
   e.leer = () => { e.lecturas++; return PEM; };
   e.avisos = [];
-  e.cache = { ruta: e.ruta, proteger: () => true, permisosBien: () => true, dormir: async (ms) => reloj.avanzar(ms), avisar: (m) => { e.avisos.push(m); vistos.add(m); } };
+  e.cache = { ruta: e.ruta, proteger: () => true, permisosBien: () => true, dormir: async (ms) => reloj.avanzar(ms), avisar: (m) => { e.avisos.push(m); } };
   e.pedir = (extra = {}) => obtenerToken({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: cliente }, leer: e.leer, fetchFn: github.fetch, reloj: reloj.ahora, cache: e.cache, ...extra });
   e.limpiar = () => rmSync(dir, { recursive: true, force: true });
   return e;
@@ -70,9 +70,7 @@ test('leerCache: absent, wrong permissions, corrupt, wrong shape, wrong app, exp
   const e = entorno();
   try {
     const leer = (extra = {}) => {
-      const r = leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra });
-      vistos.add(r.motivo);
-      return r;
+      return leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra });
     };
     assert.equal(leer().motivo, 'ausente');
     guardado(e);
@@ -162,19 +160,19 @@ test('conBloqueo: lock busy -> waits, then runs unlocked with the reason `ocupad
   } finally { e.limpiar(); }
 });
 
-test('conBloqueo: a lock older than 20 s is an orphan and is taken over', async () => {
+test('conBloqueo: a lock older than BLOQUEO_VIEJO_MS is an orphan and is taken over', async () => {
   const e = entorno();
   try {
-    await conBloqueo({ ruta: e.ruta, fn: async () => {} });
+    await conBloqueo({ ruta: e.ruta, reloj: e.reloj.ahora, fn: async () => {} });
     writeFileSync(`${e.ruta}.lock`, '1');
-    const viejo = new Date(Date.now() - 60_000);
+    const viejo = new Date(INSTANTE - BLOQUEO_VIEJO_MS - 1000);
     utimesSync(`${e.ruta}.lock`, viejo, viejo);
-    const r = await conBloqueo({ ruta: e.ruta, fn: async (s) => s });
+    const r = await conBloqueo({ ruta: e.ruta, reloj: e.reloj.ahora, fn: async (s) => s });
     assert.equal(r.bloqueado, true);
   } finally { e.limpiar(); }
 });
 
-test('obtenerToken: 20 calls in the same hour read the .pem once and exchange once', async () => {
+test('obtenerToken: many calls in the same hour read the .pem once and exchange once', async () => {
   const e = entorno();
   try {
     for (let i = 0; i < 20; i++) assert.equal((await e.pedir()).token, TOKEN);
@@ -183,7 +181,7 @@ test('obtenerToken: 20 calls in the same hour read the .pem once and exchange on
   } finally { e.limpiar(); }
 });
 
-test('obtenerToken: with less than 15 minutes left it exchanges again', async () => {
+test('obtenerToken: with less than MARGEN_MS left it exchanges again', async () => {
   const e = entorno();
   try {
     await e.pedir();
@@ -202,7 +200,7 @@ test('obtenerToken: each unusable cache leads to a fresh read and says its reaso
     'wrong app': [(e) => guardado(e, { appId: 'otra-app' }), ['otra-app']],
     unreadable: [(e) => { guardado(e); e.cache.fs = { ...fsReal, readFileSync: () => { throw new Error('x'); } }; }, ['disco']],
     absent: [() => {}, []],
-    'under 15 min': [(e) => guardado(e, { restante: MARGEN_MS - 1000 }), []],
+    'under the margin': [(e) => guardado(e, { restante: MARGEN_MS - 1000 }), []],
   };
   for (const [nombre, [prepara, avisos]] of Object.entries(casos)) {
     const e = entorno();
@@ -295,6 +293,26 @@ test('avisoCache: one stderr line with the reason; a reason outside the vocabula
   assert.throws(() => avisoCache('inventado'), /outside the vocabulary/);
 });
 
-test('MOTIVOS_CACHE: every reason of the vocabulary was produced by the code in this file', () => {
-  assert.deepEqual([...MOTIVOS_CACHE].sort(), [...vistos].sort());
+test('MOTIVOS_CACHE: one case per reason of the vocabulary, run here, each producing exactly that reason', async () => {
+  const leer = (e, extra = {}) => leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra }).motivo;
+  const otroDueno = { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' };
+  const casos = {
+    ok: (e) => { guardado(e); return leer(e); },
+    ausente: (e) => leer(e),
+    corrupto: (e) => { guardado(e); writeFileSync(e.ruta, '{roto'); return leer(e); },
+    forma: (e) => { guardado(e); writeFileSync(e.ruta, JSON.stringify({ v: 2 })); return leer(e); },
+    caducado: (e) => { guardado(e); e.reloj.avanzar(2 * HORA); return leer(e); },
+    'otra-app': (e) => { guardado(e); return leer(e, { ids: { appId: 'otra' } }); },
+    permisos: (e) => { guardado(e); return leer(e, { permisosBien: () => false }); },
+    disco: (e) => { guardado(e); return leer(e, { fs: { ...fsReal, statSync: () => { throw Object.assign(new Error('x'), { code: 'EACCES' }); } } }); },
+    'sin-ruta': async (e) => { e.cache.ruta = null; await e.pedir(); return e.avisos[0]; },
+    'otro-dueno': async (e) => { await e.pedir({ env: otroDueno }); return e.avisos[0]; },
+  };
+  assert.deepEqual(Object.keys(casos).sort(), [...MOTIVOS_CACHE].sort(), 'the table has exactly one case per reason');
+  for (const [motivo, caso] of Object.entries(casos)) {
+    const e = entorno();
+    try {
+      assert.equal(await caso(e), motivo);
+    } finally { e.limpiar(); }
+  }
 });

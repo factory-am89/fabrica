@@ -2,12 +2,11 @@
 // scripts/lib/cacheTokenSesion.mjs (same design, smaller scope).
 //
 // Why: token.mjs read fabrica-constructor.pem from 1Password on every gh/git call, and several
-// agents in a loop exhausted the service-account quota ("Too many requests", 10 Oct 2026).
+// agents in a loop exhausted the service-account quota ("Too many requests"; incident in the 1password skill).
 // An installation token lives 1 hour: it is saved and reused until MARGEN_MS before it expires.
 //
-// One file per Windows user, outside the repo and OneDrive (%LOCALAPPDATA%\Fabrica\token-cache.json;
-// elsewhere ~/.fabrica/; see rutaDeCache), readable only by that user (icacls ACL; 0600 on POSIX). It
-// holds the token, its expiry and the App client id, and nothing else: NEVER the .pem.
+// One file per system user, outside the repo and OneDrive (see rutaDeCache for the path), readable only
+// by that user (icacls ACL on Windows, mode 0600 on POSIX). It holds the token, its expiry and the App client id, and nothing else: NEVER the .pem.
 // Disk and clock are injectable so tests use a temp directory.
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -15,9 +14,9 @@ import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-// Same shape the child environment accepts: the token ends up in a process environment.
+// Shape of a GitHub installation token: read and write refuse anything else, so the file never holds arbitrary text.
 export const FORMA_TOKEN = /^ghs_[A-Za-z0-9_.-]{20,}$/;
-// Reused only while more than this is left: a served token has at least 15 minutes of life.
+// Reused only while more than this is left: a served token always has at least this much life.
 export const MARGEN_MS = 15 * 60 * 1000;
 // An installation token lasts 1 hour; a little clock skew is accepted and nothing more.
 export const VIDA_MAX_MS = 60 * 60 * 1000 + 2 * 60 * 1000;

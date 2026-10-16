@@ -52,9 +52,9 @@ Se pasa por tubería (stdin) entre dos procesos.
 - **2026-10-16 · «Too many requests» again, now from the Fábrica's `scripts/token.mjs` (the same failure as MenuPlan
   on 2026-10-10).** Cause: every gh/git call read `fabrica-constructor.pem` from 1Password, so several agents in a
   loop spent the service account's hourly quota; the quota belongs to the account, not to the session. Fix:
-  `scripts/lib/cache-token.mjs` keeps only the installation token (path: `rutaDeCache`, user-only ACL) until 15
-  minutes before it expires, with a lock so two sessions do not exchange at once. Count with
-  `node --test test/token-lecturas.test.js`: 10 calls read the .pem 10 times before, once after.
+  `scripts/lib/cache-token.mjs` keeps only the installation token (path: `rutaDeCache`, user-only ACL) until
+  the margin `MARGEN_MS` (same file) before it expires, with a lock so two sessions do not exchange at once. Count with
+  `node --test test/token-lecturas.test.js`: it runs a batch of calls and asserts the .pem was read once.
 - **2026-10-11 · la `ssh` falla con «communication with agent failed».** Causa: nadie contestó la ventana de
   aprobar; no era el agente ni la llave. Arreglo: avisar a Pablo antes de conectar y esperar su sí, sin
   reintentar en bucle.
