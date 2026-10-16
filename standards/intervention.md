@@ -4,6 +4,16 @@ Principle 6 (CLAUDE.md) says to ask before a shortcut. This file is the closed l
 
 This file decides when an agent asks before it starts. It does not decide merges: the `revisor` check keeps deciding every PR, also those that change the gate (Pablo's decision of 2026-10-15 in `intervenciones.md`).
 
+## Who decides a merge
+
+One source for this rule; the skill `github`, `PASOS-PABLO.md`, C13 of `standards/code.md` and `intervenciones.md` point here.
+
+- The `revisor` check decides every merge, also of the gate (Pablo, 2026-10-15). Pausing the ruleset of `main` is **prohibited** (Pablo, 2026-10-16): pausing lets every armed PR in without the check.
+- The only way out when `revisor` rejects by mistake is Pablo's **Approve** on the PR (Files changed tab), nothing else. A machine checks it, not a sentence: `anulacion.yml` (runs from `main`; `senal-review.yml` only wakes it) calls `aprobacionDePablo` in `scripts/veredicto.mjs`, which counts a review only if its author is `OWNER_LOGIN` (`scripts/lib/repo.mjs`), his latest decisive review (approved, changes requested, dismissed) is an approval, and its `commit_id` is the current head. A push after it, another author or a dismissed review do not override.
+- The result is the `revisor` check in green titled «override by Pablo», listing the findings it overrides. `node scripts/records.mjs` counts them as `overrides`.
+- `npm run ventana` (disarm auto-merge before a pause, re-arm after) is only for emergencies.
+- Why the reviewer may accept this widening (C13): Pablo decided it (row of 2026-10-16 in `intervenciones.md`), and the machine limits it to his login, the current head and his latest decisive review; `test/anulacion.test.js` goes red if any of the three is removed.
+
 ## Classes
 
 An agent stops and asks Pablo, in the terminal, before it does any of these:
