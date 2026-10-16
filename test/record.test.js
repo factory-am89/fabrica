@@ -5,7 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { RECORD_VERSION, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
+import { readFileSync } from 'node:fs';
+import { RUTA_ESTANDAR } from '../scripts/veredicto.mjs';
+import { ANSWERS, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
 
 const SHA = 'a'.repeat(40);
 const base = { repo: 'o/r', pr: 2, sha: SHA, standard: 'standards/code.md', veredicto: { ok: false, fallos: ['C5: no'] }, respuestas: { answers: { C1: 'sí', C5: 'no', C6: 'no aplica', C7: null }, invalid: 0 }, run: { id: 99, attempt: 1 } };
@@ -109,4 +111,25 @@ test('CLI: missing file, bad JSON or a non-array exit 1; no --file exits 1', () 
   assert.equal(cli('--file', path.join(tmpdir(), 'no-existe-xyz.json')).status, 1);
   assert.equal(cli('--file', tmp({ a: 1 })).status, 1);
   assert.equal(cli().status, 1);
+});
+
+test('the standard path shape is one constant: the record and the judge both build their regex from STANDARD_SOURCE', () => {
+  assert.equal(RUTA_ESTANDAR.source, new RegExp(String.raw`^(\.fabrica/)?(${STANDARD_SOURCE})$`).source);
+  assert.ok(RUTA_ESTANDAR.test('.fabrica/standards/code.md') && RUTA_ESTANDAR.test('standards/code.md'));
+  for (const f of ['scripts/veredicto.mjs', 'scripts/lib/record.mjs']) {
+    const copias = readFileSync(path.join(import.meta.dirname, '..', f), 'utf8').split('a-z0-9-]+').length - 1;
+    assert.equal(copias, f.endsWith('record.mjs') ? 1 : 0, `${f}: the path shape is written once, in record.mjs`);
+  }
+  assert.ok(!RUTA_ESTANDAR.test('standards/codeXmd') && !RUTA_ESTANDAR.test('x.fabrica/standards/code.md'));
+  assert.throws(() => buildRecord({ ...base, standard: 'standards/codeXmd' }));
+  assert.doesNotThrow(() => buildRecord(base));
+  assert.throws(() => buildRecord({ ...base, standard: 'standards/a/b.md' }));
+});
+
+test('aggregate: counters come from the answer vocabulary, so a new answer never gives NaN; an unknown one throws', () => {
+  const nuevo = [...ANSWERS, 'quizás'];
+  const r = { ...expected, answers: { C1: 'quizás' } };
+  const a = aggregate([r, { ...expected, answers: { C1: 'sí' } }], nuevo);
+  assert.deepEqual(a.porPregunta.C1, { sí: 1, no: 0, 'no aplica': 0, quizás: 1, 'sin-respuesta': 0 });
+  assert.throws(() => aggregate([r]), /vocabulary/);
 });

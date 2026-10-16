@@ -9,7 +9,9 @@ const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid'
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const SHA = /^[0-9a-f]{40}$/;
-const STANDARD = /^standards\/[a-z0-9-]+\.md$/;
+// The shape of a standard path, written once: scripts/veredicto.mjs builds its STANDARD check from it too.
+export const STANDARD_SOURCE = String.raw`standards/[a-z0-9-]+\.md`;
+const STANDARD = new RegExp(`^${STANDARD_SOURCE}$`);
 const ID = /^[A-Z]\d+$/;
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 const isPosInt = (n) => Number.isInteger(n) && n > 0;
@@ -97,9 +99,9 @@ export function readCheckRuns(checkRuns) {
   return { records, unreadable };
 }
 
-// records -> { porPr: {"repo#pr": {rondas, ok, no, salida-ilegible, standard-unloadable}}, porPregunta: {id: {sí, no, no aplica, sin-respuesta}} }
+// records (and the answer vocabulary, ANSWERS by default) -> { porPr: {"repo#pr": {rondas, ok, no, salida-ilegible, standard-unloadable}}, porPregunta: {id: {sí, no, no aplica, sin-respuesta}} }
 // rondas = records of that PR; `no` = a no verdict without error. A record with an error says nothing about the questions.
-export function aggregate(records) {
+export function aggregate(records, answers = ANSWERS) {
   const porPr = {};
   const porPregunta = {};
   for (const r of records) {
@@ -112,8 +114,10 @@ export function aggregate(records) {
     else p.no += 1;
     if (r.error) continue;
     for (const [id, a] of Object.entries(r.answers)) {
-      const q = (porPregunta[id] ??= { sí: 0, no: 0, 'no aplica': 0, 'sin-respuesta': 0 });
-      q[a ?? 'sin-respuesta'] += 1;
+      const q = (porPregunta[id] ??= Object.fromEntries([...answers, 'sin-respuesta'].map((x) => [x, 0])));
+      const clave = a ?? 'sin-respuesta';
+      if (!(clave in q)) throw new Error(`aggregate: answer outside the vocabulary in ${r.repo}#${r.pr}`);
+      q[clave] += 1;
     }
   }
   return { porPr, porPregunta };

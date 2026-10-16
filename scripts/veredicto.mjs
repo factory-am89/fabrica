@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readQuestions } from './lib/questions.mjs';
-import { ANSWERS, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWERS, STANDARD_SOURCE, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce el prefijo C.
 export function leerPreguntas(md) {
@@ -16,7 +16,7 @@ export function leerPreguntas(md) {
 
 // STANDARD es «standards/<nombre>.md», con o sin el prefijo «.fabrica/» del workflow; se resuelve
 // contra la raíz del repo que contiene este script (en CI, .fabrica/; en los tests, la carpeta de trabajo).
-const RUTA_ESTANDAR = /^(\.fabrica\/)?(standards\/[a-z0-9-]+\.md)$/;
+export const RUTA_ESTANDAR = new RegExp(String.raw`^(\.fabrica/)?(${STANDARD_SOURCE})$`);
 const RAIZ = path.resolve(import.meta.dirname, '..');
 
 export function rutaEstandar(valor, raiz = RAIZ) {
