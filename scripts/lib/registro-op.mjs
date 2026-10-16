@@ -8,17 +8,23 @@ import { dirname, join } from 'node:path';
 export const rutaDeRegistro = (casa = homedir) => join(casa(), '.fabrica', 'op-reads.jsonl');
 
 // The script and what it read are names (a file or document name), never values: no spaces, newlines or quotes.
-const FORMA_NOMBRE = /^[A-Za-z0-9._-]{1,80}$/;
+// The gh calls log (registro-gh.mjs) uses the same shape for its caller.
+export const FORMA_NOMBRE = /^[A-Za-z0-9._-]{1,80}$/;
 // `ok` or a reason of MOTIVOS (token.mjs); the shape is checked here, the list lives in one place.
 const FORMA_RESULTADO = /^[a-z][a-z0-9-]{0,40}$/;
+
+// Appends one JSON line to a log file and creates its directory (user only). Shared by the op and gh logs.
+export function anexarLinea(ruta, objeto, fs = fsReal) {
+  fs.mkdirSync(dirname(ruta), { recursive: true, mode: 0o700 });
+  fs.appendFileSync(ruta, `${JSON.stringify(objeto)}\n`);
+}
 
 // Appends one line. Throws if a field has the wrong shape or the disk refuses: the caller decides what to say.
 export function registrarLectura({ script, nombre, resultado, ruta = rutaDeRegistro(), fs = fsReal, reloj = Date.now }) {
   if (!FORMA_NOMBRE.test(String(script)) || !FORMA_NOMBRE.test(String(nombre)) || !FORMA_RESULTADO.test(String(resultado))) {
     throw new Error('read log: field with a wrong shape (a name and a reason are expected, never a value)');
   }
-  fs.mkdirSync(dirname(ruta), { recursive: true, mode: 0o700 });
-  fs.appendFileSync(ruta, `${JSON.stringify({ t: new Date(reloj()).toISOString(), script, leido: nombre, resultado })}\n`);
+  anexarLinea(ruta, { t: new Date(reloj()).toISOString(), script, leido: nombre, resultado }, fs);
 }
 
 // Reads per script: { 'token.mjs': { total, ok, error } }. No file means no reads. A broken line throws

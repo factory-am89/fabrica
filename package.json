@@ -10,6 +10,7 @@
     "instalar-hooks": "node scripts/instalar-hooks.mjs",
     "retirar": "node scripts/retirar.mjs",
     "lecturas-op": "node scripts/lecturas-op.mjs",
+    "llamadas-gh": "node scripts/llamadas-gh.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test"
   },
