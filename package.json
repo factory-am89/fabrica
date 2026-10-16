@@ -13,6 +13,7 @@
     "lecturas-op": "node scripts/lecturas-op.mjs",
     "llamadas-gh": "node scripts/llamadas-gh.mjs",
     "skills-viejas": "node scripts/skills-viejas.mjs",
+    "hora": "node scripts/hora.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test"
   },
