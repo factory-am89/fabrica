@@ -9,29 +9,11 @@ import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { retirar } from '../scripts/retirar.mjs';
 import { nombreDeRama, norm } from '../scripts/lib/carpetas.mjs';
+import { git, repo } from './apoyo/repo.mjs';
 import { decidir, enPrincipal, carpetaDeCommit } from '../.claude/hooks/carpeta-principal.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(RAIZ, '.claude', 'hooks', 'carpeta-principal.mjs');
-
-const git = (cwd, ...args) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
-  assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
-  return r.stdout.trim();
-};
-
-// <tmp>/fabrica con un commit en main, listo para colgarle carpetas hermanas.
-function repo() {
-  const padre = realpathSync(mkdtempSync(path.join(tmpdir(), 'carpetas-')));
-  const principal = path.join(padre, 'fabrica');
-  mkdirSync(principal);
-  git(principal, 'init', '-q', '-b', 'main');
-  for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
-  writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
-  git(principal, 'commit', '-q', '-m', 'inicial');
-  return { padre, principal };
-}
 
 const tarea = (principal, rama) => crearTarea(rama, { cwd: principal, instalar: false });
 
