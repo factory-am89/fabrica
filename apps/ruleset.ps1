@@ -1,19 +1,26 @@
-# Crea el ruleset de main en fabrica (uso unico).
-# Normalmente lo llama apps\arranque.ps1 al final (con -SesionAbierta). Suelto sirve para relanzarlo:
-#   powershell -ExecutionPolicy Bypass -File <esta ruta>
-# Suelto hace login y, siempre (tambien si falla), logout de gh; con -SesionAbierta usa la sesion del
-# que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el
+# Crea el ruleset de main en un repo de una cuenta u organizacion (uso unico).
+# Normalmente lo llama apps\arranque.ps1 al final (con -SesionAbierta). Suelto sirve para relanzarlo
+# y para repos de otras cuentas de la organizacion:
+#   powershell -ExecutionPolicy Bypass -File <esta ruta> -Repo factory-am89/fabrica
+# El dueno del repo y el usuario de la sesion de gh son cosas distintas: la sesion puede ser de
+# cualquiera que sea ADMIN del repo, y la App revisora tiene que estar instalada en la cuenta DUENA.
+# -ContextoTests es el nombre del check de tests que se exige (por defecto 'tests'); un workflow
+# reutilizado puede publicarlo con otro nombre (p. ej. 'tests / tests'): se mira en un PR real antes.
+# Suelto, si no hay sesion de gh abierta, hace login y la cierra al acabar (tambien si falla); una sesion
+# que ya existia no se cierra. Con -SesionAbierta usa la sesion del que lo llama y no la cierra. Requiere que main exista en origin. El check `revisor` se exige con el
 # id de la App aunque aun no haya corrido (solo corre en PR). Se puede relanzar: si el ruleset existe, no lo toca. Textos sin tildes a proposito (Windows PowerShell 5.1
 # lee un .ps1 sin BOM como ANSI).
 param(
-  [string]$Repo = 'factory-am89/fabrica',
+  [Parameter(Mandatory = $true)][string]$Repo,   # dueno/nombre: sin valor por defecto a proposito
+  [string]$ContextoTests = 'tests',              # nombre del check de tests que se exige
   [string]$AppRevisor = 'fabrica-revisor',
   [string]$NombreRuleset = 'main',
   [switch]$SesionAbierta   # la sesion de gh es del script que me llama: ni login ni logout
 )
 
 $ErrorActionPreference = 'Continue'
-$Dueno = ($Repo -split '/')[0]
+$AbriSesion = $false   # $true si el login lo hace este script: solo esa sesion se cierra al final
+$Usuario = $null   # usuario de la sesion de gh: se lee tras el login; NO tiene por que ser el dueno del repo
 $IdGitHubActions = 15368   # integracion de GitHub Actions: origen del check `tests`
 
 function Info($t)  { Write-Host "  $t" }
@@ -21,6 +28,7 @@ function Aviso($t) { Write-Host "  [!] $t" -ForegroundColor Yellow }
 function Bien($t)  { Write-Host "  [ok] $t" -ForegroundColor Green }
 . (Join-Path $PSScriptRoot 'lib-gh.ps1')
 
+try { $Dueno = (Partir-Repo $Repo).Dueno } catch { Write-Host "  $($_.Exception.Message)" -ForegroundColor Red; exit 1 }   # cuenta duena del repo
 $resultado = 'no llego a ejecutarse'
 $fallo = $false
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Host 'Falta gh.' -ForegroundColor Red; exit 1 }
@@ -29,43 +37,40 @@ if ($env:GH_TOKEN -or $env:GITHUB_TOKEN) {
   Remove-Item Env:GH_TOKEN, Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
 }
 
-& gh.exe auth status --hostname github.com 2>&1 | Out-Null
-if ($LASTEXITCODE -eq 0) {
-  $q = (& gh.exe api user --jq .login 2>$null | Out-String).Trim()
-  if ($q -ne $Dueno) {
-    Write-Host "  Ya hay una sesion de gh abierta como '$q' (no como '$Dueno'). No la toco: cierrala tu (gh auth logout) o usa otro terminal, y vuelve a lanzar." -ForegroundColor Red
-    exit 1
-  }
-}
-
 try {
   # --- login ---
   Write-Host '=== Sesion de gh ===' -ForegroundColor Cyan
   & gh.exe auth status --hostname github.com 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  Se abrira el navegador: copia el codigo que te da gh, pegalo y autoriza.'
+    $AbriSesion = $true
     Gh-Login
     if ($LASTEXITCODE -ne 0) { throw 'gh auth login no termino bien.' }
   }
   $u = Gh @('api', 'user', '--jq', '.login')
-  if ($u.Code -ne 0 -or $u.Out -ne $Dueno) { throw "La sesion es de '$($u.Out)' y deberia ser '$Dueno'." }
+  if ($u.Code -ne 0 -or -not $u.Out) { throw "No pude leer el usuario de la sesion de gh: $($u.Out)" }
+  $Usuario = $u.Out
 
-  # --- requisitos: main con commits ---
+  # --- requisitos: la sesion es admin del repo (da igual de quien sea el repo) y main tiene commits ---
   Write-Host '=== Comprobaciones ===' -ForegroundColor Cyan
+  $ad = Gh @('api', "repos/$Repo", '--jq', '.permissions.admin')
+  if ($ad.Code -ne 0) { throw "No veo el repo $Repo con la sesion de '$Usuario': $($ad.Out)" }
+  if ($ad.Out -ne 'true') { throw "La sesion de '$Usuario' no es administradora de $Repo (hace falta para crear el ruleset)." }
+  Write-Host "  [ok] La sesion de '$Usuario' es admin de $Repo (dueno: $Dueno)."
   $b = Gh @('api', "repos/$Repo/branches/main", '--jq', '.name')
   if ($b.Code -ne 0) { throw "La rama main de $Repo no existe todavia: sube antes la v0 (git push -u origin main)." }
 
   # --- id de la App revisor, leido por API ---
   # GET /apps/<slug> da 404 si la App es privada, asi que se busca en las instalaciones de la sesion
-  # (/user/installations trae app_id y app_slug). Solo se fija con una App instalada en la cuenta de $Dueno.
+  # (/user/installations trae app_id y app_slug). Solo cuenta una App instalada en la cuenta DUENA del repo
+  # ($Dueno), no en la del usuario de la sesion: no se fija el ruleset con una App ajena.
   $idRevisor = $null
-  $b = Buscar-App-Instalada $AppRevisor
+  $b = Buscar-App-Instalada $AppRevisor $Dueno
   if ($b.Estado -eq 'ok') {
-    if ($b.Cuenta -ine $Dueno) { throw "La App '$AppRevisor' esta instalada en '$($b.Cuenta)', no en $Dueno. No fijo el ruleset con una App ajena: usa el nombre real de tu App con -AppRevisor." }
     $idRevisor = $b.Id
   }
   else {
-    if ($b.Estado -eq 'ninguna') { Write-Host "  [!] La App $AppRevisor no aparece entre tus instalaciones (esta instalada en el repo? Es el paso 4 de arranque.ps1)." -ForegroundColor Yellow }
+    if ($b.Estado -eq 'ninguna') { Write-Host "  [!] La App $AppRevisor no aparece instalada en la cuenta '$Dueno' entre las instalaciones de '$Usuario' (instalala en el repo: paso 4 de arranque.ps1; o usa el nombre real de tu App con -AppRevisor)." -ForegroundColor Yellow }
     else { Write-Host "  [!] No pude leer tus instalaciones de Apps en GitHub." -ForegroundColor Yellow }
     Write-Host "      Lo ves en https://github.com/settings/apps/$AppRevisor (App ID: un numero de 7 cifras, no el Client ID que empieza por Iv23; no es secreto; comprueba que la App es tuya)."
     $t = (Read-Host '  Escribe el App ID del revisor, solo numeros (vacio para cancelar)').Trim()
@@ -82,36 +87,14 @@ try {
     Write-Host "  El ruleset '$NombreRuleset' ya existe: no lo toco." -ForegroundColor DarkGreen
     $resultado = 'ya hecho'
   } else {
-    # Sin regla "update" (Restrict updates) y sin bypass_actors: nadie salta el ruleset.
-    $cuerpo = [ordered]@{
-      name          = $NombreRuleset
-      target        = 'branch'
-      enforcement   = 'active'
-      conditions    = @{ ref_name = @{ include = @('~DEFAULT_BRANCH'); exclude = @() } }
-      bypass_actors = @()
-      rules         = @(
-        @{ type = 'pull_request'; parameters = @{
-            required_approving_review_count   = 0
-            dismiss_stale_reviews_on_push     = $false
-            require_code_owner_review         = $false
-            require_last_push_approval        = $false
-            required_review_thread_resolution = $false } },
-        @{ type = 'required_status_checks'; parameters = @{
-            strict_required_status_checks_policy = $false
-            required_status_checks = @(
-              @{ context = 'tests';   integration_id = $IdGitHubActions },
-              @{ context = 'revisor'; integration_id = $idRevisor }) } },
-        @{ type = 'non_fast_forward' },
-        @{ type = 'deletion' }
-      )
-    } | ConvertTo-Json -Depth 10
+    $cuerpo = Cuerpo-Ruleset $NombreRuleset $ContextoTests $IdGitHubActions $idRevisor | ConvertTo-Json -Depth 10
     $c = Gh @('api', '-X', 'POST', "repos/$Repo/rulesets", '--input', '-') $cuerpo
     if ($c.Code -ne 0) { throw "GitHub rechazo el ruleset: $($c.Out)" }
     $v = Gh @('api', "repos/$Repo/rulesets")
     $jv = $null
     try { $jv = @($v.Out | ConvertFrom-Json) | Where-Object { $_.name -eq $NombreRuleset } | Select-Object -First 1 } catch { $jv = $null }
     if (-not $jv -or $jv.enforcement -ne 'active') { throw 'El ruleset no aparece activo tras crearlo.' }
-    Write-Host '  [ok] Ruleset creado y activo: PR obligatorio, checks tests y revisor, sin force push, sin borrado, sin bypass.' -ForegroundColor Green
+    Write-Host '  [ok] Ruleset creado y activo: PR obligatorio, checks $ContextoTests y revisor, sin force push, sin borrado, sin bypass.' -ForegroundColor Green
     $resultado = 'ok'
   }
 }
@@ -124,8 +107,11 @@ catch {
 finally {
   Write-Host '=== Cierre ===' -ForegroundColor Cyan
   if ($SesionAbierta) { Write-Host '  La sesion de gh es de quien me llamo: no la cierro aqui.' }
+  elseif (-not $AbriSesion) { Write-Host '  La sesion de gh ya existia antes de este script: no la cierro.' }
   else {
-    & gh.exe auth logout --hostname github.com --user $Dueno 2>&1 | Out-Null
+    # Se cierra la sesion que abrio este script (la del usuario leido tras el login), no la del dueno del repo.
+    if ($Usuario) { & gh.exe auth logout --hostname github.com --user $Usuario 2>&1 | Out-Null }
+    else { & gh.exe auth logout --hostname github.com 2>&1 | Out-Null }
     & gh.exe auth status 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { Write-Host '  [!] gh sigue con sesion: ejecuta  gh auth logout  a mano.' -ForegroundColor Yellow }
     else { Write-Host '  Sesion de gh cerrada.' -ForegroundColor Green }
