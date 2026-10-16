@@ -1,0 +1,51 @@
+diff --git a/scripts/lib/aviso-rama.mjs b/scripts/lib/aviso-rama.mjs
+new file mode 100644
+index 0000000..8cbadb8
+--- /dev/null
++++ b/scripts/lib/aviso-rama.mjs
+@@ -0,0 +1,8 @@
++// Mensaje para quien lanza `npm run tarea` con una rama que no sigue el formato del encargo.
++const PREFIJOS = ['feat', 'fix', 'ops'];
++
++export function avisoDeRama(rama) {
++  const prefijo = String(rama).split('/')[0];
++  if (PREFIJOS.includes(prefijo)) return null;
++  return `la rama «${rama}» debe empezar por ${PREFIJOS.map((p) => `${p}/`).join(', ')}`;
++}
+diff --git a/scripts/lib/prefijo-rama.mjs b/scripts/lib/prefijo-rama.mjs
+new file mode 100644
+index 0000000..54c6f6d
+--- /dev/null
++++ b/scripts/lib/prefijo-rama.mjs
+@@ -0,0 +1,7 @@
++// Comprueba que una rama empieza por un prefijo de encargo (feat/, fix/ u ops/) y un nombre en castellano.
++const PREFIJOS = ['feat', 'fix', 'ops'];
++
++export function ramaValida(rama) {
++  const m = String(rama).match(/^([a-z]+)\/([a-z0-9-]+)$/);
++  return Boolean(m) && PREFIJOS.includes(m[1]);
++}
+diff --git a/test/prefijo-rama.test.js b/test/prefijo-rama.test.js
+new file mode 100644
+index 0000000..1fcb5ab
+--- /dev/null
++++ b/test/prefijo-rama.test.js
+@@ -0,0 +1,18 @@
++// ramaValida y avisoDeRama: el formato de la rama de un encargo.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { ramaValida } from '../scripts/lib/prefijo-rama.mjs';
++import { avisoDeRama } from '../scripts/lib/aviso-rama.mjs';
++
++test('prefijo-rama: acepta feat/, fix/ y ops/ con un nombre en minúsculas', () => {
++  for (const r of ['feat/revisor', 'fix/token-cache', 'ops/limpiar-ramas']) assert.equal(ramaValida(r), true, r);
++});
++
++test('prefijo-rama: rechaza otro prefijo, mayúsculas y ramas sin nombre', () => {
++  for (const r of ['chore/x', 'feat/Revisor', 'feat/', 'main']) assert.equal(ramaValida(r), false, r);
++});
++
++test('aviso-rama: no avisa con un prefijo bueno y lista los prefijos con uno malo', () => {
++  assert.equal(avisoDeRama('fix/x'), null);
++  assert.match(avisoDeRama('chore/x'), /feat\/, fix\/, ops\//);
++});
