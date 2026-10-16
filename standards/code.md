@@ -23,7 +23,7 @@ Solo 30 de los 118 llevan etiqueta `causa:`, así que no cuenta la etiqueta: agr
 | Secreto o dato sensible expuesto | 8 | C10 |
 | Regla solo en texto, sin check | 7 | principio 5 y C4 |
 
-C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) y C13 (no rebajar comprobaciones, la contrapartida de que ningún cambio espere a una persona; la única excepción está en `standards/intervention.md`) no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños.
+C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) y C13 (no rebajar comprobaciones, la contrapartida de que ningún cambio pase por una persona) no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños.
 
 ## Preguntas
 

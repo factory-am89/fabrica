@@ -2,7 +2,7 @@
 
 Principle 6 (CLAUDE.md) says to ask before a shortcut. This file is the closed list of what counts as one. Everything else an agent decides and writes down (a row in `intervenciones.md` when it is a decision of Pablo's).
 
-This file decides when an agent asks before it starts. It does not decide merges: the `revisor` check decides every PR, also those that change the gate (Pablo's decision of 2026-10-15 in `intervenciones.md`), with one exception since 2026-10-16: when the revisor rejects by mistake, Pablo's **Approve** in GitHub on the head commit of the PR overrides the «no». That is the only way out; pausing the ruleset of `main` is forbidden (the entries of 2026-10-16 in `intervenciones.md` give the reasons).
+This file decides when an agent asks before it starts. It does not decide merges: the `revisor` check keeps deciding every PR, also those that change the gate (Pablo's decision of 2026-10-15 in `intervenciones.md`).
 
 ## Classes
 
