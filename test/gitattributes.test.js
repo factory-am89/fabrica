@@ -39,7 +39,7 @@ test('two branches appending a row to intervenciones.md merge without conflict',
   assert.ok(!lineas.some((l) => l.startsWith('<<<<<<<')));
 });
 
-test('package.json never uses merge=union (union would corrupt JSON)', () => {
-  assert.ok(!/^package\.json\s.*merge=union/m.test(ATRIBUTOS));
-  assert.ok(!/^\*\s.*merge=union/m.test(ATRIBUTOS));
+test('only intervenciones.md uses merge=union (union would corrupt package.json or any JSON)', () => {
+  const conUnion = ATRIBUTOS.split('\n').filter((l) => !l.trim().startsWith('#') && /\bmerge=union\b/.test(l));
+  assert.deepEqual(conUnion.map((l) => l.trim().split(/\s+/)[0]), ['intervenciones.md']);
 });
