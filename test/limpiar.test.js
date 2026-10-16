@@ -7,7 +7,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
-import { limpiar } from '../scripts/limpiar.mjs';
+import { limpiar, opciones, imprimir } from '../scripts/limpiar.mjs';
+import { leerFicha } from '../scripts/lib/ficha.mjs';
+import { lanzadorDe } from '../scripts/lib/puede-borrarse.mjs';
+import { consultar, rutaDe } from '../scripts/lib/gh-publico.mjs';
+import { REPO } from '../scripts/lib/repo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const FALSO = path.join(AQUI, 'fixtures', 'token-falso.mjs');
@@ -18,8 +22,11 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 
+const FICHA = { repo: 'factory-am89/r', base: 'main', identidad: 'fabrica-constructor' };
+
 // <tmp>/fabrica con origin local y una carpeta por rama, cada una con un commit ya subido.
-function mundo(ramas) {
+// `ficha`: lo que se escribe en .fabrica.json (null: sin ficha). `conStaging`: origin también tiene la rama staging.
+function mundo(ramas, { ficha = FICHA, conStaging = false } = {}) {
   const padre = realpathSync(mkdtempSync(path.join(tmpdir(), 'limpiar-')));
   const principal = path.join(padre, 'fabrica');
   const remoto = path.join(padre, 'remoto.git');
@@ -32,6 +39,8 @@ function mundo(ramas) {
   git(padre, 'init', '-q', '--bare', '-b', 'main', remoto);
   git(principal, 'remote', 'add', 'origin', remoto);
   git(principal, 'push', '-q', 'origin', 'main');
+  if (conStaging) git(principal, 'push', '-q', 'origin', 'main:staging');
+  if (ficha) writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(ficha));
   const carpetas = {};
   for (const rama of ramas) {
     const { carpeta } = crearTarea(rama, { cwd: principal, instalar: false });
@@ -44,8 +53,8 @@ function mundo(ramas) {
   return { padre, principal, remoto, carpetas };
 }
 
-const pr = (numero, rama, sha, fusionado = true) => ({
-  number: numero, merged_at: fusionado ? '2026-10-16T10:00:00Z' : null, head: { ref: rama, sha },
+const pr = (numero, rama, sha, fusionado = true, base = 'main') => ({
+  number: numero, merged_at: fusionado ? '2026-10-16T10:00:00Z' : null, head: { ref: rama, sha }, base: { ref: base },
 });
 
 function correr(m, prs, { ensayo = false, falla = false } = {}) {
@@ -56,7 +65,7 @@ function correr(m, prs, { ensayo = false, falla = false } = {}) {
   process.env.FALSO_LOG = log;
   if (falla) process.env.FALSO_FALLA = '1';
   else delete process.env.FALSO_FALLA;
-  const salida = limpiar({ cwd: m.principal, ensayo, token: FALSO, repo: 'o/r' });
+  const salida = limpiar({ cwd: m.principal, ensayo, token: FALSO });
   const llamadas = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
   return { salida, llamadas };
 }
@@ -71,7 +80,7 @@ test('limpiar: squash con rama remota viva → carpeta, rama local y rama remota
   assert.ok(!existsSync(carpeta));
   assert.ok(!ramasLocales(m).includes('feat/uno'));
   assert.ok(!ramasRemotas(m).includes('feat/uno'));
-  assert.deepEqual(llamadas, ['api repos/o/r/pulls?state=closed&per_page=100']);
+  assert.deepEqual(llamadas, ['api repos/factory-am89/r/pulls?state=closed&per_page=100']);
   assert.equal(salida.fallos, 0);
   assert.deepEqual(salida.borradas.map((b) => b.rama), ['feat/uno']);
 });
@@ -189,4 +198,133 @@ test('limpiar: sucia y además sin PR fusionado → el motivo que se dice es el 
   writeFileSync(path.join(m.carpetas['feat/trece'].carpeta, 'sin-guardar.txt'), 'x\n');
   const { salida } = correr(m, []);
   assert.match(salida.quedan.find((q) => q.rama === 'feat/trece').motivo, /cambios sin guardar/);
+});
+
+// ── Una sola limpieza para cualquier repo: la ficha .fabrica.json ─────────────────────────────────
+
+const identidadGit = (cwd) => { for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(cwd, 'config', k, v); };
+
+test('limpiar: dos repos distintos (merge a base staging, squash a main) → borra lo fusionado en los dos', () => {
+  const a = mundo(['feat/aa'], { ficha: { repo: 'factory-am89/staging', base: 'staging', identidad: 'fabrica-constructor' }, conStaging: true });
+  const b = mundo(['feat/bb']);
+  // a: fusión con merge de verdad en origin/staging; b: squash en origin/main (la rama NO queda contenida).
+  const clonA = path.join(a.padre, 'clon');
+  git(a.padre, 'clone', '-q', '-b', 'staging', a.remoto, clonA);
+  identidadGit(clonA);
+  git(clonA, 'fetch', '-q', 'origin', 'feat/aa');
+  git(clonA, 'merge', '-q', '--no-ff', '-m', 'merge', 'origin/feat/aa');
+  git(clonA, 'push', '-q', 'origin', 'staging');
+  const clonB = path.join(b.padre, 'clon');
+  git(b.padre, 'clone', '-q', b.remoto, clonB);
+  identidadGit(clonB);
+  writeFileSync(path.join(clonB, 'x.txt'), 'feat/bb\n');
+  git(clonB, 'add', 'x.txt');
+  git(clonB, 'commit', '-q', '-m', 'squash de feat/bb');
+  git(clonB, 'push', '-q', 'origin', 'main');
+  git(b.principal, 'fetch', '-q', 'origin');
+  assert.notEqual(spawnSync('git', ['merge-base', '--is-ancestor', 'feat/bb', 'origin/main'], { cwd: b.principal }).status, 0, 'el squash no deja la rama contenida');
+  const ra = correr(a, [pr(1, 'feat/aa', a.carpetas['feat/aa'].punta, true, 'staging')]);
+  const rb = correr(b, [pr(2, 'feat/bb', b.carpetas['feat/bb'].punta)]);
+  for (const [m, rama, r] of [[a, 'feat/aa', ra], [b, 'feat/bb', rb]]) {
+    assert.ok(!existsSync(m.carpetas[rama].carpeta), `${rama}: carpeta borrada`);
+    assert.ok(!ramasLocales(m).includes(rama), `${rama}: rama local borrada`);
+    assert.ok(!ramasRemotas(m).includes(rama), `${rama}: rama remota borrada`);
+    assert.equal(r.salida.fallos, 0);
+  }
+  assert.deepEqual(ra.llamadas, ['api repos/factory-am89/staging/pulls?state=closed&per_page=100']);
+});
+
+test('limpiar: un PR fusionado en OTRA rama que la base de la ficha no cuenta → se queda', () => {
+  const m = mundo(['feat/cc'], { ficha: { ...FICHA, base: 'staging' } });
+  const { salida } = correr(m, [pr(3, 'feat/cc', m.carpetas['feat/cc'].punta, true, 'main')]);
+  assert.ok(existsSync(m.carpetas['feat/cc'].carpeta));
+  assert.match(salida.quedan[0].motivo, /no está fusionada/);
+});
+
+test('limpiar: sin ficha → error que nombra la ficha y no se borra nada', () => {
+  const m = mundo(['feat/dd'], { ficha: null });
+  const { carpeta, punta } = m.carpetas['feat/dd'];
+  assert.throws(() => correr(m, [pr(4, 'feat/dd', punta)]), /Falta la ficha .*\.fabrica\.json/);
+  assert.ok(existsSync(carpeta));
+  assert.ok(ramasLocales(m).includes('feat/dd'));
+  assert.ok(ramasRemotas(m).includes('feat/dd'));
+});
+
+test('ficha: incompleta, con claves de más, identidad desconocida o no JSON → error (sin valores por defecto)', () => {
+  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'ficha-')));
+  const con = (contenido) => {
+    writeFileSync(path.join(dir, '.fabrica.json'), typeof contenido === 'string' ? contenido : JSON.stringify(contenido));
+    return () => leerFicha(dir);
+  };
+  assert.deepEqual(con(FICHA)(), FICHA);
+  assert.throws(con({ repo: 'o/r', base: 'main' }), /no tiene «identidad»/);
+  assert.throws(con({ ...FICHA, base: '' }), /no tiene «base»/);
+  assert.throws(con({ ...FICHA, repo: 'sin-barra' }), /owner\/name/);
+  assert.throws(con({ ...FICHA, extra: 1 }), /claves que no conozco: extra/);
+  assert.throws(con({ ...FICHA, identidad: 'pablo' }), /«identidad» debe ser una de/);
+  assert.throws(con('{no es json'), /no es JSON legible/);
+  assert.throws(con('[]'), /debe ser un objeto/);
+  assert.throws(con({ repo: 'otro-dueno/r', base: 'main', identidad: 'fabrica-constructor' }), /solo está instalada en/);
+  assert.deepEqual(con({ repo: 'otro-dueno/r', base: 'staging', identidad: 'ninguna' })(), { repo: 'otro-dueno/r', base: 'staging', identidad: 'ninguna' });
+});
+
+test('ficha: la de esta Fábrica existe, es válida y dice el mismo repo que scripts/lib/repo.mjs', () => {
+  const f = leerFicha(path.join(AQUI, '..'));
+  assert.equal(f.repo, REPO);
+  assert.equal(f.identidad, 'fabrica-constructor');
+});
+
+test('identidad «ninguna»: borra carpeta y rama local, NO toca la rama remota y lo dice', () => {
+  const m = mundo(['feat/ee'], { ficha: { repo: 'o/publico', base: 'main', identidad: 'ninguna' } });
+  const { carpeta, punta } = m.carpetas['feat/ee'];
+  const { salida } = correr(m, [pr(5, 'feat/ee', punta)]);
+  assert.ok(!existsSync(carpeta));
+  assert.ok(!ramasLocales(m).includes('feat/ee'));
+  assert.ok(ramasRemotas(m).includes('feat/ee'));
+  assert.equal(salida.fallos, 0);
+  const lineas = [];
+  imprimir(salida, (l) => lineas.push(l));
+  assert.ok(lineas.some((l) => /o\/publico no tiene identidad de escritura/.test(l)), lineas.join('\n'));
+  assert.ok(!lineas.some((l) => /y su rama remota/.test(l)));
+});
+
+test('--repo: se puede lanzar desde fuera de la carpeta del repo', () => {
+  const m = mundo(['feat/ff']);
+  const { carpeta, punta } = m.carpetas['feat/ff'];
+  const fuera = realpathSync(mkdtempSync(path.join(tmpdir(), 'fuera-')));
+  const { repoDir } = opciones(['--repo', m.principal]);
+  writeFileSync(path.join(m.padre, 'prs.json'), JSON.stringify([pr(6, 'feat/ff', punta)]));
+  process.env.FALSO_PRS = path.join(m.padre, 'prs.json');
+  delete process.env.FALSO_FALLA;
+  const salida = limpiar({ cwd: fuera, repoDir, token: FALSO });
+  assert.ok(!existsSync(carpeta));
+  assert.equal(salida.borradas.length, 1);
+});
+
+test('opciones: --repo y --ficha piden valor y un argumento desconocido es un error', () => {
+  assert.deepEqual(opciones([]), { ensayo: false });
+  assert.equal(opciones(['--ensayo']).ensayo, true);
+  assert.equal(opciones(['--ficha', 'x.json']).fichero, path.resolve('x.json'));
+  assert.throws(() => opciones(['--repo']), /necesita un valor/);
+  assert.throws(() => opciones(['--repo', '--ensayo']), /necesita un valor/);
+  assert.throws(() => opciones(['--borra']), /argumento desconocido/);
+});
+
+test('identidad: cada una tiene su lanzador y una desconocida lanza', () => {
+  assert.match(lanzadorDe('fabrica-constructor'), /token\.mjs$/);
+  assert.match(lanzadorDe('ninguna'), /gh-publico\.mjs$/);
+  assert.throws(() => lanzadorDe('pablo'), /desconocida/);
+});
+
+test('gh-publico: pide la URL pública sin cabecera de autorización, solo acepta «gh api <ruta>» y falla en alto', async () => {
+  const visto = [];
+  const ok = async (url, o) => (visto.push({ url, cabeceras: Object.keys(o.headers) }), new Response('[1]', { status: 200 }));
+  assert.equal(await consultar('repos/o/r/pulls?state=closed', ok), '[1]');
+  assert.equal(visto[0].url, 'https://api.github.com/repos/o/r/pulls?state=closed');
+  assert.ok(!visto[0].cabeceras.some((c) => /authorization/i.test(c)));
+  await assert.rejects(consultar('repos/o/r/pulls', async () => new Response('no', { status: 403 })), /403.*límite/);
+  assert.equal(rutaDe(['--', 'gh', 'api', 'repos/o/r']), 'repos/o/r');
+  assert.throws(() => rutaDe(['--', 'git', 'push']), /Sin credencial/);
+  assert.throws(() => rutaDe(['--', 'gh', 'api', 'a', 'b']), /Sin credencial/);
+  assert.throws(() => rutaDe(['gh', 'api', 'a']), /Sin credencial/);
 });
