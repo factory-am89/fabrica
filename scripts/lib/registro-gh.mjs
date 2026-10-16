@@ -5,12 +5,11 @@
 import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { anexarLinea } from './registro-op.mjs';
+import { anexarLinea, FORMA_NOMBRE } from './registro-op.mjs';
 
 export const APIS = ['rest', 'graphql', 'unknown'];
 export const RESULTADOS = ['ok', 'limited', 'error'];
 export const CAMPOS = ['t', 'caller', 'api', 'result'];
-const FORMA_CALLER = /^[A-Za-z0-9._-]{1,80}$/;
 
 export const rutaDeRegistroGh = (casa = homedir) => join(casa(), '.fabrica', 'gh-calls.jsonl');
 
@@ -52,7 +51,7 @@ export function resultadoDe(status, stderr = '') {
 
 // Appends one line. Throws if a field is outside the vocabulary or the disk refuses: the caller decides what to say.
 export function registrarLlamada({ caller, api, resultado, ruta = rutaDeRegistroGh(), fs = fsReal, reloj = Date.now }) {
-  if (!FORMA_CALLER.test(String(caller)) || !APIS.includes(api) || !RESULTADOS.includes(resultado)) {
+  if (!FORMA_NOMBRE.test(String(caller)) || !APIS.includes(api) || !RESULTADOS.includes(resultado)) {
     throw new Error('gh log: field outside the vocabulary (a script name, an api and a result are expected, nothing else)');
   }
   anexarLinea(ruta, { t: new Date(reloj()).toISOString(), caller, api, result: resultado }, fs);
