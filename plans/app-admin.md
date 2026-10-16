@@ -1,6 +1,6 @@
 # Plan: App «fabrica-administrador» (tercera App) y proyecto nuevo sin Pablo
 
-Fecha: 16 oct 2026. Base leída: `origin/main` en 22daa10 (incluye #52, proyecto-nuevo.ps1 y lib-proyecto.ps1).
+Fecha: 16 oct 2026. Base leída: `origin/main` en 2466f51 (incluye #52, proyecto-nuevo.ps1 y lib-proyecto.ps1); los «Existing:» se volvieron a comprobar con `git grep` sobre esa base.
 Estado: plan; el trozo T2 ya está fusionado (#57), el resto sin código. Ningún valor de secreto se ha leído ni impreso.
 
 Verdict: viable y recomendable, pero la clave administradora es un superpoder (puede borrar repos y quitar protecciones); su única frontera real es lo que entra en `main` de fabrica, así que la «ventana» (pausar el ruleset) deja de ser un riesgo menor y pasa a ser el agujero principal: con esta App, la ventana debe desaparecer, no automatizarse.
@@ -150,7 +150,7 @@ y guarda en el environment `administrador` (lo crea limitado a `main` si falta).
 Files: `apps/crear-apps.html`, `apps/convertir.mjs`, `test/convertir.test.js`
 Depends on: none
 Blocked by: B
-Existing: ningún test de `convertir.mjs` ni rastro de la App en el repo.
+Existing: `test/apps.test.js` ya prueba `convertir.mjs` para las dos Apps actuales (líneas 9 y 33); de la App administradora no hay rastro en el repo.
 ```
 $ git grep -l "fabrica-administrador"          (salida vacía)
 $ ls test | grep convertir                     (salida vacía)
@@ -330,7 +330,7 @@ npm test
 ## Decisions for Pablo
 
 ### A. Con esta App, cada ventana (pausar el ruleset) expone la clave administradora: ¿qué se hace con la ventana? (antes D1)
-Decidida el 16 oct 2026: opción 1; consta en `intervenciones.md`.
+Decidida el 16 oct 2026: opción 1; consta en `intervenciones.md`, fila que añade el PR #63.
 1. Prohibir la ventana: un juez roto se arregla con un PR que el juez viejo pueda aprobar, y si no puede, Pablo hace el arreglo como dueño sin pausar el ruleset para todos (recommended)
 2. Mantener la ventana pero desactivar antes el environment `administrador` (un clic más de Pablo cada vez)
 3. Aceptar el riesgo y apuntarlo
