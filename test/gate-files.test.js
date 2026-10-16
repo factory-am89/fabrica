@@ -73,11 +73,11 @@ test('fabricaPaths: finds paths in run, env, with and claude_args (good), nothin
     'jobs:', '  a:', '    steps:',
     '      - run: node .fabrica/scripts/x.mjs && .fabrica/node_modules/.bin/eslint',
     '        env:', '          P: .fabrica/e/env.txt',
-    '      - uses: y@z', '        with:', '          prompt: lee .fabrica/estandares/c.md (ok)',
+    '      - uses: y@z', '        with:', '          prompt: lee .fabrica/standards/c.md (ok)',
     '          claude_args: --x .fabrica/a/args.json',
     '      - run: npm ci --prefix .fabrica',
   ].join('\n');
-  assert.deepEqual(fabricaPaths(con).sort(), ['a/args.json', 'e/env.txt', 'estandares/c.md', 'package-lock.json', 'package.json', 'scripts/x.mjs']);
+  assert.deepEqual(fabricaPaths(con).sort(), ['a/args.json', 'e/env.txt', 'package-lock.json', 'package.json', 'scripts/x.mjs', 'standards/c.md']);
   assert.deepEqual(fabricaPaths('jobs:\n  a:\n    steps:\n      - run: echo hola\n'), []);
 });
 

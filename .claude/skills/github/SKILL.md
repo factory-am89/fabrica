@@ -1,6 +1,6 @@
 ---
 name: github
-description: Úsala cuando el CI de GitHub esté en rojo, un workflow no arranque, haya que mirar checks o logs de un PR, abrir un PR con la identidad de la App, o tocar el ruleset de main, las Apps o los secretos de Actions. No para: guardar o rotar claves (1password) ni el estándar que juzga el revisor (estandares/codigo.md).
+description: Úsala cuando el CI de GitHub esté en rojo, un workflow no arranque, haya que mirar checks o logs de un PR, abrir un PR con la identidad de la App, o tocar el ruleset de main, las Apps o los secretos de Actions. No para: guardar o rotar claves (1password) ni el estándar que juzga el revisor (standards/code.md).
 dueño: constructor
 comprobado: 2026-10-15
 ---
@@ -23,7 +23,7 @@ comprobado: 2026-10-15
   ejecuta código del PR** (ese lo ejecuta `tests.yml`, sin secretos). Sus secretos viven en el environment
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
 - **Ningún cambio pasa por la aprobación de Pablo**: decide el check `revisor`. Qué rutas vigila de cerca
-  la pregunta C13 está en `estandares/codigo.md` (única fuente).
+  la pregunta C13 está en `standards/code.md` (única fuente).
 
 ## Identidad del constructor
 
