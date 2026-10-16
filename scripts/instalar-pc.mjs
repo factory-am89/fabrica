@@ -1,13 +1,19 @@
-// Capa de usuario versionada: usuario/ (hoy solo CLAUDE.md global; admite subcarpetas) <-> ~/.claude/.
-//   node scripts/instalar-pc.mjs instalar    copia lo que falta o difiere y apunta la huella
-//   node scripts/instalar-pc.mjs comprobar   sale con 1 y nombra cada fichero que no coincide
-// HOME inyectable: variable FABRICA_HOME (o el parámetro `home`). Sin ella, el HOME real.
-// Fuera de alcance a propósito: settings.json (trozo 4b) y memorias.
+// Capa de usuario versionada: usuario/ (CLAUDE.md global y, si lo hay, settings.json; admite subcarpetas) <-> ~/.claude/.
+//   node scripts/instalar-pc.mjs instalar              copia lo que falta o difiere y apunta la huella
+//   node scripts/instalar-pc.mjs instalar --ampliar    igual, aunque settings.json amplíe permisos: SOLO desde una
+//                                                      terminal interactiva y tecleando AMPLIAR (solo Pablo)
+//   node scripts/instalar-pc.mjs comprobar             sale con 1 y nombra cada fichero que no coincide
+// Si el settings.json nuevo AMPLÍA permisos respecto al instalado (scripts/lib/ampliacion-settings.mjs), instalar sale
+// con 1 sin escribir NADA. --ampliar no basta: sin terminal (las sesiones de Claude no la tienen) o sin la
+// confirmación, sale con 1 igual. Quitar permisos se aplica solo.
+// HOME inyectable: FABRICA_HOME (o el parámetro `home`); origen: FABRICA_USUARIO (o `origen`). Sin ellas, los reales.
+// Fuera de alcance a propósito: memorias.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ampliaciones } from './lib/ampliacion-settings.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ORIGEN = path.join(RAIZ, 'usuario');
@@ -53,9 +59,61 @@ export function estado({ home, origen = ORIGEN } = {}) {
   });
 }
 
-export function instalar({ home, origen = ORIGEN } = {}) {
+export const CONFIRMACION = 'AMPLIAR';
+
+export class AmpliaPermisos extends Error {
+  constructor(motivos, causa = 'no se ha pedido --ampliar') {
+    const lineas = motivos.map((m) => `  - ${m}`).join('\n');
+    super(
+      `settings.json amplía permisos y no se ha escrito nada (${causa}):\n${lineas}\n` +
+        `Lo lanza Pablo en su terminal: npm run instalar-pc -- --ampliar (y teclea ${CONFIRMACION}).`,
+    );
+    this.motivos = motivos;
+  }
+}
+
+// Una línea de la entrada estándar (terminal), leída byte a byte hasta el salto de línea.
+function leerLineaDeTerminal() {
+  const un = Buffer.alloc(1);
+  let linea = '';
+  while (readSync(0, un, 0, 1, null) === 1 && un[0] !== 10) linea += String.fromCharCode(un[0]);
+  return linea;
+}
+
+// Devuelve la función `confirmar(motivos)` de instalar. Sin terminal interactiva lanza AmpliaPermisos;
+// con ella, muestra la lista y solo da el visto bueno si se teclea exactamente CONFIRMACION.
+export function confirmarEnTerminal({
+  tty = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  leerLinea = leerLineaDeTerminal,
+  escribir = console.log,
+} = {}) {
+  return (motivos) => {
+    if (!tty) throw new AmpliaPermisos(motivos, 'sin terminal interactiva');
+    escribir(`settings.json amplía permisos:\n${motivos.map((m) => `  - ${m}`).join('\n')}`);
+    escribir(`Para aplicarlo escribe ${CONFIRMACION} y Enter (otra cosa cancela):`);
+    if (leerLinea().trim() !== CONFIRMACION) throw new AmpliaPermisos(motivos, 'confirmación incorrecta');
+    return true;
+  };
+}
+
+const leerJson = (f) => {
+  try {
+    return JSON.parse(readFileSync(f, 'utf8'));
+  } catch (e) {
+    throw new Error(`${f} no es un JSON válido.`, { cause: e });
+  }
+};
+
+// `confirmar`: función que da el visto bueno a una ampliación o lanza; sin ella, una ampliación no se aplica.
+export function instalar({ home, origen = ORIGEN, confirmar } = {}) {
   const destino = sitio(home);
   const previo = estado({ home, origen });
+  const ajustes = previo.find((p) => p.fichero === 'settings.json');
+  if (ajustes && ajustes.estado !== 'ok') {
+    const actual = ajustes.estado === 'falta' ? {} : leerJson(path.join(destino, 'settings.json'));
+    const motivos = ampliaciones(actual, leerJson(path.join(origen, 'settings.json')));
+    if (motivos.length && !(confirmar && confirmar(motivos) === true)) throw new AmpliaPermisos(motivos);
+  }
   const cambiados = [];
   for (const { fichero, estado: e } of previo) {
     if (e === 'ok') continue;
@@ -80,19 +138,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const orden = process.argv[2];
   try {
     if (orden === 'instalar') {
-      const c = instalar();
+      const c = instalar({
+        origen: process.env.FABRICA_USUARIO,
+        confirmar: process.argv.includes('--ampliar') ? confirmarEnTerminal() : undefined,
+      });
       if (!c.length) console.log('instalar-pc: sin cambios');
       for (const { fichero, antes } of c) console.log(`instalar-pc: ${fichero} (${antes})`);
     } else if (orden === 'comprobar') {
-      const mal = comprobar();
+      const mal = comprobar({ origen: process.env.FABRICA_USUARIO });
       for (const { fichero, estado: e } of mal) console.error(`comprobar-pc: ${fichero} ${e}`);
       if (mal.length) process.exit(1);
       console.log('comprobar-pc: coincide');
     } else {
-      throw new Error('Uso: instalar-pc.mjs instalar | comprobar');
+      throw new Error('Uso: instalar-pc.mjs instalar [--ampliar] | comprobar');
     }
   } catch (e) {
     console.error(e.message);
-    process.exit(2);
+    process.exit(e instanceof AmpliaPermisos ? 1 : 2);
   }
 }
