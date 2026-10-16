@@ -1,0 +1,58 @@
+diff --git a/scripts/hora.mjs b/scripts/hora.mjs
+index e3cb1aa..ca9988f 100644
+--- a/scripts/hora.mjs
++++ b/scripts/hora.mjs
+@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
+ 
+ export const horaDeMadrid = (ahora = new Date()) => ahora.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' });
+ 
++export const horaUtc = (ahora = new Date()) => ahora.toLocaleString('es-ES', { timeZone: 'UTC' });
++
+ const linea = (ahora) => `Hora local de Pablo (Madrid): ${horaDeMadrid(ahora)}`;
+ 
+ // El reloj se inyecta (función que da un Date) para poder probar verano e invierno.
+@@ -12,4 +14,7 @@ export const pasoHora = (reloj = () => new Date()) => ({
+   ejecutar: (escribir) => escribir(linea(reloj())),
+ });
+ 
+-if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(linea(new Date()));
++if (process.argv[1] === fileURLToPath(import.meta.url)) {
++  console.log(linea(new Date()));
++  if (process.argv.includes('--utc')) console.log(`UTC: ${horaUtc(new Date())}`);
++}
+diff --git a/scripts/lib/zonas.mjs b/scripts/lib/zonas.mjs
+new file mode 100644
+index 0000000..ad054d6
+--- /dev/null
++++ b/scripts/lib/zonas.mjs
+@@ -0,0 +1,6 @@
++// La hora en cualquier zona horaria, por si hace falta más adelante (Londres, Nueva York...).
++export function horaDeZona(zona, ahora = new Date()) {
++  return ahora.toLocaleString('es-ES', { timeZone: zona });
++}
++
++export const ZONAS_CONOCIDAS = ['Europe/Madrid', 'Europe/London', 'America/New_York', 'UTC'];
+diff --git a/test/hora.test.js b/test/hora.test.js
+index 2fdf681..7985b5d 100644
+--- a/test/hora.test.js
++++ b/test/hora.test.js
+@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
+ import { spawnSync } from 'node:child_process';
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { horaDeMadrid, pasoHora } from '../scripts/hora.mjs';
++import { horaDeMadrid, horaUtc, pasoHora } from '../scripts/hora.mjs';
+ import { arrancar, PASOS } from '../scripts/al-arrancar.mjs';
+ 
+ const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'hora.mjs');
+@@ -14,6 +14,10 @@ test('hora: en verano (CEST, UTC+2) es dos horas más que UTC', () => {
+   assert.equal(horaDeMadrid(new Date('2026-07-15T10:30:00Z')), '15/7/2026, 12:30:00');
+ });
+ 
++test('hora: horaUtc da la hora sin desfase', () => {
++  assert.equal(horaUtc(new Date('2026-07-15T10:30:00Z')), '15/7/2026, 10:30:00');
++});
++
+ test('hora: en invierno (CET, UTC+1) es una hora más que UTC', () => {
+   assert.equal(horaDeMadrid(new Date('2026-01-15T10:30:00Z')), '15/1/2026, 11:30:00');
+ });

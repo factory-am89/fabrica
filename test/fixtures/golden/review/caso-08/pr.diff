@@ -1,0 +1,47 @@
+diff --git a/.claude/agents/arquitecto.md b/.claude/agents/arquitecto.md
+index 2e4cb6f..f6b00d3 100644
+--- a/.claude/agents/arquitecto.md
++++ b/.claude/agents/arquitecto.md
+@@ -12,5 +12,5 @@ Estándar del plan:
+ 2. Cada trozo dice qué no se hace, y lo que el encargo no cubre se apunta, no se asume.
+ 3. Cada trozo cabe en un PR: una idea, revisable de una sentada; si no cabe, se parte.
+ 
+-Si falta un dato para decidir, decide y apúntalo en el plan; solo si cae en la lista cerrada de `standards/intervention.md`, apunta la duda y marca el trozo como bloqueado.
++Si falta un dato para decidir, no preguntes ni adivines: si la evidencia que haya permite decidir, decide y apúntalo en el plan; si no, o si cae en la lista cerrada de `standards/intervention.md`, apunta la duda y marca el trozo como bloqueado.
+ Informe: veredicto en una línea, el plan numerado y las dudas.
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 8701fe8..b16106a 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -9,7 +9,7 @@ Principios (cada uno nace de un fallo real; el porqué, en `standards/code.md`):
+ 3. Fallar en alto: un error se ve o se lanza; nunca se traga ni se sustituye por un valor por defecto.
+ 4. Una idea, un sitio: un dato o una regla vive en un solo lugar y los demás lo enlazan.
+ 5. Lo que comprueba una máquina lo comprueba una máquina: una regla importante se convierte en un check, no en una frase.
+-6. Preguntar antes de un atajo: solo se pregunta a Pablo por lo de la lista cerrada de `standards/intervention.md`; todo lo demás se decide y se apunta.
++6. Preguntar antes de un atajo: solo se pregunta a Pablo por lo de la lista cerrada de `standards/intervention.md`; en todo lo demás no se adivina ni se interrumpe: se decide con la evidencia que haya y se apunta, y si no hay evidencia se para y se deja escrito.
+ 
+ Prohibido: empujar o fusionar a `main` (lo hace GitHub al estar verdes `tests` y `revisor`); escribir un secreto, solo su nombre; ampliar permisos de una App; juzgar tu propio trabajo.
+ Prohibido también: editar o hacer commit en la carpeta principal; lo niegan `.claude/hooks/carpeta-principal.mjs` y los hooks de git de `.githooks/` (los activa `npm run tarea`), y cada sesión trabaja en su carpeta: `npm run tarea -- feat/<nombre>`.
+diff --git a/test/principles-and-roles.test.js b/test/principles-and-roles.test.js
+index 879cf7d..e20b9f1 100644
+--- a/test/principles-and-roles.test.js
++++ b/test/principles-and-roles.test.js
+@@ -14,6 +14,18 @@ test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
+   });
+ });
+ 
++test('el principio 6 conserva las obligaciones del viejo: no adivinar, no interrumpir, parar y apuntar sin evidencia (C13)', () => {
++  const linea = leer('CLAUDE.md').split('\n').find((l) => l.startsWith('6. '));
++  assert.ok(linea, 'falta la línea del principio 6');
++  for (const frase of ['no se adivina', 'ni se interrumpe', 'se para y se deja escrito', 'standards/intervention.md']) {
++    assert.ok(linea.includes(frase), `el principio 6 perdió: ${frase}`);
++  }
++  const arquitecto = leer('.claude/agents/arquitecto.md');
++  for (const frase of ['no preguntes ni adivines', 'marca el trozo como bloqueado', 'standards/intervention.md']) {
++    assert.ok(arquitecto.includes(frase), `el arquitecto perdió: ${frase}`);
++  }
++});
++
+ test('los tres roles tienen su modelo y el revisor no escribe', () => {
+   const modelos = { arquitecto: 'opus', constructor: 'sonnet', revisor: 'opus' };
+   for (const [rol, modelo] of Object.entries(modelos)) {

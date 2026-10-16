@@ -1,0 +1,38 @@
+diff --git a/scripts/lib/nombre-rama.mjs b/scripts/lib/nombre-rama.mjs
+new file mode 100644
+index 0000000..96756f3
+--- /dev/null
++++ b/scripts/lib/nombre-rama.mjs
+@@ -0,0 +1,12 @@
++// Convierte un título en el nombre de una rama: minúsculas, sin tildes, palabras unidas por guiones.
++// Lo usará `npm run tarea` en el siguiente trozo para proponer el nombre de la rama.
++export function nombreDeRama(titulo) {
++  const base = String(titulo)
++    .normalize('NFD')
++    .replace(/[̀-ͯ]/g, '')
++    .toLowerCase()
++    .replace(/[^a-z0-9]+/g, '-')
++    .replace(/^-+|-+$/g, '');
++  if (!base) throw new Error('el título no tiene ninguna letra ni número');
++  return base;
++}
+diff --git a/test/nombre-rama.test.js b/test/nombre-rama.test.js
+new file mode 100644
+index 0000000..bf51fc4
+--- /dev/null
++++ b/test/nombre-rama.test.js
+@@ -0,0 +1,14 @@
++// nombreDeRama: título -> nombre de rama.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { existsSync } from 'node:fs';
++import { nombreDeRama } from '../scripts/lib/nombre-rama.mjs';
++
++test('nombre-rama: el módulo existe y exporta la función', () => {
++  assert.ok(existsSync(new URL('../scripts/lib/nombre-rama.mjs', import.meta.url)));
++  assert.equal(typeof nombreDeRama, 'function');
++});
++
++test('nombre-rama: un título normal no lanza', () => {
++  assert.doesNotThrow(() => nombreDeRama('Conjunto de prueba del revisor'));
++});

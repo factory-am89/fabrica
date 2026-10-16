@@ -1,0 +1,49 @@
+diff --git a/scripts/lib/duracion.mjs b/scripts/lib/duracion.mjs
+new file mode 100644
+index 0000000..7cba503
+--- /dev/null
++++ b/scripts/lib/duracion.mjs
+@@ -0,0 +1,12 @@
++// Formatea una duración en milisegundos como «1 h 02 min 03 s», «4 min 05 s» o «7 s».
++export function formatearDuracion(ms) {
++  if (!Number.isInteger(ms) || ms < 0) throw new Error('la duración debe ser un entero de milisegundos, no negativo');
++  const total = Math.floor(ms / 1000);
++  const h = Math.floor(total / 3600);
++  const m = Math.floor((total % 3600) / 60);
++  const s = total % 60;
++  const dos = (n) => String(n).padStart(2, '0');
++  if (h > 0) return `${h} h ${dos(m)} min ${dos(s)} s`;
++  if (m > 0) return `${m} min ${dos(s)} s`;
++  return `${s} s`;
++}
+diff --git a/test/duracion.test.js b/test/duracion.test.js
+new file mode 100644
+index 0000000..abd9235
+--- /dev/null
++++ b/test/duracion.test.js
+@@ -0,0 +1,25 @@
++// formatearDuracion: milisegundos -> texto legible.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { formatearDuracion } from '../scripts/lib/duracion.mjs';
++
++test('duracion: segundos sueltos', () => {
++  assert.equal(formatearDuracion(0), '0 s');
++  assert.equal(formatearDuracion(7400), '7 s');
++});
++
++test('duracion: minutos y segundos con dos cifras', () => {
++  assert.equal(formatearDuracion(245000), '4 min 05 s');
++});
++
++test('duracion: horas, minutos y segundos', () => {
++  assert.equal(formatearDuracion(3723000), '1 h 02 min 03 s');
++});
++
++test('duracion: lo que no es un entero no negativo lanza', () => {
++  for (const x of [-1, 1.5, '5', NaN]) assert.throws(() => formatearDuracion(x), /entero de milisegundos/, String(x));
++});
++
++test('duracion: un día entero sigue contando en horas', () => {
++  assert.equal(formatearDuracion(86400000), '24 h 00 min 00 s');
++});

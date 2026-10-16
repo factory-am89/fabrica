@@ -7,7 +7,7 @@ export const MAX_LINEAS = 120;
 export const REVISAR_DIAS = 90;
 export const MAX_DESCRIPCION = 600;
 const CAMPOS = ['name', 'description', 'dueño', 'comprobado'];
-const SENSIBLE = [
+export const SENSIBLE = [
   [/\b\d{1,3}(?:\.\d{1,3}){3}\b/, 'una dirección IP'],
   [/-----BEGIN [A-Z ]*PRIVATE KEY/, 'una clave privada'],
   [/\b(?:ghp_|github_pat_|ghs_|sk-ant-|ops_ey)[A-Za-z0-9_]{8,}/, 'un token'],

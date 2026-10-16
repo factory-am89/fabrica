@@ -1,0 +1,11 @@
+{
+  "caso-01": { "author": "opus", "expect": "C5" },
+  "caso-02": { "author": "sonnet", "expect": "C6" },
+  "caso-03": { "author": "sonnet", "expect": "C8" },
+  "caso-04": { "author": "sonnet", "expect": "C9" },
+  "caso-05": { "author": "sonnet", "expect": "C12" },
+  "caso-06": { "author": "sonnet", "expect": "C13" },
+  "caso-07": { "author": "opus", "expect": "clean" },
+  "caso-08": { "author": "sonnet", "expect": "clean" },
+  "caso-09": { "author": "sonnet", "expect": "clean" }
+}

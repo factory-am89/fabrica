@@ -1,0 +1,745 @@
+diff --git a/PASOS-PABLO.md b/PASOS-PABLO.md
+index 6d9c748..22e8365 100644
+--- a/PASOS-PABLO.md
++++ b/PASOS-PABLO.md
+@@ -4,3 +4,18 @@ Lo que solo tú puedes hacer. En este orden. **Ningún constructor trabaja antes
+ 
+ 1. Lanza `powershell -ExecutionPolicy Bypass -File C:\dev\fabrica-v0-revisor\apps\arranque.ps1`. Con una sola sesión de `gh` hace, en este orden: el environment `revisor` (limitado a `main`), la cuenta de servicio de 1Password, las dos Apps y su instalación solo en `fabrica`, el token de Claude, el auto-merge, **sube `main` desde `C:\dev\fabrica`** y, al final, **crea el ruleset de `main`** (PR obligatorio, checks `tests` y `revisor`, sin force push, sin borrado y sin excepciones). Te para donde hay que pulsar algo en el navegador, se puede relanzar y cierra la sesión de `gh` al final. El login de `gh` corre aislado de tu git y de tu Administrador de credenciales, así que da igual lo que conteste a «Authenticate Git…»; si ya tenías una sesión de `gh` sin el permiso `workflow`, el script para y te dice que la cierres. A mano le quedan dos cosas: si `fabrica-constructor` o `fabrica-revisor` ya están cogidos en GitHub, cambia el nombre en `apps/crear-apps.html` y en `.github/workflows/revisor.yml` (`allowed_bots`) antes de lanzarlo; y compara el *client id* del constructor que imprime al final con `CLIENT_ID_CONSTRUCTOR` en `scripts/lib/repo.mjs` (lo que usa `scripts/token.mjs`); si difieren, cambia solo esa constante. Una vez fusionado el PR del paso 2, el script vive en `C:\dev\fabrica\apps\` tras un `git pull --ff-only`; `apps\ruleset.ps1` se puede relanzar suelto.
+ Ningún cambio pasa por tu aprobación (ver C13 en `standards/code.md`): lo decide el check `revisor` (decisión de Pablo, 15 oct 2026, MenuPlan#875).
++
++## Proyecto nuevo con un solo script (una vez por repo)
++
++Para que un repo de `factory-am89` trabaje con la Fábrica (primer caso: `homenu-panel`), con tu sesión de `gh` de administrador:
++
++`powershell -ExecutionPolicy Bypass -File C:\dev\fabrica\apps\proyecto-nuevo.ps1 -Repo factory-am89/homenu-panel`
++
++Activa la fusión automática y el borrado de ramas, deja el environment `revisor` limitado a `main`, comprueba que las dos Apps están instaladas, dice por nombre qué secretos faltan y cómo crearlos, abre un PR con los workflows, un `CLAUDE.md` mínimo y `.fabrica.json`, y crea el ruleset de `main`. Se puede relanzar y para en alto donde algo no cuadre. Lo que te toca a ti:
++
++1. **Apps** (decisión de Pablo, 16 oct 2026): `fabrica-constructor` y `fabrica-revisor` en «All repositories» de `factory-am89`. Con eso el script no pide ningún clic por proyecto; si una App no cubre el repo, el script te dice la dirección exacta del clic. No las instala él ni amplía permisos.
++2. **Secretos** del environment `revisor` que falten (los nombra el script): `gh secret set <NOMBRE> --env revisor --repo <repo>`; el valor lo escribes tú, nunca en la orden.
++3. **Lanzarlo dos veces**: la primera deja el PR y acaba en «pendiente: fusiona el PR»; ese PR lo fusionas tú (el revisor aún no existe en `main`, no puede juzgarlo). La segunda, con los ficheros ya en `main` y el check `tests` corrido allí, crea el ruleset.
++4. **Repo privado**: con el plan gratuito GitHub da 403 «Upgrade to GitHub Pro or make this repository public» al pedir rulesets; el script se para con ese motivo.
++
++Comprobación: `gh api repos/factory-am89/homenu-panel/rules/branches/main` debe mostrar `tests / tests` y `revisor`, y un PR de prueba debe fusionarse solo.
+diff --git a/apps/arranque.ps1 b/apps/arranque.ps1
+index a13f5f5..12d0426 100644
+--- a/apps/arranque.ps1
++++ b/apps/arranque.ps1
+@@ -324,19 +324,7 @@ try {
+ 
+   # ---------- 2. environment revisor limitado a main ----------
+   Paso '2 Environment revisor (main)' {
+-    $e = Gh @('api', "repos/$Repo/environments/revisor")
+-    $existia = ($e.Code -eq 0)
+-    $r = Gh @('api', '-X', 'PUT', "repos/$Repo/environments/revisor", '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true')
+-    if ($r.Code -ne 0) { throw "No pude crear el environment: $($r.Out)" }
+-    $p = Gh @('api', "repos/$Repo/environments/revisor/deployment-branch-policies", '--jq', '.branch_policies[].name')
+-    if ($p.Code -ne 0) { throw "No pude leer las ramas permitidas: $($p.Out)" }
+-    $nombres = @($p.Out -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+-    if ($nombres -notcontains 'main') {
+-      $n = Gh @('api', '-X', 'POST', "repos/$Repo/environments/revisor/deployment-branch-policies", '-f', 'name=main', '-f', 'type=branch')
+-      if ($n.Code -ne 0) { throw "No pude limitar el environment a main: $($n.Out)" }
+-    } elseif ($existia) { $script:Estado = 'ya hecho' }
+-    $extra = @($nombres | Where-Object { $_ -ne 'main' })
+-    if ($extra.Count -gt 0) { Aviso "El environment admite ademas: $($extra -join ', '). Deberia ser solo main." }
++    if ((Asegurar-Environment-Revisor $Repo) -eq 'ya hecho') { $script:Estado = 'ya hecho' }
+     Bien 'Environment revisor limitado a la rama main.'
+   }
+ 
+diff --git a/apps/lib-gh.ps1 b/apps/lib-gh.ps1
+index 8e9787d..21f8f1c 100644
+--- a/apps/lib-gh.ps1
++++ b/apps/lib-gh.ps1
+@@ -116,6 +116,27 @@ function Buscar-App-Instalada([string]$Slug, [string]$Cuenta = '') {
+   return [pscustomobject]@{ Estado = 'ok'; Id = [int]$m[0].app_id; ClientId = $cid; Cuenta = [string]$m[0].account.login }
+ }
+ 
++# ---------- environment revisor ----------
++# Crea (o deja) el environment `revisor` limitado a la rama main. Devuelve 'ok' o 'ya hecho'; lanza si
++# GitHub no deja. Si admite ademas otras ramas, avisa (no las quita). Lo usan arranque.ps1 y proyecto-nuevo.ps1.
++function Asegurar-Environment-Revisor([string]$Repo) {
++  $estado = 'ok'
++  $e = Gh @('api', "repos/$Repo/environments/revisor")
++  $existia = ($e.Code -eq 0)
++  $r = Gh @('api', '-X', 'PUT', "repos/$Repo/environments/revisor", '-F', 'deployment_branch_policy[protected_branches]=false', '-F', 'deployment_branch_policy[custom_branch_policies]=true')
++  if ($r.Code -ne 0) { throw "No pude crear el environment: $($r.Out)" }
++  $p = Gh @('api', "repos/$Repo/environments/revisor/deployment-branch-policies", '--jq', '.branch_policies[].name')
++  if ($p.Code -ne 0) { throw "No pude leer las ramas permitidas: $($p.Out)" }
++  $nombres = @($p.Out -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
++  if ($nombres -notcontains 'main') {
++    $n = Gh @('api', '-X', 'POST', "repos/$Repo/environments/revisor/deployment-branch-policies", '-f', 'name=main', '-f', 'type=branch')
++    if ($n.Code -ne 0) { throw "No pude limitar el environment a main: $($n.Out)" }
++  } elseif ($existia) { $estado = 'ya hecho' }
++  $extra = @($nombres | Where-Object { $_ -ne 'main' })
++  if ($extra.Count -gt 0) { Aviso "El environment admite ademas: $($extra -join ', '). Deberia ser solo main." }
++  return $estado
++}
++
+ # ---------- ruleset de main (funciones puras: no tocan GitHub) ----------
+ # Parte 'dueno/nombre' en Dueno y Nombre; lanza si no tiene esa forma. El dueno del repo (usuario u
+ # organizacion) NO es el usuario de la sesion de gh: la sesion solo tiene que ser admin del repo.
+diff --git a/apps/lib-proyecto.ps1 b/apps/lib-proyecto.ps1
+new file mode 100644
+index 0000000..491525f
+--- /dev/null
++++ b/apps/lib-proyecto.ps1
+@@ -0,0 +1,172 @@
++# Piezas de proyecto-nuevo.ps1 (se cargan con punto: . .\lib-proyecto.ps1, despues de lib-gh.ps1).
++# Necesitan Gh, Partir-Repo y las funciones Info, Aviso y Bien de quien las carga.
++# Ninguna lee ni imprime el valor de un secreto: de los secretos solo se mira el NOMBRE.
++# Sin tildes a proposito: Windows PowerShell 5.1 lee un .ps1 sin BOM como ANSI.
++
++# Secretos que el juez reutilizable pide al environment `revisor` (los mismos que declara
++# workflow_call en .github/workflows/revisor.yml; test/proyecto-nuevo.test.js comprueba que coinciden).
++$script:SecretosRevisor = @('CLAUDE_CODE_OAUTH_TOKEN', 'REVISOR_CLIENT_ID', 'REVISOR_APP_KEY')
++
++# Ficheros que se dejan en el repo nuevo: ruta en el repo y plantilla de apps\proyecto-nuevo\.
++$script:ArchivosProyecto = @(
++  @{ Ruta = '.github/workflows/tests.yml'; Plantilla = 'tests.yml' },
++  @{ Ruta = '.github/workflows/revisor.yml'; Plantilla = 'revisor.yml' },
++  @{ Ruta = 'CLAUDE.md'; Plantilla = 'CLAUDE.md' },
++  @{ Ruta = '.fabrica.json'; Plantilla = 'ficha.json' }
++)
++
++function Json-De($r) { try { return ($r.Out | ConvertFrom-Json) } catch { return $null } }
++
++# Para si el plan de la cuenta no admite rulesets en este repo (privado y plan gratuito: 403). No cambia nada.
++function Comprobar-Rulesets-Disponibles([string]$Repo) {
++  $r = Gh @('api', "repos/$Repo/rulesets")
++  if ($r.Code -eq 0) { return }
++  if ($r.Out -match 'Upgrade to GitHub Pro|make this repository public') {
++    throw "El repo $Repo no admite rulesets con este plan (GitHub: $($r.Out)). Sin ruleset main no queda protegida, asi que no sigo. Hazlo publico o cambia de plan."
++  }
++  throw "No pude leer los rulesets de ${Repo}: $($r.Out)"
++}
++
++function Leer-Repo([string]$Repo) {
++  $g = Gh @('api', "repos/$Repo")
++  if ($g.Code -ne 0) { throw "No pude leer el repo ${Repo}: $($g.Out)" }
++  return (Json-De $g)
++}
++
++# Fusion automatica y borrado de ramas al fusionar. Devuelve 'ok' o 'ya hecho'; lanza si no quedan activados.
++function Asegurar-Ajustes-Repo([string]$Repo) {
++  $j = Leer-Repo $Repo
++  if ($j -and $j.allow_auto_merge -eq $true -and $j.delete_branch_on_merge -eq $true) { return 'ya hecho' }
++  $p = Gh @('api', '-X', 'PATCH', "repos/$Repo", '-F', 'allow_auto_merge=true', '-F', 'delete_branch_on_merge=true')
++  if ($p.Code -ne 0) { throw "No pude activar la fusion automatica y el borrado de ramas: $($p.Out)" }
++  $j = Leer-Repo $Repo
++  if (-not $j -or $j.allow_auto_merge -ne $true) { throw 'La fusion automatica sigue desactivada tras activarla.' }
++  if ($j.delete_branch_on_merge -ne $true) { throw 'El borrado de ramas al fusionar sigue desactivado tras activarlo.' }
++  return 'ok'
++}
++
++# Estado de una App en un repo, mirando las instalaciones de la sesion de gh. NO instala nada.
++# Estado: repo (instalada con acceso a ese repo) | todos (instalada en todos los repos de la cuenta) |
++#         otros (instalada en la cuenta pero sin este repo) | ninguna | dudosa (no se pudo leer; Detalle dice por que).
++function Estado-App-En-Repo([string]$Slug, [string]$Repo) {
++  $p = Partir-Repo $Repo
++  $r = Gh @('api', '/user/installations?per_page=100')
++  if ($r.Code -ne 0) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = "gh no pudo listar las instalaciones: $($r.Out)" } }
++  $j = Json-De $r
++  if (-not $j) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = 'la lista de instalaciones no es JSON' } }
++  $m = @($j.installations | Where-Object { $_.app_slug -eq $Slug -and $_.account.login -ieq $p.Dueno })
++  if ($m.Count -eq 0) { return [pscustomobject]@{ Estado = 'ninguna'; Detalle = '' } }
++  if ($m[0].repository_selection -eq 'all') { return [pscustomobject]@{ Estado = 'todos'; Detalle = '' } }
++  $r2 = Gh @('api', "/user/installations/$($m[0].id)/repositories?per_page=100")
++  $j2 = $null
++  if ($r2.Code -eq 0) { $j2 = Json-De $r2 }
++  if (-not $j2) { return [pscustomobject]@{ Estado = 'dudosa'; Detalle = "no pude leer los repos de la instalacion: $($r2.Out)" } }
++  $esta = @($j2.repositories | Where-Object { [string]$_.full_name -ieq $Repo })
++  if ($esta.Count -gt 0) { return [pscustomobject]@{ Estado = 'repo'; Detalle = '' } }
++  return [pscustomobject]@{ Estado = 'otros'; Detalle = '' }
++}
++
++# El clic que falta para una App, con la direccion exacta. Texto vacio si no falta nada.
++function Clic-App-Que-Falta([string]$Slug, $Estado, [string]$Repo) {
++  $p = Partir-Repo $Repo
++  switch ($Estado.Estado) {
++    'ninguna' { return "Instala la App $Slug en la cuenta $($p.Dueno): abre https://github.com/apps/$Slug/installations/new , elige la cuenta $($p.Dueno), marca 'Only select repositories' y elige $($p.Nombre) (o 'All repositories' si decides esa opcion)." }
++    'otros' { return "La App $Slug esta en $($p.Dueno) pero sin $($p.Nombre): abre https://github.com/organizations/$($p.Dueno)/settings/installations (si la cuenta es personal: https://github.com/settings/installations ), Configure en $Slug y anade $($p.Nombre) en 'Repository access'." }
++    'dudosa' { return "No pude comprobar la App ${Slug}: $($Estado.Detalle)" }
++    default { return '' }
++  }
++}
++
++# Nombres de secretos del environment `revisor` que faltan (solo nombres; el valor no se pide a GitHub).
++function Secretos-Que-Faltan([string]$Repo) {
++  $r = Gh @('api', "repos/$Repo/environments/revisor/secrets")
++  if ($r.Code -ne 0) { throw "No pude listar los secretos del environment revisor: $($r.Out)" }
++  $j = Json-De $r
++  if (-not $j) { throw 'La lista de secretos del environment revisor no es JSON.' }
++  $hay = @($j.secrets | ForEach-Object { [string]$_.name })
++  return @($script:SecretosRevisor | Where-Object { $hay -notcontains $_ })
++}
++
++# Como crear un secreto sin que su valor pase por la pantalla ni por la orden.
++function Texto-Crear-Secreto([string]$Nombre, [string]$Repo) {
++  $o = "gh secret set $Nombre --env revisor --repo $Repo"
++  switch ($Nombre) {
++    'CLAUDE_CODE_OAUTH_TOKEN' { return "$o   (te pide el valor oculto; sale de  claude setup-token )" }
++    'REVISOR_CLIENT_ID' { return "$o   (te pide el valor oculto; es el Client ID de la App fabrica-revisor, el que empieza por Iv)" }
++    'REVISOR_APP_KEY' { return "$o < ruta\a\la\clave-de-fabrica-revisor.pem   (la clave privada de la App; entra por la entrada, no por la orden)" }
++    default { return $o }
++  }
++}
++
++function Archivo-En-Rama([string]$Repo, [string]$Ruta, [string]$Rama) {
++  $r = Gh @('api', "repos/$Repo/contents/${Ruta}?ref=$Rama")
++  if ($r.Code -eq 0) { return $true }
++  if ($r.Out -match 'Not Found|404') { return $false }
++  throw "No pude mirar $Ruta en ${Repo}@${Rama}: $($r.Out)"
++}
++
++# Contenido de un fichero del repo nuevo a partir de su plantilla (cambia __REPO__ y __NOMBRE__).
++function Contenido-De-Plantilla([string]$Carpeta, [string]$Plantilla, [string]$Repo) {
++  $f = Join-Path $Carpeta $Plantilla
++  if (-not (Test-Path $f)) { throw "Falta la plantilla $f." }
++  $t = [System.IO.File]::ReadAllText($f, [System.Text.Encoding]::UTF8)
++  return $t.Replace('__REPO__', $Repo).Replace('__NOMBRE__', (Partir-Repo $Repo).Nombre)
++}
++
++# Rutas de $script:ArchivosProyecto que aun no estan en la rama base del repo.
++function Archivos-Que-Faltan([string]$Repo, [string]$Base) {
++  return @($script:ArchivosProyecto | Where-Object { -not (Archivo-En-Rama $Repo $_.Ruta $Base) } | ForEach-Object { $_.Ruta })
++}
++
++# Deja listo el PR con los ficheros que faltan: rama nueva desde la base, un fichero por commit y el PR.
++# Si ya hay un PR abierto desde esa rama, no hace nada. Devuelve la direccion del PR y si es 'nuevo' o 'ya abierto'.
++function Abrir-Pr-Inicial([string]$Repo, [string]$Base, [string]$Rama, [string]$Carpeta, [string[]]$Faltan) {
++  $p = Partir-Repo $Repo
++  $l = Gh @('api', "repos/$Repo/pulls?state=open&head=$($p.Dueno):$Rama")
++  if ($l.Code -ne 0) { throw "No pude listar los PR abiertos: $($l.Out)" }
++  $abiertos = @(Json-De $l)
++  if ($abiertos.Count -gt 0 -and $abiertos[0].html_url) { return [pscustomobject]@{ Url = [string]$abiertos[0].html_url; Estado = 'ya abierto' } }
++  $s = Gh @('api', "repos/$Repo/git/ref/heads/$Base")
++  $sj = $null
++  if ($s.Code -eq 0) { $sj = Json-De $s }
++  if (-not $sj -or -not $sj.object.sha) { throw "No pude leer la punta de ${Base}: $($s.Out)" }
++  $b = Gh @('api', '-X', 'POST', "repos/$Repo/git/refs", '-f', "ref=refs/heads/$Rama", '-f', "sha=$($sj.object.sha)")
++  if ($b.Code -ne 0 -and $b.Out -notmatch 'Reference already exists') { throw "No pude crear la rama ${Rama}: $($b.Out)" }
++  foreach ($a in ($script:ArchivosProyecto | Where-Object { $Faltan -contains $_.Ruta })) {
++    if (Archivo-En-Rama $Repo $a.Ruta $Rama) { continue }
++    $texto = Contenido-De-Plantilla $Carpeta $a.Plantilla $Repo
++    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($texto))
++    $m = Gh @('api', '-X', 'PUT', "repos/$Repo/contents/$($a.Ruta)", '-f', "message=Fabrica: $($a.Ruta)", '-f', "content=$b64", '-f', "branch=$Rama")
++    if ($m.Code -ne 0) { throw "No pude subir $($a.Ruta) a ${Rama}: $($m.Out)" }
++  }
++  $cuerpo = "Deja el repo trabajando con la Fabrica (https://github.com/factory-am89/fabrica): los workflows que llaman a los reutilizables, un CLAUDE.md minimo y la ficha .fabrica.json.`n`nLo abre apps/proyecto-nuevo.ps1. Los checks tests y revisor aun no son obligatorios: el ruleset de main se crea al relanzar el script cuando este PR este fusionado."
++  $n = Gh @('api', '-X', 'POST', "repos/$Repo/pulls", '-f', 'title=Trabajar con la Fabrica', '-f', "head=$Rama", '-f', "base=$Base", '-f', "body=$cuerpo")
++  $nj = $null
++  if ($n.Code -eq 0) { $nj = Json-De $n }
++  if (-not $nj -or -not $nj.html_url) { throw "No pude abrir el PR: $($n.Out)" }
++  return [pscustomobject]@{ Url = [string]$nj.html_url; Estado = 'nuevo' }
++}
++
++# Nombre con el que GitHub ve el check de tests en el repo, mirando los checks de la punta de la rama base.
++# Devuelve el nombre o $null si aun no hay ninguno (el workflow no ha corrido en esa rama).
++function Contexto-Tests-Observado([string]$Repo, [string]$Base) {
++  $r = Gh @('api', "repos/$Repo/commits/$Base/check-runs?per_page=100")
++  if ($r.Code -ne 0) { throw "No pude leer los checks de ${Base}: $($r.Out)" }
++  $j = Json-De $r
++  if (-not $j) { throw 'Los checks de la rama base no son JSON.' }
++  $n = @($j.check_runs | ForEach-Object { [string]$_.name } | Where-Object { $_ -match '^tests( / tests)?$' })
++  if ($n.Count -eq 0) { return $null }
++  return $n[0]
++}
++
++# Comprueba lo que de verdad aplica GitHub a la rama: exige $ContextoTests y revisor. Lanza si no.
++function Comprobar-Reglas-De-Main([string]$Repo, [string]$Base, [string]$ContextoTests) {
++  $r = Gh @('api', "repos/$Repo/rules/branches/$Base")
++  if ($r.Code -ne 0) { throw "No pude leer las reglas de ${Base}: $($r.Out)" }
++  $j = Json-De $r
++  if (-not $j) { throw 'Las reglas de la rama no son JSON.' }
++  $ctx = @($j | Where-Object { $_.type -eq 'required_status_checks' } | ForEach-Object { $_.parameters.required_status_checks } | ForEach-Object { [string]$_.context })
++  foreach ($c in @($ContextoTests, 'revisor')) {
++    if ($ctx -notcontains $c) { throw "GitHub no exige el check '$c' en ${Base} (exige: $($ctx -join ', '))." }
++  }
++}
+diff --git a/apps/proyecto-nuevo.ps1 b/apps/proyecto-nuevo.ps1
+new file mode 100644
+index 0000000..e11bb73
+--- /dev/null
++++ b/apps/proyecto-nuevo.ps1
+@@ -0,0 +1,158 @@
++# Pone un proyecto nuevo a trabajar con la Fabrica (lo lanza Pablo con SU sesion de gh, que debe ser admin del repo):
++#   powershell -ExecutionPolicy Bypass -File <esta ruta> -Repo factory-am89/homenu-panel
++# Hace, en este orden, y se puede relanzar (lo que ya esta hecho se salta):
++#   2 el repo existe, tienes admin y main tiene commits   3 el plan admite rulesets (un repo privado con plan gratuito da 403: para)
++#   4 fusion automatica y borrado de ramas al fusionar    5 environment `revisor` limitado a main
++#   6 las Apps fabrica-constructor y fabrica-revisor estan instaladas en el repo (NO las instala: dice el clic que falta)
++#   7 secretos del environment: dice cuales faltan por NOMBRE y como crearlos (nunca lee ni imprime un valor)
++#   8 abre un PR con los workflows que llaman a los reutilizables de la Fabrica, un CLAUDE.md minimo y la ficha .fabrica.json
++#   9 ruleset de main (lo crea ruleset.ps1)               10 comprueba que GitHub exige de verdad tests y revisor
++# El ruleset espera a que el PR del paso 8 este fusionado: el check `revisor` solo corre si su workflow ya esta en main,
++# asi que con el ruleset puesto antes ese PR no se podria fusionar nunca. Por eso el primer lanzamiento acaba en
++# «pendiente: fusiona el PR» y el segundo, ya con los ficheros en main, crea el ruleset.
++# Apps en «todos los repos» de la cuenta o repo a repo: valen las dos; el paso 6 solo mira que estan.
++# Sale con 0 solo si todo esta hecho; con 1 si algo fallo o queda un pendiente (el resumen dice cual).
++# Textos sin tildes a proposito (Windows PowerShell 5.1 lee un .ps1 sin BOM como ANSI).
++param(
++  [Parameter(Mandatory = $true)][string]$Repo,   # dueno/nombre: sin valor por defecto a proposito
++  [string]$ContextoTests = '',                   # nombre del check de tests; vacio = el que GitHub ve en main
++  [string]$AppConstructor = 'fabrica-constructor',
++  [string]$AppRevisor = 'fabrica-revisor',
++  [string]$Rama = 'ops/fabrica-inicial'          # rama del PR del paso 8
++)
++
++$ErrorActionPreference = 'Continue'
++$Base = 'main'
++$AbriSesion = $false
++$Usuario = $null
++$script:Hay = @{}   # estado de cada paso: ok | ya hecho | pendiente: ... | FALLO: ...
++$script:Orden = @('2 Repo', '3 Plan (rulesets)', '4 Ajustes del repo', '5 Environment revisor', '6 Apps instaladas', '7 Secretos', '8 PR con los ficheros', '9 Ruleset de main', '10 Comprobacion final')
++$script:Pendientes = @()
++
++function Titulo($t) { Write-Host ''; Write-Host "=== $t ===" -ForegroundColor Cyan }
++function Info($t)   { Write-Host "  $t" }
++function Aviso($t)  { Write-Host "  [!] $t" -ForegroundColor Yellow }
++function Bien($t)   { Write-Host "  [ok] $t" -ForegroundColor Green }
++. (Join-Path $PSScriptRoot 'lib-gh.ps1')
++. (Join-Path $PSScriptRoot 'lib-proyecto.ps1')
++
++try { $null = Partir-Repo $Repo } catch { Write-Host "  $($_.Exception.Message)" -ForegroundColor Red; exit 1 }
++$Dueno = (Partir-Repo $Repo).Dueno
++if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Host 'Falta gh.' -ForegroundColor Red; exit 1 }
++if ($env:GH_TOKEN -or $env:GITHUB_TOKEN) {
++  Aviso 'Quito GH_TOKEN/GITHUB_TOKEN solo para este script (impediria el login).'
++  Remove-Item Env:GH_TOKEN, Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
++}
++$Plantillas = Join-Path $PSScriptRoot 'proyecto-nuevo'
++$fallo = $false
++
++# Un paso: su resultado (ok / ya hecho) o su pendiente quedan en el resumen; si lanza, el script para.
++function Paso([string]$Nombre, [scriptblock]$Cuerpo) {
++  Titulo $Nombre
++  $r = & $Cuerpo
++  $script:Hay[$Nombre] = [string](@($r)[-1])
++  if ($script:Hay[$Nombre] -like 'pendiente*') { $script:Pendientes += "$Nombre -> $($script:Hay[$Nombre])" }
++}
++
++try {
++  Titulo '1 Sesion de gh'
++  & gh.exe auth status --hostname github.com 2>&1 | Out-Null
++  if ($LASTEXITCODE -ne 0) {
++    Info 'Se abrira el navegador: copia el codigo que te da gh, pegalo y autoriza.'
++    $AbriSesion = $true
++    Gh-Login
++    if ($LASTEXITCODE -ne 0) { throw 'gh auth login no termino bien.' }
++  } else { Exigir-Workflow }
++  $u = Gh @('api', 'user', '--jq', '.login')
++  if ($u.Code -ne 0 -or -not $u.Out) { throw "No pude leer el usuario de la sesion de gh: $($u.Out)" }
++  $Usuario = $u.Out
++  Bien "Sesion de '$Usuario'."
++
++  Paso '2 Repo' {
++    $j = Leer-Repo $Repo
++    if (-not $j.permissions -or $j.permissions.admin -ne $true) { throw "La sesion de '$Usuario' no es administradora de $Repo (hace falta para ajustes, environment y ruleset)." }
++    if ($Dueno -ne 'factory-am89') { throw "La ficha .fabrica.json usa la identidad fabrica-constructor, que solo vale en repos de factory-am89; $Repo no vale." }
++    $b = Gh @('api', "repos/$Repo/branches/$Base", '--jq', '.name')
++    if ($b.Code -ne 0) { throw "La rama $Base de $Repo no existe todavia: sube antes un primer commit." }
++    Bien "$Repo existe, la sesion es admin y $Base tiene commits."
++    'ok'
++  }
++  Paso '3 Plan (rulesets)' { Comprobar-Rulesets-Disponibles $Repo; Bien 'El plan admite rulesets en este repo.'; 'ok' }
++  Paso '4 Ajustes del repo' { $r = Asegurar-Ajustes-Repo $Repo; Bien 'Fusion automatica y borrado de ramas al fusionar activados.'; $r }
++  Paso '5 Environment revisor' { $r = Asegurar-Environment-Revisor $Repo; Bien 'Environment revisor limitado a la rama main.'; $r }
++
++  Paso '6 Apps instaladas' {
++    $faltan = @()
++    foreach ($app in @($AppConstructor, $AppRevisor)) {
++      $e = Estado-App-En-Repo $app $Repo
++      $clic = Clic-App-Que-Falta $app $e $Repo
++      if ($clic) { Aviso $clic; $faltan += $app } else { Bien "App $app instalada en $Repo ($($e.Estado))." }
++    }
++    if ($faltan.Count -gt 0) { return "pendiente: falta instalar $($faltan -join ' y ') (el clic esta arriba; este script no instala Apps ni amplia permisos)" }
++    'ok'
++  }
++
++  Paso '7 Secretos' {
++    $faltan = @(Secretos-Que-Faltan $Repo)
++    if ($faltan.Count -eq 0) { Bien 'Estan los tres secretos del environment revisor.'; return 'ya hecho' }
++    foreach ($n in $faltan) { Aviso "Falta el secreto $n. Crealo asi:"; Info "  $(Texto-Crear-Secreto $n $Repo)" }
++    "pendiente: faltan los secretos $($faltan -join ', ')"
++  }
++
++  $faltanFicheros = @()
++  Paso '8 PR con los ficheros' {
++    $script:faltanFicheros = @(Archivos-Que-Faltan $Repo $Base)
++    if ($script:faltanFicheros.Count -eq 0) { Bien "Los workflows, CLAUDE.md y .fabrica.json ya estan en $Base."; return 'ya hecho' }
++    Info "Faltan en ${Base}: $($script:faltanFicheros -join ', ')"
++    $pr = Abrir-Pr-Inicial $Repo $Base $Rama $Plantillas $script:faltanFicheros
++    Bien "PR $($pr.Estado): $($pr.Url)"
++    "pendiente: fusiona el PR $($pr.Url) (el revisor aun no puede juzgarlo: su workflow no esta en main) y relanza este script"
++  }
++
++  Paso '9 Ruleset de main' {
++    $bloqueos = @($script:Pendientes | Where-Object { $_ -notlike '7 *' })
++    if ($bloqueos.Count -gt 0) { return 'pendiente: no se intenta hasta resolver los pasos 6 y 8 de arriba' }
++    $ctx = $ContextoTests
++    if (-not $ctx) {
++      $ctx = Contexto-Tests-Observado $Repo $Base
++      if (-not $ctx) { return "pendiente: el check tests aun no ha corrido en $Base; espera a que acabe y relanza (o pasa -ContextoTests con su nombre exacto)" }
++      Info "Check de tests tal como lo ve GitHub: '$ctx'."
++    }
++    $script:Contexto = $ctx
++    & (Join-Path $PSScriptRoot 'ruleset.ps1') -Repo $Repo -ContextoTests $ctx -AppRevisor $AppRevisor -SesionAbierta
++    if ($LASTEXITCODE -ne 0) { throw 'ruleset.ps1 fallo (mira el mensaje de arriba). Se puede relanzar suelto: apps\ruleset.ps1' }
++    'ok'
++  }
++
++  Paso '10 Comprobacion final' {
++    if (-not $script:Contexto) { return 'pendiente: sin ruleset todavia' }
++    Comprobar-Reglas-De-Main $Repo $Base $script:Contexto
++    Bien "GitHub exige '$($script:Contexto)' y 'revisor' en $Base."
++    'ok'
++  }
++}
++catch {
++  $fallo = $true
++  $script:Hay['FALLO'] = "FALLO: $($_.Exception.Message)"
++  Write-Host ''
++  Write-Host "PARADO: $($_.Exception.Message)" -ForegroundColor Red
++  Write-Host 'Arregla lo que dice y relanza el script: lo ya hecho se salta.' -ForegroundColor Red
++}
++finally {
++  Titulo 'Cierre'
++  if (-not $AbriSesion) { Info 'La sesion de gh ya existia antes de este script: no la cierro.' }
++  else {
++    if ($Usuario) { & gh.exe auth logout --hostname github.com --user $Usuario 2>&1 | Out-Null }
++    else { & gh.exe auth logout --hostname github.com 2>&1 | Out-Null }
++    Info 'Sesion de gh cerrada.'
++  }
++  Titulo 'Resumen'
++  foreach ($k in $script:Orden) {
++    $v = if ($script:Hay.ContainsKey($k)) { $script:Hay[$k] } else { 'no llego a ejecutarse' }
++    $col = if ($v -eq 'ok') { 'Green' } elseif ($v -eq 'ya hecho') { 'DarkGreen' } elseif ($v -like 'pendiente*') { 'Yellow' } else { 'Red' }
++    Write-Host ("  {0,-26} {1}" -f $k, $v) -ForegroundColor $col
++  }
++  if ($script:Hay.ContainsKey('FALLO')) { Write-Host "  $($script:Hay['FALLO'])" -ForegroundColor Red }
++}
++if ($fallo -or $script:Pendientes.Count -gt 0) { exit 1 }
++exit 0
+diff --git a/apps/proyecto-nuevo/CLAUDE.md b/apps/proyecto-nuevo/CLAUDE.md
+new file mode 100644
+index 0000000..a721cb5
+--- /dev/null
++++ b/apps/proyecto-nuevo/CLAUDE.md
+@@ -0,0 +1,12 @@
++# __NOMBRE__
++
++Este repo trabaja con la Fábrica: https://github.com/factory-am89/fabrica
++
++- Mandan el `CLAUDE.md` y `standards/code.md` de la Fábrica. Este fichero solo dice lo propio de este repo; añádelo debajo y no copies aquí lo de la Fábrica (una idea, un sitio).
++- `main` solo cambia por PR con los checks `tests` y `revisor` en verde; GitHub fusiona solo. Nadie empuja a `main`.
++- La ficha `.fabrica.json` dice a las herramientas de la Fábrica qué repo, qué rama base y qué identidad usar.
++- Los secretos solo se nombran, nunca se escriben.
++
++## Lo propio de este repo
++
++(Pendiente: qué es, cómo se arranca y cómo se prueba.)
+diff --git a/apps/proyecto-nuevo/ficha.json b/apps/proyecto-nuevo/ficha.json
+new file mode 100644
+index 0000000..35e8c36
+--- /dev/null
++++ b/apps/proyecto-nuevo/ficha.json
+@@ -0,0 +1,5 @@
++{
++  "repo": "__REPO__",
++  "base": "main",
++  "identidad": "fabrica-constructor"
++}
+diff --git a/apps/proyecto-nuevo/revisor.yml b/apps/proyecto-nuevo/revisor.yml
+new file mode 100644
+index 0000000..a1ab4f9
+--- /dev/null
++++ b/apps/proyecto-nuevo/revisor.yml
+@@ -0,0 +1,19 @@
++name: revisor
++
++# Llama al juez reutilizable de la Fábrica (factory-am89/fabrica). Corre con pull_request_target: ejecuta
++# la versión de este fichero que está en main, no la del PR. Los secretos (CLAUDE_CODE_OAUTH_TOKEN,
++# REVISOR_CLIENT_ID y REVISOR_APP_KEY) viven en el environment `revisor` de este repo, limitado a main.
++# Lo crea apps/proyecto-nuevo.ps1.
++on:
++  pull_request_target:
++    types: [opened, synchronize, reopened, ready_for_review, edited]
++
++permissions:
++  contents: read
++  pull-requests: read
++  checks: read
++
++jobs:
++  revisor:
++    uses: factory-am89/fabrica/.github/workflows/revisor.yml@main
++    secrets: inherit
+diff --git a/apps/proyecto-nuevo/tests.yml b/apps/proyecto-nuevo/tests.yml
+new file mode 100644
+index 0000000..0fa7d54
+--- /dev/null
++++ b/apps/proyecto-nuevo/tests.yml
+@@ -0,0 +1,17 @@
++name: tests
++
++# Llama al workflow reutilizable de la Fábrica (factory-am89/fabrica): tests, lint y reglas de workflows
++# con la configuración de la Fábrica. Lo crea apps/proyecto-nuevo.ps1; no lleva secretos.
++# El check se llama `tests / tests` (job que llama / job llamado): es el que exige el ruleset de main.
++on:
++  pull_request:
++    types: [opened, synchronize, reopened, edited]
++  push:
++    branches: [main]
++
++permissions:
++  contents: read
++
++jobs:
++  tests:
++    uses: factory-am89/fabrica/.github/workflows/tests.yml@main
+diff --git a/test/lib-gh.test.js b/test/lib-gh.test.js
+index 2fd5ea8..9ca51ec 100644
+--- a/test/lib-gh.test.js
++++ b/test/lib-gh.test.js
+@@ -10,8 +10,8 @@ const ruta = (r) => fileURLToPath(new URL(`../${r}`, import.meta.url));
+ const ps = (args) => spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', ...args], { encoding: 'utf8' });
+ const hayPs = process.platform === 'win32';
+ 
+-test('arranque.ps1, ruleset.ps1 y lib-gh.ps1 pasan el parser de PowerShell 5.1', { skip: !hayPs }, () => {
+-  for (const f of ['arranque', 'ruleset', 'lib-gh']) {
++test('los .ps1 de apps/ pasan el parser de PowerShell 5.1', { skip: !hayPs }, () => {
++  for (const f of ['arranque', 'ruleset', 'lib-gh', 'lib-proyecto', 'proyecto-nuevo']) {
+     const cmd = `$e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${ruta(`apps/${f}.ps1`)}',[ref]$null,[ref]$e); if ($e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }`;
+     const r = ps(['-Command', cmd]);
+     assert.equal(r.status, 0, `${f}.ps1: ${r.stdout}${r.stderr}`);
+diff --git a/test/proyecto-nuevo.prueba.ps1 b/test/proyecto-nuevo.prueba.ps1
+new file mode 100644
+index 0000000..43a1f91
+--- /dev/null
++++ b/test/proyecto-nuevo.prueba.ps1
+@@ -0,0 +1,147 @@
++# Prueba de apps\proyecto-nuevo.ps1 en Windows PowerShell 5.1 con un gh FALSO con estado: no toca GitHub (lo lanza
++# test/proyecto-nuevo.test.js). Imprime una linea "OK: ..." por comprobacion; si falla, "FALLO: ...".
++param([string]$Script)
++$ErrorActionPreference = 'Continue'
++$RP = 'factory-am89/homenu-panel'
++$global:ArgsLog = New-Object System.Collections.ArrayList
++$global:E = $null
++
++function Nuevo-Estado {
++  @{
++    privado = $false; planGratis403 = $false; admin = $true; sinMain = $false
++    auto = $false; borrar = $false
++    env = $false; policies = @()
++    instalaciones = @(
++      @{ id = 1; app_slug = 'fabrica-constructor'; repository_selection = 'all'; account = @{ login = 'factory-am89' } },
++      @{ id = 2; app_slug = 'fabrica-revisor'; repository_selection = 'all'; account = @{ login = 'factory-am89' } })
++    reposDe = @{}
++    secretos = @('CLAUDE_CODE_OAUTH_TOKEN', 'REVISOR_CLIENT_ID', 'REVISOR_APP_KEY')
++    enMain = @('.github/workflows/tests.yml', '.github/workflows/revisor.yml', 'CLAUDE.md', '.fabrica.json')
++    enRama = @(); ramaCreada = $false; prAbierto = $false
++    checks = @('tests / tests')
++    rulesets = @(); cuerpoRuleset = $null
++  }
++}
++
++function Json($o) { ConvertTo-Json -InputObject $o -Depth 10 -Compress }
++
++# Cada llamada se anota; las que cambian algo (-X PATCH/PUT/POST) tambien se cuentan aparte.
++function gh.exe {
++  $a = @($args)
++  $cuerpo = $null
++  if ($MyInvocation.ExpectingInput) { $cuerpo = ($input | Out-String) }
++  [void]$global:ArgsLog.Add(($a -join ' '))
++  $global:LASTEXITCODE = 0
++  $e = $global:E
++  $ruta = if ($a[0] -eq 'api') { ($a | Where-Object { $_ -match '^(repos/|/user|user$)' } | Select-Object -First 1) } else { '' }
++  $metodo = if ($a -contains '-X') { $a[[array]::IndexOf($a, '-X') + 1] } else { 'GET' }
++  $jq = $a -contains '--jq'
++  function Falla([string]$t) { $global:LASTEXITCODE = 1; $t }
++  if ($a[0] -eq 'auth') { return }
++  if ($ruta -eq 'user' -and $a -contains '-i') { return "HTTP/2.0 200 OK`r`nX-OAuth-Scopes: repo, workflow`r`n`r`n{}" }
++  if ($ruta -eq 'user') { return 'pablo' }
++  if ($ruta -eq "repos/$RP" -and $metodo -eq 'PATCH') { $e.auto = $true; $e.borrar = $true; return '{}' }
++  if ($ruta -eq "repos/$RP") {
++    if ($jq) { return $(if ($e.admin) { 'true' } else { 'false' }) }
++    return (Json @{ private = $e.privado; allow_auto_merge = $e.auto; delete_branch_on_merge = $e.borrar; permissions = @{ admin = $e.admin } })
++  }
++  if ($ruta -eq "repos/$RP/branches/main") { if ($e.sinMain) { return (Falla 'Not Found') }; return 'main' }
++  if ($ruta -eq "repos/$RP/rulesets" -and $metodo -eq 'POST') { $e.cuerpoRuleset = $cuerpo; $e.rulesets += 'main'; return '{}' }
++  if ($ruta -eq "repos/$RP/rulesets") {
++    if ($e.planGratis403) { return (Falla 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)') }
++    if ($jq) { return ($e.rulesets -join "`n") }
++    return (Json @($e.rulesets | ForEach-Object { @{ name = $_; enforcement = 'active' } }))
++  }
++  if ($ruta -eq "repos/$RP/environments/revisor" -and $metodo -eq 'PUT') { $e.env = $true; return '{}' }
++  if ($ruta -eq "repos/$RP/environments/revisor") { if ($e.env) { return '{}' }; return (Falla 'Not Found') }
++  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies" -and $metodo -eq 'POST') { $e.policies += 'main'; return '{}' }
++  if ($ruta -eq "repos/$RP/environments/revisor/deployment-branch-policies") { return ($e.policies -join "`n") }
++  if ($ruta -eq "repos/$RP/environments/revisor/secrets") { return (Json @{ secrets = @($e.secretos | ForEach-Object { @{ name = $_ } }) }) }
++  if ($ruta -like '/user/installations?per_page*') { return (Json @{ installations = $e.instalaciones }) }
++  if ($ruta -match '^/user/installations/(\d+)/repositories') { return (Json @{ repositories = @($e.reposDe[[int]$Matches[1]] | ForEach-Object { @{ full_name = $_ } }) }) }
++  if ($ruta -like "repos/$RP/contents/*" -and $metodo -eq 'PUT') { $p = ($ruta -replace "^repos/$RP/contents/", ''); $e.enRama += $p; return '{}' }
++  if ($ruta -like "repos/$RP/contents/*") {
++    $p = ($ruta -replace "^repos/$RP/contents/", '') -replace '\?ref=.*$', ''
++    $rama = ($ruta -replace '^.*\?ref=', '')
++    $donde = if ($rama -eq 'main') { $e.enMain } else { $e.enRama }
++    if ($donde -contains $p) { return '{"sha":"abc"}' }
++    return (Falla 'gh: Not Found (HTTP 404)')
++  }
++  if ($ruta -like "repos/$RP/pulls?*") { if ($e.prAbierto) { return (Json @(@{ html_url = "https://github.com/$RP/pull/1" })) }; return '[]' }
++  if ($ruta -eq "repos/$RP/pulls" -and $metodo -eq 'POST') { $e.prAbierto = $true; return (Json @{ html_url = "https://github.com/$RP/pull/1" }) }
++  if ($ruta -eq "repos/$RP/git/ref/heads/main") { return '{"object":{"sha":"deadbeef"}}' }
++  if ($ruta -eq "repos/$RP/git/refs") { if ($e.ramaCreada) { return (Falla 'Reference already exists') }; $e.ramaCreada = $true; return '{}' }
++  if ($ruta -like "repos/$RP/commits/main/check-runs*") { return (Json @{ check_runs = @($e.checks | ForEach-Object { @{ name = $_ } }) }) }
++  if ($ruta -eq "repos/$RP/rules/branches/main") {
++    if (-not $e.cuerpoRuleset) { return '[]' }
++    $c = $e.cuerpoRuleset | ConvertFrom-Json
++    $rs = @($c.rules | Where-Object { $_.type -eq 'required_status_checks' })
++    return (Json @(@{ type = 'required_status_checks'; parameters = @{ required_status_checks = @($rs[0].parameters.required_status_checks | ForEach-Object { @{ context = $_.context } }) } }))
++  }
++  return (Falla "gh falso: no conozco $($a -join ' ')")
++}
++
++function Lanza([hashtable]$Estado, [hashtable]$Extra = @{}) {
++  $global:E = $Estado
++  $global:ArgsLog.Clear()
++  $salida = (& $Script -Repo $RP @Extra *>&1 | Out-String)
++  [pscustomobject]@{ Code = $LASTEXITCODE; Out = $salida; Muta = @($global:ArgsLog | Where-Object { $_ -match '-X (PATCH|PUT|POST)' }) }
++}
++function Prueba([string]$n, [bool]$ok) { if ($ok) { "OK: $n" } else { "FALLO: $n" } }
++
++# 1. Todo bien y los ficheros ya en main: crea el ruleset con tests y revisor, y lo comprueba.
++$e = Nuevo-Estado
++$r = Lanza $e
++Prueba 'camino completo sale 0' ($r.Code -eq 0)
++Prueba 'activa fusion automatica y borrado de ramas' ($e.auto -and $e.borrar)
++Prueba 'deja el environment revisor limitado a main' ($e.env -and ($e.policies -contains 'main'))
++Prueba 'crea el ruleset con tests / tests (el que ve GitHub) y revisor' ($e.cuerpoRuleset -match 'tests / tests' -and $e.cuerpoRuleset -match '"revisor"')
++Prueba 'no abre PR si los ficheros ya estan' (-not $e.prAbierto)
++Prueba 'no instala nada: ninguna llamada a installations con metodo que cambie' (@($r.Muta | Where-Object { $_ -match 'installations' }).Count -eq 0)
++# 2. Relanzarlo: nada cambia.
++$r2 = Lanza $e
++Prueba 'relanzado sale 0' ($r2.Code -eq 0)
++$muta2 = @($r2.Muta | Where-Object { $_ -notmatch 'environments/revisor -F' })   # el PUT del environment es idempotente y se repite
++Prueba 'relanzado no cambia nada (salvo el PUT idempotente del environment)' ($muta2.Count -eq 0)
++# 3. Repo privado con plan gratuito: para con el motivo y sin tocar nada.
++$e = Nuevo-Estado; $e.planGratis403 = $true; $e.privado = $true
++$r = Lanza $e
++Prueba 'privado en plan gratuito: sale 1 con el motivo' ($r.Code -eq 1 -and $r.Out -match 'Upgrade to GitHub Pro' -and $r.Out -match 'no sigo')
++Prueba 'privado en plan gratuito: no cambia nada' ($r.Muta.Count -eq 0 -and -not $e.auto)
++# 4. Sin permisos de admin: para antes de tocar.
++$e = Nuevo-Estado; $e.admin = $false
++$r = Lanza $e
++Prueba 'sin admin: sale 1 y no cambia nada' ($r.Code -eq 1 -and $r.Out -match 'no es administradora' -and $r.Muta.Count -eq 0)
++# 5. Apps: revisor sin instalar. Dice el clic y no crea el ruleset.
++$e = Nuevo-Estado; $e.instalaciones = @($e.instalaciones[0])
++$r = Lanza $e
++Prueba 'falta la App revisora: sale 1 con la direccion exacta del clic' ($r.Code -eq 1 -and $r.Out -match 'https://github.com/apps/fabrica-revisor/installations/new')
++Prueba 'falta la App revisora: no crea el ruleset ni PR de ruleset' (-not $e.cuerpoRuleset)
++# 5b. App instalada solo en otros repos de la cuenta.
++$e = Nuevo-Estado; $e.instalaciones[1].repository_selection = 'selected'; $e.reposDe[2] = @('factory-am89/otro')
++$r = Lanza $e
++Prueba 'App en otros repos: dice como anadir este y no crea el ruleset' ($r.Code -eq 1 -and $r.Out -match 'Repository access' -and -not $e.cuerpoRuleset)
++# 5c. App 'selected' que si incluye el repo: pasa.
++$e = Nuevo-Estado; $e.instalaciones[1].repository_selection = 'selected'; $e.reposDe[2] = @($RP)
++$r = Lanza $e
++Prueba 'App repo a repo con este repo incluido: pasa' ($r.Code -eq 0 -and $e.cuerpoRuleset)
++# 6. Ficheros que faltan: abre el PR y NO crea el ruleset.
++$e = Nuevo-Estado; $e.enMain = @()
++$r = Lanza $e
++Prueba 'faltan ficheros: abre rama, sube los cuatro y abre el PR' ($e.ramaCreada -and $e.enRama.Count -eq 4 -and $e.prAbierto)
++Prueba 'faltan ficheros: no crea el ruleset y sale 1 diciendo que fusione' ($r.Code -eq 1 -and -not $e.cuerpoRuleset -and $r.Out -match 'fusiona el PR')
++$r = Lanza $e
++Prueba 'con el PR ya abierto no abre otro ni vuelve a subir ficheros' ($e.enRama.Count -eq 4 -and @($r.Muta | Where-Object { $_ -match '/pulls |contents/' }).Count -eq 0)
++# 7. Secretos: dice los que faltan por nombre y como crearlos; nunca llama a nada que lea un valor.
++$e = Nuevo-Estado; $e.secretos = @('REVISOR_CLIENT_ID')
++$r = Lanza $e
++Prueba 'faltan secretos: los nombra y da gh secret set --env revisor' ($r.Out -match 'CLAUDE_CODE_OAUTH_TOKEN' -and $r.Out -match 'REVISOR_APP_KEY' -and $r.Out -match 'gh secret set REVISOR_APP_KEY --env revisor --repo factory-am89/homenu-panel')
++Prueba 'faltan secretos: sale 1 pero el ruleset se crea igual' ($r.Code -eq 1 -and $e.cuerpoRuleset)
++Prueba 'nunca pide un valor: ninguna llamada a secrets con metodo distinto de GET' (@($global:ArgsLog | Where-Object { $_ -match 'secrets' -and $_ -match '-X' }).Count -eq 0)
++# 8. El check de tests aun no ha corrido en main: no inventa el nombre.
++$e = Nuevo-Estado; $e.checks = @()
++$r = Lanza $e
++Prueba 'sin check de tests observado: para sin crear el ruleset' ($r.Code -eq 1 -and -not $e.cuerpoRuleset -and $r.Out -match 'ContextoTests')
++$e = Nuevo-Estado; $e.checks = @()
++$r = Lanza $e @{ ContextoTests = 'tests' }
++Prueba '-ContextoTests manda sobre lo observado' ($r.Code -eq 0 -and $e.cuerpoRuleset -match '"context":\s+"tests"')
+diff --git a/test/proyecto-nuevo.test.js b/test/proyecto-nuevo.test.js
+new file mode 100644
+index 0000000..e6c9da5
+--- /dev/null
++++ b/test/proyecto-nuevo.test.js
+@@ -0,0 +1,72 @@
++// apps/proyecto-nuevo.ps1: las plantillas que deja en un repo nuevo se comprueban en cualquier sistema;
++// el script, contra un gh falso con estado, solo en Windows (usa Windows PowerShell 5.1).
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import yaml from 'js-yaml';
++import { REPO } from '../scripts/lib/repo.mjs';
++import { leerFicha } from '../scripts/lib/ficha.mjs';
++
++const FABRICA = path.resolve(import.meta.dirname, '..');
++const PLANTILLAS = path.join(FABRICA, 'apps', 'proyecto-nuevo');
++const leer = (...r) => readFileSync(path.join(...r), 'utf8');
++const hayPs = process.platform === 'win32';
++
++test('proyecto-nuevo.ps1 contra un gh falso: privado, sin admin, Apps, secretos, PR, ruleset e idempotencia', { skip: !hayPs }, () => {
++  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
++    path.join(FABRICA, 'test', 'proyecto-nuevo.prueba.ps1'), '-Script', path.join(FABRICA, 'apps', 'proyecto-nuevo.ps1')], { encoding: 'utf8' });
++  const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
++  assert.ok(lineas.length >= 23, `salida inesperada: ${r.stdout}${r.stderr}`);
++  assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
++});
++
++test('los secretos que el script exige son los que declara el workflow_call de revisor.yml', () => {
++  const declarados = Object.keys(yaml.load(leer(FABRICA, '.github', 'workflows', 'revisor.yml')).on.workflow_call.secrets).sort();
++  const lib = leer(FABRICA, 'apps', 'lib-proyecto.ps1');
++  const m = lib.match(/\$script:SecretosRevisor = @\(([^)]*)\)/);
++  assert.ok(m, 'no encuentro la lista SecretosRevisor');
++  const exigidos = [...m[1].matchAll(/'([A-Z_]+)'/g)].map((x) => x[1]).sort();
++  assert.deepEqual(exigidos, declarados);
++});
++
++test('las plantillas de workflows llaman a los reutilizables de la Fábrica y pasan las reglas de máquina (C4)', () => {
++  const tests = yaml.load(leer(PLANTILLAS, 'tests.yml'));
++  const revisor = yaml.load(leer(PLANTILLAS, 'revisor.yml'));
++  assert.equal(tests.jobs.tests.uses, `${REPO}/.github/workflows/tests.yml@main`);
++  assert.equal(revisor.jobs.revisor.uses, `${REPO}/.github/workflows/revisor.yml@main`);
++  assert.equal(revisor.jobs.revisor.secrets, 'inherit');
++  assert.ok('pull_request_target' in revisor.on, 'el juez corre con pull_request_target, como el reutilizable');
++  assert.ok('pull_request' in tests.on);
++  // El check que se exige es "<job que llama> / <job llamado>": si alguien renombra el job, el ruleset se queda sin check.
++  assert.deepEqual(Object.keys(tests.jobs), ['tests']);
++  const reutilizable = yaml.load(leer(FABRICA, '.github', 'workflows', 'tests.yml'));
++  assert.deepEqual(Object.keys(reutilizable.jobs), ['tests']);
++  // Las mismas reglas que se aplican a un repo que llama (workflows.test.js apuntando a su carpeta).
++  const carpeta = mkdtempSync(path.join(tmpdir(), 'proyecto-nuevo-'));
++  try {
++    mkdirSync(path.join(carpeta, '.github', 'workflows'), { recursive: true });
++    for (const f of ['tests.yml', 'revisor.yml']) writeFileSync(path.join(carpeta, '.github', 'workflows', f), leer(PLANTILLAS, f));
++    const env = { ...process.env, FABRICA_REPO_A_COMPROBAR: carpeta };
++    delete env.NODE_TEST_CONTEXT;
++    const r = spawnSync(process.execPath, ['--test', path.join(FABRICA, 'test', 'workflows.test.js')], { env, encoding: 'utf8' });
++    assert.equal(r.status, 0, r.stdout + r.stderr);
++  } finally {
++    rmSync(carpeta, { recursive: true, force: true });
++  }
++});
++
++test('la ficha y el CLAUDE.md de la plantilla son válidos para un repo nuevo', () => {
++  const carpeta = mkdtempSync(path.join(tmpdir(), 'proyecto-nuevo-'));
++  try {
++    writeFileSync(path.join(carpeta, '.fabrica.json'), leer(PLANTILLAS, 'ficha.json').replaceAll('__REPO__', 'factory-am89/homenu-panel'));
++    assert.deepEqual(leerFicha(carpeta), { repo: 'factory-am89/homenu-panel', base: 'main', identidad: 'fabrica-constructor' });
++  } finally {
++    rmSync(carpeta, { recursive: true, force: true });
++  }
++  const md = leer(PLANTILLAS, 'CLAUDE.md');
++  assert.match(md, new RegExp(`github[.]com/${REPO}`), 'remite a la Fábrica');
++  assert.ok(md.split('\n').length < 20, 'mínimo de verdad');
++});

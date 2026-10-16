@@ -1,0 +1,30 @@
+diff --git a/scripts/veredicto.mjs b/scripts/veredicto.mjs
+index fcb494b..2ed2316 100644
+--- a/scripts/veredicto.mjs
++++ b/scripts/veredicto.mjs
+@@ -6,14 +6,10 @@
+ import { readFileSync } from 'node:fs';
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
++import { CHECKED_BY, readQuestions } from './lib/questions.mjs';
+ import { ANSWER, ANSWERS, ERROR, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+ 
+-// Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
+-// (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
+-// las respuestas con cualquier otro id cuentan como desconocidas, también si el estándar tiene preguntas con ese id.
+-const PREFIJO_DEL_JUEZ = 'C';
+-const ID_DEL_JUEZ = new RegExp(`^(?=${ID_SOURCE}$)${PREFIJO_DEL_JUEZ}`);
++// Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs).
+ export function leerPreguntas(md) {
+   return readQuestions(md).map((q) => ({ id: q.id, pregunta: q.text, quien: q.checkedBy }));
+ }
+@@ -69,7 +65,7 @@ export function decidir(salida, preguntas, ctx = {}) {
+   const porId = new Map();
+   let desconocidos = 0;
+   for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
+-    if (typeof r?.id !== 'string' || !ID_DEL_JUEZ.test(r.id) || !conocidos.has(r.id)) {
++    if (typeof r?.id !== 'string' || !conocidos.has(r.id)) {
+       desconocidos += 1;
+       continue;
+     }
