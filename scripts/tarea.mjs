@@ -10,7 +10,7 @@ import { instalarHooks } from './instalar-hooks.mjs';
 import { ExitError, runCommand, finish } from './lib/exit.mjs';
 import { gitOk, principal, nombreDeRama, carpetaDe, tieneOrigin } from './lib/carpetas.mjs';
 
-export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = false } = {}) {
+export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = false, lanzar = spawnSync } = {}) {
   const nombre = nombreDeRama(rama);
   const raiz = principal(cwd);
   const carpeta = carpetaDe(raiz, nombre);
@@ -23,7 +23,7 @@ export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = 
   gitOk(['worktree', 'add', '--no-track', '-b', rama, carpeta, base], raiz);
   instalarHooks(raiz); // los hooks de git que niegan commit, merge y cherry-pick en la principal
   if (instalar) {
-    const r = spawnSync('npm', ['ci'], { cwd: carpeta, stdio: ['ignore', json ? 2 : 'inherit', 'inherit'], shell: process.platform === 'win32' });
+    const r = lanzar('npm', ['ci'], { cwd: carpeta, stdio: ['ignore', json ? 2 : 'inherit', 'inherit'], shell: process.platform === 'win32' });
     if (r.status !== 0) throw new ExitError('INSTALL_FAILED', `npm ci falló en ${carpeta}; la carpeta y la rama existen, arréglalo ahí.`);
   }
   return { carpeta, rama, base };

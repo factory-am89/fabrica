@@ -2,7 +2,7 @@
 // Existing behaviour of tarea/retirar (messages, folders, branches) is covered by carpetas.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -12,7 +12,7 @@ import { prFusionado, cliRetirar } from '../scripts/retirar.mjs';
 import { git as gitRaw } from '../scripts/lib/carpetas.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
 import { git, repo as baseRepo } from '../test-support/repo.mjs';
-import { runDone, npmStep, DONE_LINE } from '../scripts/done.mjs';
+import { runDone, cliDone, npmStep, DONE_LINE } from '../scripts/done.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -214,4 +214,30 @@ test('ExitError: accepts only own failure classes of EXIT, never OK or inherited
   for (const bad of ['OK', 'toString', 'constructor', '__proto__', 'NOPE', undefined]) {
     assert.throws(() => new ExitError(bad, 'x'), /unknown failure class/, String(bad));
   }
+});
+
+test('done: cliDone prints the fixed last line with the right exit code (fake runner)', () => {
+  const failing = (step) => (s) => (s === step ? 1 : 0);
+  const ok = cliDone(failing(null));
+  assert.deepEqual([ok.code, ok.stdout, ok.stderr], [EXIT.OK, 'done: ok\n', '']);
+  const lint = cliDone(failing('lint'));
+  assert.deepEqual([lint.code, lint.stdout], [EXIT.DONE_LINT_FAILED, 'done: fail lint\n']);
+  const tests = cliDone(failing('test'));
+  assert.deepEqual([tests.code, tests.stdout], [EXIT.DONE_TESTS_FAILED, 'done: fail test\n']);
+});
+
+test('package.json: the done entry runs exactly scripts/done.mjs', () => {
+  const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert.equal(pkg.scripts.done, 'node scripts/done.mjs');
+});
+
+test('tarea: npm ci runs with stdin ignored, and npm stdout goes to stderr only with --json', () => {
+  const { main } = repo();
+  const seen = [];
+  const lanzar = (cmd, args, opts) => { seen.push([cmd, args, opts.stdio]); return { status: 0 }; };
+  assert.equal(cliTarea(['feat/stdin-a'], { cwd: main, lanzar }).code, EXIT.OK);
+  assert.equal(cliTarea(['--json', 'feat/stdin-b'], { cwd: main, lanzar }).code, EXIT.OK);
+  assert.deepEqual(seen.map((s) => s.slice(0, 2)), [['npm', ['ci']], ['npm', ['ci']]]);
+  assert.deepEqual(seen[0][2], ['ignore', 'inherit', 'inherit']);
+  assert.deepEqual(seen[1][2], ['ignore', 2, 'inherit']);
 });

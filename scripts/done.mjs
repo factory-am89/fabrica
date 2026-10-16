@@ -4,7 +4,7 @@
 //   done: ok  |  done: fail lint  |  done: fail test
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { EXIT } from './lib/exit.mjs';
+import { EXIT, finish } from './lib/exit.mjs';
 
 export const DONE_LINE = Object.freeze({ ok: 'done: ok', lint: 'done: fail lint', test: 'done: fail test' });
 const STEPS = [
@@ -33,8 +33,10 @@ export function npmStep(step, launch = spawnSync) {
   return r.error ? 1 : (r.status ?? 1);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { code, line } = runDone(npmStep);
-  console.log(line);
-  process.exit(code);
+// Returns what the command prints and its exit code; the block below only prints and exits.
+export function cliDone(run = npmStep) {
+  const { code, line } = runDone(run);
+  return { code, stdout: `${line}\n`, stderr: '' };
 }
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) finish(cliDone());
