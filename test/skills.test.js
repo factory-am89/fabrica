@@ -5,7 +5,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, CADUCA_DIAS } from '../scripts/lib/skills.mjs';
+import { spawnSync } from 'node:child_process';
+import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, REVISAR_DIAS, leerFrontmatter, skillsViejas } from '../scripts/lib/skills.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOY = '2026-10-15';
@@ -25,7 +26,7 @@ comprobado: 2026-10-01
 `;
 
 // Una skill de mentira en una raíz temporal que tiene el agente `constructor`.
-function skill(texto, extra = {}) {
+function skill(texto, extra = {}, hoy = HOY) {
   const raiz = mkdtempSync(path.join(tmpdir(), 'forja-'));
   mkdirSync(path.join(raiz, '.claude', 'agents'), { recursive: true });
   writeFileSync(path.join(raiz, '.claude', 'agents', 'constructor.md'), '---\nname: constructor\n---\n');
@@ -36,14 +37,16 @@ function skill(texto, extra = {}) {
     mkdirSync(path.dirname(path.join(carpeta, ruta)), { recursive: true });
     writeFileSync(path.join(carpeta, ruta), contenido);
   }
-  return comprobarSkill(carpeta, { raiz, hoy: HOY });
+  return comprobarSkill(carpeta, { raiz, hoy });
 }
 
 test('toda skill de .claude/skills/ tiene la forma de base/skill.md', () => {
   const carpetas = carpetasDeSkills(RAIZ);
   assert.ok(carpetas.length > 0, 'no hay ninguna skill que comprobar');
   for (const c of carpetas) {
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Sin reloj: «hoy» es la propia fecha de la skill, así no queda en el futuro.
+    const hoy = leerFrontmatter(readFileSync(path.join(c, 'SKILL.md'), 'utf8'))?.comprobado;
+    assert.ok(hoy, `${path.basename(c)}: sin fecha comprobado`);
     assert.deepEqual(comprobarSkill(c, { raiz: RAIZ, hoy }), [], path.basename(c));
   }
 });
@@ -51,7 +54,7 @@ test('toda skill de .claude/skills/ tiene la forma de base/skill.md', () => {
 test('base/skill.md dice los mismos topes que el test', () => {
   const base = readFileSync(path.join(RAIZ, 'base', 'skill.md'), 'utf8');
   assert.match(base, new RegExp(`${MAX_LINEAS} líneas`));
-  assert.match(base, new RegExp(`${CADUCA_DIAS} días`));
+  assert.match(base, new RegExp(`${REVISAR_DIAS} días`));
 });
 
 test('una skill bien hecha no tiene faltas', () => {
@@ -66,7 +69,6 @@ test('cada regla de la forma se ve fallar', () => {
     ['dueño que no existe', BIEN.replace('constructor', 'fantasma'), /dueño/],
     ['campo de más', BIEN.replace('dueño:', 'tipo: x\ndueño:'), /campos del frontmatter/],
     ['nombre distinto', BIEN.replace('name: prueba', 'name: otra'), /no es el de la carpeta/],
-    ['fecha caducada', BIEN.replace('2026-10-01', '2026-06-01'), /caducó/],
     ['fecha futura', BIEN.replace('2026-10-01', '2026-11-01'), /futuro/],
     ['fecha rota', BIEN.replace('2026-10-01', 'ayer'), /fecha AAAA/],
     ['demasiado larga', `${BIEN}${'línea\n'.repeat(MAX_LINEAS)}`, /líneas/],
@@ -82,7 +84,47 @@ test('cada regla de la forma se ve fallar', () => {
   }
 });
 
+test('una fecha antigua no es una falta: la skill no caduca, solo se lista como vieja', () => {
+  assert.deepEqual(skill(BIEN, {}, '2030-01-01'), []);
+});
+
+// Una raíz temporal con una skill de mentira por cada fecha dada (fechas fijas, ninguna del repo).
+function raizConSkills(fechas) {
+  const raiz = mkdtempSync(path.join(tmpdir(), 'forja-'));
+  fechas.forEach((fecha, n) => {
+    const carpeta = path.join(raiz, '.claude', 'skills', `s${n}`);
+    mkdirSync(carpeta, { recursive: true });
+    writeFileSync(path.join(carpeta, 'SKILL.md'), BIEN.replace('name: prueba', `name: s${n}`).replace('2026-10-01', fecha));
+  });
+  return raiz;
+}
+
+test('skillsViejas lista las de más de REVISAR_DIAS días y no las de justo ese plazo', () => {
+  const raiz = raizConSkills(['2026-10-15', '2026-12-01']);
+  assert.deepEqual(skillsViejas(raiz, '2027-02-01'), [{ nombre: 's0', comprobado: '2026-10-15', dias: 109 }]);
+  assert.deepEqual(skillsViejas(raiz, '2027-01-13'), []);
+  assert.equal(skillsViejas(raiz, '2027-01-14').length, 1);
+});
+
+test('una fecha con formato válido pero imposible se rechaza igual en comprobarSkill y en skillsViejas', () => {
+  const rota = BIEN.replace('2026-10-01', '2026-13-45');
+  assert.match(skill(rota).join('\n'), /fecha AAAA/);
+  assert.throws(() => skillsViejas(raizConSkills(['2026-13-45']), '2027-02-01'), /sin fecha/);
+});
+
+test('skillsViejas lanza si no puede leer las skills, no dice que no hay ninguna', () => {
+  const vacia = mkdtempSync(path.join(tmpdir(), 'forja-'));
+  assert.throws(() => skillsViejas(vacia, '2027-02-01'), /no existe/);
+  const r = spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'skills-viejas.mjs'), vacia], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+  assert.doesNotMatch(r.stdout, /ninguna/);
+});
+
 test('una referencia que SKILL.md no cita es huérfana, y una carpeta ajena sobra', () => {
   assert.match(skill(BIEN, { 'referencias/huerfana.md': 'x' }).join('\n'), /huérfana/);
   assert.match(skill(BIEN, { 'casos.json': '[]' }).join('\n'), /sobra «casos.json»/);
+});
+
+test('skillsViejas lanza si una skill tiene comprobado en el futuro', () => {
+  assert.throws(() => skillsViejas(raizConSkills(['2027-03-01']), '2027-02-01'), /en el futuro/);
 });

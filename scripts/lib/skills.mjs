@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 export const MAX_LINEAS = 120;
-export const CADUCA_DIAS = 90;
+export const REVISAR_DIAS = 90;
 export const MAX_DESCRIPCION = 600;
 const CAMPOS = ['name', 'description', 'dueño', 'comprobado'];
 const SENSIBLE = [
@@ -26,6 +26,11 @@ export function leerFrontmatter(texto) {
   return campos;
 }
 
+// Única definición de «fecha válida»: AAAA-MM-DD y que Date.parse la entienda (rechaza 2026-13-45).
+export function fechaValida(fecha) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '') && !Number.isNaN(Date.parse(fecha));
+}
+
 export function diasDesde(fecha, hoy) {
   return Math.floor((Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${fecha}T00:00:00Z`)) / 86400000);
 }
@@ -42,12 +47,11 @@ function faltasDeCabecera(f, carpeta, raiz, hoy) {
   if (!f['dueño'] || !existsSync(path.join(raiz, '.claude', 'agents', `${f['dueño']}.md`))) {
     faltas.push(`dueño «${f['dueño']}» no es un agente de .claude/agents/`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.comprobado ?? '') || Number.isNaN(Date.parse(f.comprobado))) {
+  if (!fechaValida(f.comprobado)) {
     faltas.push(`comprobado «${f.comprobado}» no es una fecha AAAA-MM-DD`);
   } else {
     const dias = diasDesde(f.comprobado, hoy);
     if (dias < 0) faltas.push(`comprobado ${f.comprobado} está en el futuro`);
-    if (dias > CADUCA_DIAS) faltas.push(`comprobado ${f.comprobado} caducó hace ${dias - CADUCA_DIAS} días (vale ${CADUCA_DIAS})`);
   }
   return faltas;
 }
@@ -81,6 +85,23 @@ export function comprobarSkill(carpeta, { raiz, hoy }) {
   else if (!/^- \*\*/m.test(falló.split(/^## /m)[0])) faltas.push('«Lo que falló» no tiene ninguna lección («- **fecha · síntoma.** Causa… Arreglo…»)');
   for (const [re, que] of SENSIBLE) if (re.test(texto)) faltas.push(`parece llevar ${que}`);
   return [...faltas, ...faltasDeCarpeta(carpeta, texto)];
+}
+
+// Skills que llevan más de REVISAR_DIAS días sin revisar. Informa, no falla: lo lee `npm run skills-viejas`.
+// `hoy` entra siempre por parámetro. Si no puede leer las skills, lanza (no devuelve [] como si todo estuviera al día).
+export function skillsViejas(raiz, hoy) {
+  const dir = path.join(raiz, '.claude', 'skills');
+  if (!existsSync(dir)) throw new Error(`no existe ${dir}: no se puede saber qué skills están viejas`);
+  const viejas = [];
+  for (const carpeta of carpetasDeSkills(raiz)) {
+    const nombre = path.basename(carpeta);
+    const f = leerFrontmatter(readFileSync(path.join(carpeta, 'SKILL.md'), 'utf8'));
+    if (!f || !fechaValida(f.comprobado)) throw new Error(`${nombre}: sin fecha «comprobado» legible`);
+    const dias = diasDesde(f.comprobado, hoy);
+    if (dias < 0) throw new Error(`${nombre}: comprobado ${f.comprobado} está en el futuro (hoy es ${hoy})`);
+    if (dias > REVISAR_DIAS) viejas.push({ nombre, comprobado: f.comprobado, dias });
+  }
+  return viejas;
 }
 
 export function carpetasDeSkills(raiz) {
