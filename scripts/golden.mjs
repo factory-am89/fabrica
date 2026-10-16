@@ -12,17 +12,16 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE } from './lib/questions.mjs';
+import { CASE_FILES, CLEAN, EXPECTED_FILE, GOLDEN_DIR } from './lib/golden-guard.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
-export const CORPUS = path.join(RAIZ, 'test', 'fixtures', 'golden', 'review');
+export const CORPUS = path.join(RAIZ, ...GOLDEN_DIR.split('/'));
 export const STANDARD = 'standards/code.md';
 export const AUTHORS = ['sonnet', 'opus', 'human'];
-export const CLEAN = 'clean';
+export { CLEAN };
 export const MIN_CASES_PER_CELL = 5;
-const CASE_FILES = ['pr.diff', 'body.md'];
-const EXPECTED = 'expected.json';
 // decidir also checks that the judged commit is the PR head; here there is no PR, so both are the same fixed value.
 const CTX = { sha: 'corpus', cabeza: 'corpus' };
 
@@ -38,7 +37,7 @@ const readJson = (file, what) => {
 
 // Reads the corpus and checks it against the standard's reviewer questions. Throws on the first malformed thing.
 export function loadCorpus(dir, preguntas) {
-  const expected = readJson(path.join(dir, EXPECTED), 'corpus');
+  const expected = readJson(path.join(dir, EXPECTED_FILE), 'corpus');
   if (!plain(expected)) throw new Error('corpus: expected.json must be an object');
   const folders = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
   const ids = Object.keys(expected).sort();

@@ -13,12 +13,13 @@ import { preguntas, buenas, SHA, ctx } from './apoyo/fabrica.mjs';
 // Recorre el script entero como lo corre el workflow (variables de entorno y llamadas a la API),
 // con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
 // de Pablo y con todas las respuestas en «sí». VEREDICTO_RUTA permite apuntarlo a otra copia del script.
+const BASE_SHA = 'b'.repeat(40);
 const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   return { r, publicado };
@@ -79,13 +80,13 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   const raiz = mkdtempSync(path.join(tmpdir(), 'juez-p-'));
   mkdirSync(path.join(raiz, 'scripts', 'lib'), { recursive: true });
   mkdirSync(path.join(raiz, 'standards'));
-  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
+  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs', 'lib/golden-guard.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
   writeFileSync(path.join(raiz, 'standards', 'p.md'), '### P1 — First question\nQuién: revisor\n\n### P2 — Second question\nQuién: revisor\n');
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });
   const r = spawnSync(process.execPath, ['--import', precarga, path.join(raiz, 'scripts', 'veredicto.mjs')], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, TOKEN: 'falso', SALIDA: salida, STANDARD: 'standards/p.md' },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', SALIDA: salida, STANDARD: 'standards/p.md' },
   });
   const c = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10))).find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
   assert.equal(c.conclusion, 'failure', r.stderr);
@@ -131,3 +132,42 @@ for (const [nombre, extra] of [['falta', {}], ['vacío', { STANDARD: '' }], ['co
     assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews')), undefined, 'no debe aprobar');
   });
 }
+
+// El freno del corpus dorado de punta a punta: la API simulada devuelve el compare y los ficheros del corpus en la base y en la cabeza.
+const DIR = 'test/fixtures/golden/review';
+const corpus = (baseJson, headJson) => ({
+  COMPARE_FALSO: JSON.stringify([{ filename: `${DIR}/expected.json`, status: 'modified' }]),
+  CONTENIDOS_FALSOS: JSON.stringify({ [`${BASE_SHA}:${DIR}/expected.json`]: baseJson, [`${SHA}:${DIR}/expected.json`]: headJson }),
+});
+const BASE_CORPUS = { 'caso-01': { author: 'opus', expect: 'C5' }, 'caso-02': { author: 'sonnet', expect: 'clean' } };
+const fk = (publicado) => publicado.find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+
+test('freno dorado de punta a punta: un PR que rebaja un caso da no con motivo cerrado, aunque todas las respuestas sean sí', () => {
+  const rebajado = { ...BASE_CORPUS, 'caso-01': { author: 'opus', expect: 'clean' } };
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', ...corpus(JSON.stringify(BASE_CORPUS), JSON.stringify(rebajado)) });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fk(publicado).conclusion, 'failure');
+  assert.equal(fk(publicado).output.summary, '- corpus dorado: expect rebajado de no a clean (caso-01)');
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews')), undefined, 'un no no lleva aprobación');
+});
+
+test('freno dorado de punta a punta: un caso nuevo y un expect nuevo no frenan (sí y aprobación)', () => {
+  const nuevo = { ...BASE_CORPUS, 'caso-03': { author: 'sonnet', expect: 'clean' }, 'caso-04': { author: 'sonnet', expect: 'C9' } };
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', ...corpus(JSON.stringify(BASE_CORPUS), JSON.stringify(nuevo)) });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fk(publicado).conclusion, 'success');
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE');
+});
+
+test('freno dorado de punta a punta: un corpus que no se puede leer en la cabeza es no, no un pase', () => {
+  const { r, publicado } = corre({ STANDARD: 'standards/code.md', ...corpus(JSON.stringify(BASE_CORPUS), '{ no es json') });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fk(publicado).conclusion, 'failure');
+  assert.equal(fk(publicado).output.summary, '- corpus dorado: no se pudo comprobar');
+});
+
+test('freno dorado de punta a punta: sin la variable BASE el juez falla en alto', () => {
+  const { r } = corre({ STANDARD: 'standards/code.md', BASE: '' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /falta la variable BASE/);
+});

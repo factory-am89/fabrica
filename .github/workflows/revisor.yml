@@ -116,4 +116,8 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          # Freno del corpus dorado (scripts/lib/golden-guard.mjs): lee el PR por la API con el token de solo lectura
+          # del workflow (la App no tiene contents) y no ejecuta nada del PR.
+          BASE: ${{ github.event.pull_request.base.sha }}
+          LECTOR: ${{ github.token }}
           TOKEN: ${{ steps.app.outputs.token }}
