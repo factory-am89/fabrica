@@ -16,6 +16,7 @@ export const GATE_FILES = [
   '.github/workflows/tests.yml', // defines the `tests` check (also reusable by other repos)
   'scripts/veredicto.mjs', // turns the reviewer output into the verdict; run from .fabrica/
   'scripts/lib/questions.mjs', // imported by scripts/veredicto.mjs: the only reader of the questions
+  'scripts/lib/record.mjs', // imported by scripts/veredicto.mjs: the verdict record schema and its writer
   'standards/code.md', // the questions the verdict is built from (read by veredicto.mjs)
   '.claude/agents/revisor.md', // the reviewer role the revisor.yml prompt tells Claude to follow
   'eslint.config.js', // lint rules tests.yml applies from .fabrica/ (C1, C3)

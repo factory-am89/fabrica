@@ -1,0 +1,30 @@
+[
+  {
+    "output": {
+      "title": "Veredicto: no",
+      "summary": "x",
+      "text": "```json\n{\"v\":1,\"repo\":\"o/r\",\"pr\":1,\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"standard\":\"standards/code.md\",\"ok\":false,\"answers\":{\"C1\":\"sí\",\"C5\":\"no\"},\"invalid\":0,\"error\":null,\"run\":{\"id\":10,\"attempt\":1}}\n```"
+    }
+  },
+  {
+    "output": {
+      "title": "Veredicto: sí",
+      "summary": "x",
+      "text": "```json\n{\"v\":1,\"repo\":\"o/r\",\"pr\":1,\"sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"standard\":\"standards/code.md\",\"ok\":true,\"answers\":{\"C1\":\"sí\",\"C5\":\"sí\"},\"invalid\":0,\"error\":null,\"run\":{\"id\":11,\"attempt\":1}}\n```"
+    }
+  },
+  {
+    "output": {
+      "title": "Veredicto: sí",
+      "summary": "x",
+      "text": "```json\n{\"v\":1,\"repo\":\"o/r\",\"pr\":2,\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"standard\":\"standards/code.md\",\"ok\":true,\"answers\":{\"C1\":\"no aplica\",\"C5\":\"sí\"},\"invalid\":0,\"error\":null,\"run\":{\"id\":12,\"attempt\":1}}\n```"
+    }
+  },
+  {
+    "output": {
+      "title": "Veredicto: no",
+      "summary": "x",
+      "text": "```json\n{\"v\":1,\"repo\":\"o/r\",\"pr\":3,\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"standard\":\"standards/code.md\",\"ok\":false,\"answers\":{\"C1\":null,\"C5\":null},\"invalid\":0,\"error\":\"output-unreadable\",\"run\":{\"id\":13,\"attempt\":1}}\n```"
+    }
+  }
+]

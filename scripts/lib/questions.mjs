@@ -1,13 +1,18 @@
 // The single reader of the questions of a standard (standards/code.md today, a plans standard next).
 // A question is a block that starts with "### <P><n> — <text>" and has a "Quién: máquina|revisor" line.
 // One prefix (an uppercase letter) per file. It throws on anything malformed: a bad question is never skipped.
+// Who checks a question: the one place these two words are written.
+export const CHECKED_BY = { machine: 'máquina', reviewer: 'revisor' };
 export const FIELDS = {
-  checkedBy: { label: 'Quién', values: ['máquina', 'revisor'] },
+  checkedBy: { label: 'Quién', values: Object.values(CHECKED_BY) },
   good: 'Bien',
   bad: 'Mal',
 };
 
-const HEADER = /^([A-Z])(\d+) — (.+)$/m;
+// The shape of a question id (prefix + number), written once; scripts/lib/record.mjs builds its id check from it.
+export const ID_PARTS = { prefix: '[A-Z]', number: String.raw`\d+` };
+export const ID_SOURCE = ID_PARTS.prefix + ID_PARTS.number;
+const HEADER = new RegExp(`^(${ID_PARTS.prefix})(${ID_PARTS.number}) — (.+)$`, 'm');
 const checkedByRe = new RegExp(`^${FIELDS.checkedBy.label}: (${FIELDS.checkedBy.values.join('|')})`, 'm');
 const fieldRe = (label) => new RegExp(`^${label}: (.*)$`, 'm');
 
