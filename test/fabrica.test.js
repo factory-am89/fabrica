@@ -285,6 +285,18 @@ test('veredicto de punta a punta: un no deja title y summary de siempre y el reg
   assert.equal(reg.run, null);
 });
 
+test('veredicto de punta a punta: answers del registro es lo mismo que respuestas de decidir (hueco, id repetido, id desconocido)', () => {
+  const rs = buenas();
+  const lista = [{ ...rs[1], respuesta: 'no' }, rs[2], { ...rs[2], respuesta: 'no' }, ...rs.slice(3, -1), { id: 'C999', respuesta: 'sí', prueba: 'x' }];
+  const salida = JSON.stringify({ respuestas: lista });
+  const v = decidir(salida, preguntas, ctx());
+  const esperado = Object.fromEntries(rs.map((r) => [r.id, null]));
+  Object.assign(esperado, { [rs[1].id]: 'no' }, Object.fromEntries(rs.slice(3, -1).map((r) => [r.id, 'sí'])));
+  assert.deepEqual(v.respuestas, { answers: esperado, invalid: 2 });
+  const { publicado } = corre({ STANDARD: 'standards/code.md', SALIDA: salida });
+  assert.deepEqual(extractRecord(check(publicado).output.text).answers, v.respuestas.answers);
+});
+
 test('veredicto de punta a punta: salida ilegible y estándar que no carga también dejan registro, con error', () => {
   const ilegible = check(corre({ STANDARD: 'standards/code.md', SALIDA: '{no json' }).publicado);
   assert.deepEqual(sinRegistro(ilegible), { title: 'Veredicto: no', summary: '- salida ilegible' });

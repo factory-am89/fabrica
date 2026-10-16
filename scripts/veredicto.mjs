@@ -55,12 +55,13 @@ export function decidir(salida, preguntas, ctx = {}) {
   try {
     datos = JSON.parse(salida);
   } catch {
-    return { ok: false, fallos: [...fallos, 'salida ilegible'] };
+    return { ok: false, fallos: [...fallos, 'salida ilegible'], respuestas: null };
   }
   // Solo se aceptan ids C<número> que existan en la lista de preguntas; el resto se cuenta sin
   // escribirlo (lo que sale al check y al log nunca es texto del modelo).
   const conocidos = new Set(preguntas.map((q) => q.id));
   const repetidos = new Set();
+  let sobrantes = 0;
   const porId = new Map();
   let desconocidos = 0;
   for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
@@ -68,7 +69,10 @@ export function decidir(salida, preguntas, ctx = {}) {
       desconocidos += 1;
       continue;
     }
-    if (porId.has(r.id)) repetidos.add(r.id);
+    if (porId.has(r.id)) {
+      repetidos.add(r.id);
+      sobrantes += 1;
+    }
     porId.set(r.id, r);
   }
   for (const id of repetidos) fallos.push(`${id}: id repetido`);
@@ -83,7 +87,14 @@ export function decidir(salida, preguntas, ctx = {}) {
     else if (resp === 'no') fallos.push(`${p.id}: no`);
     else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
   }
-  return { ok: fallos.length === 0, fallos };
+  // Lo que lee el registro (scripts/lib/record.mjs): las respuestas ya reducidas al vocabulario, de esta misma lectura.
+  // Un id repetido no tiene respuesta utilizable (null); invalid = ids desconocidos + repeticiones sobrantes.
+  const answers = {};
+  for (const p of delRevisor) {
+    const resp = normalizar(porId.get(p.id)?.respuesta);
+    answers[p.id] = repetidos.has(p.id) || !ANSWERS.includes(resp) ? null : resp;
+  }
+  return { ok: fallos.length === 0, fallos, respuestas: { answers, invalid: desconocidos + sobrantes } };
 }
 
 async function api(token, metodo, ruta, cuerpo) {
@@ -103,37 +114,6 @@ async function api(token, metodo, ruta, cuerpo) {
 async function leerContexto({ repo, pr, sha, token }) {
   const datosPr = await api(token, 'GET', `/repos/${repo}/pulls/${pr}`);
   return { sha, cabeza: datosPr.head.sha };
-}
-
-// The model's answers reduced to the record's closed vocabulary: { answers: {<id>: 'sí'|'no'|'no aplica'|null}, invalid }.
-// invalid = ids unknown to the question list plus repeated ones (a repeated id has no usable answer: null).
-// Returns null when the output is not JSON. Same reading of the output as decidir, which stays untouched.
-export function resumirRespuestas(salida, preguntas) {
-  let datos;
-  try {
-    datos = JSON.parse(salida);
-  } catch {
-    return null;
-  }
-  const ids = new Set(preguntas.filter((q) => q.quien === 'revisor').map((q) => q.id));
-  const answers = Object.fromEntries([...ids].map((id) => [id, null]));
-  const vistos = new Set();
-  let invalid = 0;
-  for (const r of Array.isArray(datos?.respuestas) ? datos.respuestas : []) {
-    if (typeof r?.id !== 'string' || !preguntas.some((q) => q.id === r.id)) {
-      invalid += 1;
-      continue;
-    }
-    if (vistos.has(r.id)) {
-      invalid += 1;
-      answers[r.id] = null;
-      continue;
-    }
-    vistos.add(r.id);
-    const resp = normalizar(r.respuesta);
-    if (ids.has(r.id)) answers[r.id] = ANSWERS.includes(resp) ? resp : null;
-  }
-  return { answers, invalid };
 }
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
@@ -172,7 +152,7 @@ async function main() {
   let registro = null;
   let errorRegistro = null;
   try {
-    const resumen = errorEstandar ? { answers: {}, invalid: 0 } : resumirRespuestas(SALIDA ?? '', preguntas);
+    const resumen = errorEstandar ? { answers: {}, invalid: 0 } : veredicto.respuestas;
     const estandar = (STANDARD ?? '').match(RUTA_ESTANDAR)?.[2] ?? null;
     registro = buildRecord({
       repo: REPO, pr: PR, sha: SHA, standard: estandar, veredicto,
