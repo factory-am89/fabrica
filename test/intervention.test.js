@@ -35,6 +35,16 @@ test('touchesClosedList: * stays inside a folder, ** crosses folders, exact name
   assert.equal(touchesClosedList('aXmd', ['a.md']), false, 'a dot is a dot, not any character');
 });
 
+test('the real list holds what runs by itself or grants permissions, and leaves skills and roles free (Pablo, 2026-10-16)', () => {
+  const globs = loadClosedPaths();
+  for (const f of ['apps/ruleset.ps1', '.github/workflows/tests.yml', 'CLAUDE.md', '.claude/hooks/carpeta-principal.mjs', '.claude/settings.json', '.claude/settings.local.json']) {
+    assert.equal(touchesClosedList(f, globs), true, `${f} must wait for Pablo`);
+  }
+  for (const f of ['.claude/skills/github/SKILL.md', '.claude/agents/revisor.md', 'standards/code.md', 'scripts/veredicto.mjs']) {
+    assert.equal(touchesClosedList(f, globs), false, `${f} must stay free`);
+  }
+});
+
 test('the real file parses and CLAUDE.md links it (one idea, one place)', () => {
   assert.ok(loadClosedPaths().length > 0);
   const claude = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');

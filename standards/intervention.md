@@ -21,4 +21,8 @@ A change to a file that matches one of these globs waits for Pablo, whatever the
 apps/**
 .github/workflows/**
 CLAUDE.md
+.claude/hooks/**
+.claude/settings*.json
 ```
+
+Not in the list on purpose: the rest of `.claude/` (skills and roles), which agents edit every day and the reviewer already judges. Only what runs by itself or grants permissions waits for Pablo.
