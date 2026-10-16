@@ -4,8 +4,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { prBodyFaults, SECTIONS } from '../scripts/lib/pr-body.mjs';
+import { prBodyFaults, SECTIONS, headMark } from '../scripts/lib/pr-body.mjs';
 import { run } from '../scripts/pr-body.mjs';
+import { collectEvidence } from '../scripts/lib/evidence.mjs';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const good = read('./fixtures/pr-body/good.md');
@@ -14,6 +15,8 @@ const testFiles = ['test/x.test.js'];
 
 const without = (name) => good.replace(new RegExp(`## ${name}\\n[\\s\\S]*?(?=\\n## |$)`), '');
 const withSection = (name, content) => good.replace(new RegExp(`(## ${name}\\n)[\\s\\S]*?(?=\\n## |$)`), `$1${content}\n`);
+const compareHead = read('./fixtures/pr-body/compare-head.json');
+const staleHead = read('./fixtures/pr-body/stale-head.md');
 const dir = mkdtempSync(join(tmpdir(), 'pr-body-'));
 const tmp = (name, text) => { const p = join(dir, name); writeFileSync(p, text); return p; };
 
@@ -86,14 +89,14 @@ test('command: good body with a files file exits 0 and prints ok', () => {
 test('command: faults exit 1 and go to stderr', () => {
   const r = command(['--body-file', tmp('t.md', template), '--files-file', tmp('e.txt', '')]);
   assert.equal(r.code, 1);
-  assert.equal(r.err.length, 3);
+  assert.equal(r.err.filter((l) => !l.includes('note:')).length, 3);
 });
 
 test('command: compare file reads filename and previous_filename', () => {
   const body = tmp('nored.md', without('Red before'));
-  const cmp = tmp('c.json', JSON.stringify({ files: [{ filename: 'scripts/a.mjs', previous_filename: 'test/old.js' }] }));
+  const cmp = tmp('c.json', JSON.stringify({ ...JSON.parse(compareHead), files: [{ filename: 'scripts/a.mjs', previous_filename: 'test/old.js' }] }));
   assert.equal(command(['--body-file', body, '--compare-file', cmp]).code, 1);
-  const cmp2 = tmp('c2.json', JSON.stringify({ files: [{ filename: 'scripts/a.mjs' }] }));
+  const cmp2 = tmp('c2.json', JSON.stringify({ ...JSON.parse(compareHead), files: [{ filename: 'scripts/a.mjs' }] }));
   assert.equal(command(['--body-file', body, '--compare-file', cmp2]).code, 0);
 });
 
@@ -106,4 +109,76 @@ test('command: bad input exits 1', () => {
   assert.equal(command(['--body-file', body, '--compare-file', tmp('many.json', JSON.stringify(many))]).code, 1);
   assert.equal(command(['--body-file', body, '--files-file', f, '--compare-file', tmp('c3.json', '{"files":[]}')]).code, 1);
   assert.equal(command(['--body-file', body]).code, 1);
+});
+
+const shas = JSON.parse(compareHead).commits.map((c) => c.sha);
+const commits = { shas, total: shas.length };
+const noHeadLine = (body) => body.replace(/^Produced by.*\n/m, '');
+
+test('prBodyFaults: Evidence for another commit than the PR head is a fault', () => {
+  const faults = prBodyFaults(staleHead, [], commits);
+  assert.equal(faults.length, 1);
+  assert.match(faults[0], /Evidence is for 0000000, not for the PR head 1234567/);
+});
+
+test('prBodyFaults: Evidence naming the head by a prefix of its sha is fine', () => {
+  assert.deepEqual(prBodyFaults(good, [], commits), []);
+  assert.deepEqual(prBodyFaults(good.replace('HEAD 1234567', 'HEAD 1234567890abcdef'), [], commits), []);
+});
+
+test('prBodyFaults: the first commit of the PR is not the head', () => {
+  assert.equal(prBodyFaults(good.replace('HEAD 1234567', 'HEAD aaaaaaa'), [], commits).length, 1);
+});
+
+test('prBodyFaults: Evidence without a HEAD line is a fault in compare mode', () => {
+  assert.match(prBodyFaults(noHeadLine(good), [], commits).join('\n'), /no "HEAD <sha>" line/);
+});
+
+test('prBodyFaults: a HEAD line only inside an HTML comment does not count', () => {
+  const body = good.replace(/^Produced by.*\n/m, '<!-- HEAD 1234567 -->\n');
+  assert.match(prBodyFaults(body, [], commits).join('\n'), /no "HEAD <sha>" line/);
+});
+
+test('prBodyFaults: a truncated commit list is a fault, not a pass', () => {
+  const faults = prBodyFaults(good, [], { shas, total: 251 });
+  assert.match(faults.join('\n'), /commit list truncated: 2 listed of 251/);
+});
+
+test('prBodyFaults: an empty commit list throws', () => {
+  assert.throws(() => prBodyFaults(good, [], { shas: [], total: 0 }), /non-empty array/);
+});
+
+test('the HEAD line evidence.mjs writes is the one pr-body.mjs reads', () => {
+  const scripted = (cmd, args) => {
+    if (cmd === 'git' && args[0] === 'rev-parse') return { code: 0, output: args[2] === 'HEAD' ? '1234567\n' : '89abcde\n' };
+    if (cmd === 'git' && args[0] === 'merge-base') return { code: 0, output: '89abcdef\n' };
+    if (cmd === 'git' && args[0] === 'status') return { code: 0, output: '' };
+    return { code: 0, output: 'ℹ tests 1\nℹ pass 1\nℹ fail 0\n' };
+  };
+  const { markdown } = collectEvidence({ cwd: '.', focus: [], runner: scripted });
+  assert.ok(markdown.includes(headMark('1234567')));
+  const body = `## What changes\n\nx\n\n${markdown}\n## Not verified\n\nNothing\n`;
+  assert.deepEqual(prBodyFaults(body, [], commits), []);
+  assert.equal(prBodyFaults(body.replace(headMark('1234567'), headMark('7654321')), [], commits).length, 1);
+});
+
+test('command: compare file with a stale Evidence HEAD exits 1; the same body with the right head exits 0', () => {
+  const cmp = tmp('head.json', compareHead);
+  const stale = command(['--body-file', tmp('stale.md', staleHead), '--compare-file', cmp]);
+  assert.equal(stale.code, 1);
+  assert.match(stale.err.join('\n'), /not for the PR head 1234567/);
+  assert.equal(command(['--body-file', tmp('ok.md', good), '--compare-file', cmp]).code, 0);
+});
+
+test('command: compare JSON without a commits array fails loudly', () => {
+  const r = command(['--body-file', tmp('g.md', good), '--compare-file', tmp('nocommits.json', '{"files":[]}')]);
+  assert.equal(r.code, 1);
+  assert.match(r.err.join('\n'), /no commits array/);
+});
+
+test('command: --files-file says the head was not checked instead of passing silently', () => {
+  const r = command(['--body-file', tmp('g2.md', staleHead), '--files-file', tmp('f3.txt', '')]);
+  assert.equal(r.code, 0);
+  assert.deepEqual(r.out, ['pr-body: ok']);
+  assert.match(r.err.join('\n'), /HEAD was not checked/);
 });

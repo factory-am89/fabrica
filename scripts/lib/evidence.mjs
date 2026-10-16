@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { headMark } from './pr-body.mjs';
 
 export class EvidenceError extends Error {}
 
@@ -72,7 +73,7 @@ function header(head, mergeBase) {
   return [
     '## Evidence',
     '',
-    `Produced by \`npm run evidence\`. HEAD ${head}; merge-base with ${BASE} ${mergeBase}.`,
+    `Produced by \`npm run evidence\`. ${headMark(head)}; merge-base with ${BASE} ${mergeBase}.`,
     '',
     `Filter, applied in code: for \`node --test\` (run with \`--test-reporter=spec\`) only lines starting with ${KEPT_PREFIXES.map((p) => `\`${p}\``).join(', ').replace(/, (`✖`)$/, ' and $1')} are kept, and a duration at the end of a kept line, such as \` (12.3ms)\`, is removed so the block is reproducible; every other command is raw. Output is stdout followed by stderr.`,
   ].join('\n');
