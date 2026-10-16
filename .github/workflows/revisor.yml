@@ -14,7 +14,7 @@ name: revisor
 # (scripts, estándar y rol del revisor) se baja siempre de la Fábrica a `.fabrica/`.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_call:
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
