@@ -9,7 +9,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REPO as REPO_FABRICA } from '../scripts/lib/repo.mjs';
+import { REPO as REPO_FABRICA, ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
 
 const REPO = process.env.REPO ?? REPO_FABRICA;
 export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
@@ -28,7 +28,7 @@ export const argsEntornoPs = (repo, entorno) => ['-NoProfile', '-NonInteractive'
 export function destino(slug) {
   if (slug.startsWith('fabrica-constructor')) return 'constructor';
   if (slug.startsWith('fabrica-revisor')) return 'revisor';
-  if (slug.startsWith('fabrica-administrador')) return 'administrador';
+  if (slug.startsWith(ADMIN_APP_SLUG)) return 'administrador';
   throw new Error(`App inesperada: «${slug}». Solo se guardan fabrica-constructor, fabrica-revisor y fabrica-administrador.`);
 }
 

@@ -1,5 +1,5 @@
 // Machine guard for the key of the administrator App, written BEFORE the workflow that will use it
-// (plan-app-admin, piece 2). Today .github/workflows/administrar.yml and scripts/admin/ do not exist and
+// (plans/app-admin.md, piece 2). Today .github/workflows/administrar.yml and scripts/admin/ do not exist and
 // nobody names the key, so the real tree passes; every rule is also proven red against a bad fixture.
 // This file is a gate file (scripts/lib/gate.mjs): weakening it is weakening a check.
 //
@@ -9,8 +9,9 @@
 //   2. Its triggers are a closed list: push to main on proyectos/** and scripts/admin/**, and schedule.
 //      Anything else (pull_request_target, workflow_dispatch, workflow_call, issues...) lets code that did not
 //      pass `tests` and `revisor` run with the key.
-//   3. Its `permissions` are exactly `contents: read`. NOT YET: the `permission-*` inputs of the App token must
-//      equal the manifest in apps/crear-apps.html; that needs PR #58 (the manifest) and is added after it, never as a copied list.
+//   3. Its `permissions` are exactly `contents: read`, and the `permission-*` inputs of its App-token step equal,
+//      key and level, the default_permissions of the administrator App read from the real manifest in
+//      apps/crear-apps.html (never a copied list): asking for more than the App has, or less, is a difference.
 //   4. scripts/admin/ never deletes a repo, never grants bypass, and never creates a ruleset without
 //      `tests` and `revisor` as required checks and `enforcement: active`.
 // Limits, not checked here: a secret named through a computed expression (${{ secrets[format(...)] }}), and
@@ -23,11 +24,23 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
 import { checkPlan } from '../scripts/lib/plan.mjs';
+import { ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { manifiestos } from './apoyo/fabrica.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 // The names come from the gate list (one source): the workflow is the .yml entry, the code folder the entry ending in '/'.
 const WORKFLOW = ADMIN_GATE_FILES.find((f) => f.endsWith('.yml'));
 const CODIGO = ADMIN_GATE_FILES.find((f) => f.endsWith('/')).slice(0, -1);
+
+// The permissions of the administrator App, from the real manifest, in the form of the token action (permission-<name>).
+const PERMISOS_MANIFIESTO = Object.fromEntries(Object.entries(
+  manifiestos().find((m) => m.name === ADMIN_APP_SLUG).default_permissions,
+).map(([k, v]) => [`permission-${k.replaceAll('_', '-')}`, v]));
+
+function permisosDelToken(doc) {
+  const pasos = Object.values(doc.jobs ?? {}).flatMap((j) => j.steps ?? []).filter((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
+  return pasos.map((p) => Object.fromEntries(Object.entries(p.with ?? {}).filter(([k]) => k.startsWith('permission-'))));
+}
 
 const NOMBRA_LA_CLAVE = /\bADMIN_(?:APP_KEY|CLIENT_ID)\b|\badministrador\b/i;
 const PUSH_PATHS = ['proyectos/**', `${CODIGO}/**`];
@@ -67,6 +80,12 @@ function reglaDeWorkflow(texto) {
   if (!permisosOk(doc.permissions)) fallos.push('permissions must be exactly {contents: read}');
   for (const [nombre, job] of Object.entries(doc.jobs ?? {})) {
     if (job.permissions !== undefined && !permisosOk(job.permissions)) fallos.push(`job ${nombre}: permissions must be exactly {contents: read}`);
+  }
+  const tokens = permisosDelToken(doc);
+  if (tokens.length !== 1) fallos.push(`exactly one App-token step is expected, found ${tokens.length}`);
+  for (const t of tokens) {
+    const a = JSON.stringify(Object.entries(t).sort());
+    if (a !== JSON.stringify(Object.entries(PERMISOS_MANIFIESTO).sort())) fallos.push(`token permissions must equal the manifest of ${ADMIN_APP_SLUG}: has ${a}`);
   }
   return fallos;
 }
@@ -133,10 +152,7 @@ jobs:
         with:
           client-id: \${{ secrets.ADMIN_CLIENT_ID }}
           private-key: \${{ secrets.ADMIN_APP_KEY }}
-          permission-administration: write
-          permission-checks: read
-          permission-pull-requests: write
-`;
+${Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`).join('')}`;
 
 const BUEN_CODIGO = `const cuerpo = { name: 'main', enforcement: 'active', bypass_actors: [],
   rules: [{ type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'tests / tests' }, { context: 'revisor' }] } }] };
@@ -188,6 +204,17 @@ test('rule 3 (red): permissions beyond contents: read', () => {
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('  contents: read', '  contents: write') }).join('\n'), /permissions must be exactly/);
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('jobs:', 'jobs:').replace('    environment: administrador', '    environment: administrador\n    permissions: write-all') }).join('\n'), /job administrar: permissions/);
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permissions:\n  contents: read\n', '') }).join('\n'), /permissions must be exactly/);
+});
+
+test('rule 3 (red): the token permissions must equal the real manifest, key and level', () => {
+  assert.ok(Object.keys(PERMISOS_MANIFIESTO).length >= 8, 'the manifest was not read');
+  const lineas = Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`);
+  const sin = (n) => BUEN_WORKFLOW.replace(lineas[n], '');
+  assert.match(motivos({ [WORKFLOW]: sin(0) }).join('\n'), /token permissions must equal the manifest/);
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW + '          permission-issues: write\n' }).join('\n'), /token permissions must equal the manifest/);
+  const [k0, v0] = Object.entries(PERMISOS_MANIFIESTO)[0];
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(`${k0}: ${v0}`, `${k0}: ${v0 === 'write' ? 'read' : 'write'}`) }).join('\n'), /token permissions must equal the manifest/);
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(/ {6}- uses:[\s\S]*$/, '      - run: echo\n') }).join('\n'), /exactly one App-token step/);
 });
 
 test('rule 4 (red): scripts/admin deleting a repo, granting bypass, or a weak ruleset', () => {

@@ -8,3 +8,9 @@ export const buenas = () => preguntas.filter((p) => p.quien === 'revisor').map((
 export const SHA = 'a'.repeat(40);
 export const ctx = (extra = {}) => ({ sha: SHA, cabeza: SHA, ...extra });
 export const juzga = (respuestas, c = ctx()) => decidir(JSON.stringify({ respuestas }), preguntas, c);
+
+// The App manifests of apps/crear-apps.html, parsed (the real ones: tests compare against these, never a copy).
+export function manifiestos() {
+  const valores = [...leer('apps/crear-apps.html').matchAll(/name="manifest" value="([^"]*)"/g)].map((m) => m[1]);
+  return valores.map((v) => JSON.parse(v.replaceAll('&quot;', '"').replaceAll('&amp;', '&')));
+}

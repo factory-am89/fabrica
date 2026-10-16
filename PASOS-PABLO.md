@@ -22,7 +22,7 @@ Comprobación: `gh api repos/factory-am89/homenu-panel/rules/branches/main` debe
 
 ## App fabrica-administrador (una vez)
 
-La tercera App, la que crea y protege repos sin ti (trozo 1 de 10 de `plans/app-admin.md`). Decisión de Pablo, 16 oct 2026 (entrada de `intervenciones.md` del 16 oct, PR #63). Ella no se crea sola: ninguna App puede crear Apps. Sus secretos viven solo en el environment `administrador` de `factory-am89/fabrica` (limitado a `main`), nunca en 1Password ni en un PC.
+La tercera App, la que crea y protege repos sin ti (trozo 1 de 10 de `plans/app-admin.md`). Decisión de Pablo, 16 oct 2026 (fila de `intervenciones.md` del 16 oct «Pablo eligió «1»: una tercera App administradora…», PR #63). Ella no se crea sola: ninguna App puede crear Apps. Sus secretos viven solo en el environment `administrador` de `factory-am89/fabrica` (limitado a `main`), nunca en 1Password ni en un PC.
 
 1. Abre `apps/crear-apps.html` (en `C:\dev\fabrica`), pulsa **Crear fabrica-administrador** y en GitHub **Create GitHub App**. Copia lo que va detrás de `code=` en la barra de direcciones (página que no carga) y lanza enseguida `node apps/convertir.mjs EL_CODIGO` con tu sesión de `gh` de administrador: crea el environment `administrador` (solo `main`) y guarda `ADMIN_APP_KEY` y `ADMIN_CLIENT_ID` sin imprimirlos.
 2. Instálala en `factory-am89`, **All repositories** (el script da el enlace `…/installations/new`). No amplíes sus permisos: son exactamente los del manifiesto.

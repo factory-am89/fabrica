@@ -4,21 +4,16 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { destino, argsSecreto, argsEntornoPs, ENTORNO_ADMIN } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
-import { leer } from './apoyo/fabrica.mjs';
+import { leer, manifiestos } from './apoyo/fabrica.mjs';
+import { ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
 
 test('convertir.mjs guarda los secretos del revisor en su environment', () => {
   assert.deepEqual(argsSecreto('REVISOR_APP_KEY').slice(-2), ['--env', 'revisor']);
   assert.doesNotMatch(leer('apps/convertir.mjs'), /REVISOR_APP_ID/);
 });
 
-function manifests() {
-  const html = leer('apps/crear-apps.html');
-  const valores = [...html.matchAll(/name="manifest" value="([^"]*)"/g)].map((m) => m[1]);
-  return valores.map((v) => JSON.parse(v.replaceAll('&quot;', '"').replaceAll('&amp;', '&')));
-}
-
 test('constructor y revisor piden solo los permisos acordados', () => {
-  const [constructor, revisor] = manifests();
+  const [constructor, revisor] = manifiestos();
   assert.deepEqual(constructor.default_permissions, {
     contents: 'write', pull_requests: 'write', issues: 'write', workflows: 'write', checks: 'read', actions: 'read',
   });
@@ -38,7 +33,7 @@ const PERMISOS_ADMIN = {
 };
 
 test('fabrica-administrador pide exactamente la lista cerrada de permisos y ningún evento', () => {
-  const admin = manifests().find((m) => m.name === 'fabrica-administrador');
+  const admin = manifiestos().find((m) => m.name === ADMIN_APP_SLUG);
   assert.ok(admin, 'falta el botón de fabrica-administrador');
   assert.deepEqual(admin.default_permissions, PERMISOS_ADMIN);
   assert.deepEqual(admin.default_events, []);
@@ -62,6 +57,12 @@ test('convertir.mjs guarda la clave administradora en el environment administrad
   assert.match(lib, /NO queda limitado a main/, 'la función lee de vuelta y lanza si no está limitado');
   assert.match(lib, /function Asegurar-Environment-Revisor.*Asegurar-Environment-Limitado \$Repo 'revisor'/);
   assert.doesNotMatch(leer('apps/convertir.mjs'), /ADMIN_APP_ID/);
+});
+
+test('ADMIN_APP_SLUG es la App que crean apps/crear-apps.html y apps/convertir.mjs', () => {
+  assert.ok(leer('apps/crear-apps.html').includes(`<h2>3. ${ADMIN_APP_SLUG}</h2>`), 'crear-apps.html no crea la App con ese nombre');
+  assert.equal(destino(ADMIN_APP_SLUG), 'administrador');
+  assert.doesNotMatch(leer('apps/convertir.mjs'), /['"]fabrica-administrador['"]/, 'el slug va en la constante, no escrito a mano');
 });
 
 test('convertir.mjs solo reconoce las tres Apps', () => {
