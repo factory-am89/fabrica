@@ -4,8 +4,8 @@
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
 // scripts/lib/cache-token.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
-// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de la App, no es secreto; lo imprime
-// convertir.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
+// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
+// scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import * as fsReal from 'node:fs';
@@ -13,7 +13,11 @@ import { readFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, protegerFichero, rutaDeCache } from './lib/cache-token.mjs';
-import { REPO } from './lib/repo.mjs';
+import { REPO, CLIENT_ID_CONSTRUCTOR } from './lib/repo.mjs';
+
+export function clientId(env = process.env) {
+  return (env.FABRICA_CONSTRUCTOR_CLIENT_ID ?? '').trim() || CLIENT_ID_CONSTRUCTOR;
+}
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
 
@@ -157,11 +161,10 @@ export function avisoCache(motivo) {
 // but it is always reported through `avisar`. `cache` injects ruta, fs, proteger, permisosBien, dormir and avisar.
 // Returns { token, aviso? }; throws ErrorToken for the reasons in MOTIVOS.
 export async function obtenerToken({ env = process.env, leer = (e) => clavePrivada(e), fetchFn = fetch, reloj = Date.now, cache = {} } = {}) {
-  const clientId = env.FABRICA_CONSTRUCTOR_CLIENT_ID;
-  if (!clientId) throw new Error('Falta FABRICA_CONSTRUCTOR_CLIENT_ID (el client id de fabrica-constructor).');
+  const idApp = clientId(env);
   const repo = env.FABRICA_REPO ?? REPO;
   const avisar = cache.avisar ?? avisoCache;
-  const canje = () => canjear({ clientId, repo, pem: leer(env), fetchFn, ahora: Math.floor(reloj() / 1000) });
+  const canje = () => canjear({ clientId: idApp, repo, pem: leer(env), fetchFn, ahora: Math.floor(reloj() / 1000) });
   // The cache is per client id and cannot tell owners apart without the key: another owner's repo exchanges as before
   const mismoDueno = repo.split('/')[0].toLowerCase() === REPO.split('/')[0].toLowerCase();
   const ruta = !mismoDueno ? null : cache.ruta !== undefined ? cache.ruta : rutaDeCache(env);
@@ -171,7 +174,7 @@ export async function obtenerToken({ env = process.env, leer = (e) => clavePriva
   }
   const fs = cache.fs ?? fsReal;
   const permisosBien = cache.permisosBien ?? permisosDelUsuario;
-  const leerGuardado = () => leerCache({ ruta, ids: { appId: clientId }, reloj, fs, permisosBien });
+  const leerGuardado = () => leerCache({ ruta, ids: { appId: idApp }, reloj, fs, permisosBien });
   const guardado = leerGuardado();
   if (guardado.motivo === MOTIVO.ok && guardado.restanteMs > MARGEN_MS) return { token: guardado.entrada.token };
   // `ok` with little time left is the normal hourly refresh and `ausente` the first run; everything else is reported
@@ -186,7 +189,7 @@ export async function obtenerToken({ env = process.env, leer = (e) => clavePriva
       if (!bloqueado) avisar(MOTIVO.disco); // the lock could not even be created
       try {
         const t = await canje();
-        const guardada = escribirCache({ ruta, fs, proteger: cache.proteger ?? protegerFichero, datos: { token: t.token, expiraEn: t.expiraEn, appId: clientId } });
+        const guardada = escribirCache({ ruta, fs, proteger: cache.proteger ?? protegerFichero, datos: { token: t.token, expiraEn: t.expiraEn, appId: idApp } });
         if (guardada !== MOTIVO.ok) avisar(guardada);
         return { token: t.token };
       } catch (e) {
