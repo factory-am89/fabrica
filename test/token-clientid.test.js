@@ -1,12 +1,15 @@
 // clientId(): fabrica-constructor tiene su client id por defecto; el entorno solo lo sustituye.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { clientId } from '../scripts/token.mjs';
 import { CLIENT_ID_CONSTRUCTOR } from '../scripts/lib/repo.mjs';
 
+// Solo la forma de un client id de GitHub App: el valor vive únicamente en repo.mjs, y cambiarlo allí no rompe este test.
+const FORMA = /^Iv23li[A-Za-z0-9]+$/;
+
 test('clientId: sin entorno, o con entorno vacío, devuelve el de fabrica-constructor', () => {
-  assert.equal(CLIENT_ID_CONSTRUCTOR, 'Iv23liur4l1hSrzmpd7h');
+  assert.match(CLIENT_ID_CONSTRUCTOR, FORMA);
   assert.equal(clientId({}), CLIENT_ID_CONSTRUCTOR);
   assert.equal(clientId({ FABRICA_CONSTRUCTOR_CLIENT_ID: '  ' }), CLIENT_ID_CONSTRUCTOR);
 });
@@ -29,7 +32,7 @@ export function incoherencias(ficheros, constante) {
       for (const m of linea.matchAll(/Iv23li[A-Za-z0-9]+/g)) {
         if (m[0] !== constante) malos.push(`${f}:${i + 1} escribe el client id ${m[0]} y la fuente dice ${constante}`);
       }
-      if (/\.(ps1|md)$/.test(f) && linea.includes('FABRICA_CONSTRUCTOR_CLIENT_ID') && !linea.includes('CLIENT_ID_CONSTRUCTOR')) {
+      if (linea.includes('FABRICA_CONSTRUCTOR_CLIENT_ID') && !linea.includes('CLIENT_ID_CONSTRUCTOR')) {
         malos.push(`${f}:${i + 1} nombra FABRICA_CONSTRUCTOR_CLIENT_ID sin remitir a CLIENT_ID_CONSTRUCTOR`);
       }
     });
@@ -45,10 +48,25 @@ test('client id: el verificador acepta lo bueno y señala fichero:línea de lo m
     ['b.ps1:3 nombra FABRICA_CONSTRUCTOR_CLIENT_ID sin remitir a CLIENT_ID_CONSTRUCTOR']);
 });
 
-test('client id: ningún fichero lo contradice ni lo da por obligatorio', () => {
-  const ficheros = {};
-  for (const f of ['apps/arranque.ps1', 'apps/ruleset.ps1', 'apps/crear-apps.html', 'PASOS-PABLO.md', 'scripts/token.mjs']) {
-    ficheros[f] = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+// Los ficheros de texto del árbol de trabajo (sin git ni historial), menos .git, node_modules y este test,
+// que lleva valores malos a propósito como fixtures.
+const TEXTO = /\.(mjs|js|json|md|ps1|html|yml|yaml|txt)$/;
+function ficherosDeTexto(dir = new URL('..', import.meta.url), prefijo = '', salida = {}) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const f = prefijo + e.name;
+    if (e.name === '.git' || e.name === 'node_modules' || f === 'test/token-clientid.test.js') continue;
+    if (e.isDirectory()) ficherosDeTexto(new URL(`${e.name}/`, dir), `${f}/`, salida);
+    else if (TEXTO.test(f)) salida[f] = readFileSync(new URL(e.name, dir), 'utf8');
   }
-  assert.deepEqual(incoherencias(ficheros, CLIENT_ID_CONSTRUCTOR), []);
+  return salida;
+}
+
+test('client id: el escáner ve el árbol y cubre la skill que nombra la variable', () => {
+  const ficheros = ficherosDeTexto();
+  assert.ok('scripts/lib/repo.mjs' in ficheros && '.claude/skills/github/SKILL.md' in ficheros);
+  assert.ok(!('test/token-clientid.test.js' in ficheros));
+});
+
+test('client id: ningún fichero del repo lo contradice ni lo da por obligatorio', () => {
+  assert.deepEqual(incoherencias(ficherosDeTexto(), CLIENT_ID_CONSTRUCTOR), []);
 });
