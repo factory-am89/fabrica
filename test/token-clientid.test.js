@@ -1,7 +1,8 @@
 // clientId(): fabrica-constructor tiene su client id por defecto; el entorno solo lo sustituye.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { clientId } from '../scripts/token.mjs';
 import { CLIENT_ID_CONSTRUCTOR } from '../scripts/lib/repo.mjs';
 
@@ -48,15 +49,15 @@ test('client id: el verificador acepta lo bueno y señala fichero:línea de lo m
     ['b.ps1:3 nombra FABRICA_CONSTRUCTOR_CLIENT_ID sin remitir a CLIENT_ID_CONSTRUCTOR']);
 });
 
-// Los ficheros de texto del árbol de trabajo (sin git ni historial), menos .git, node_modules y este test,
-// que lleva valores malos a propósito como fixtures.
+// Los ficheros de texto versionados, menos este test, que lleva valores malos a propósito como fixtures.
 const TEXTO = /\.(mjs|js|json|md|ps1|html|yml|yaml|txt)$/;
-function ficherosDeTexto(dir = new URL('..', import.meta.url), prefijo = '', salida = {}) {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const f = prefijo + e.name;
-    if (e.name === '.git' || e.name === 'node_modules' || f === 'test/token-clientid.test.js') continue;
-    if (e.isDirectory()) ficherosDeTexto(new URL(`${e.name}/`, dir), `${f}/`, salida);
-    else if (TEXTO.test(f)) salida[f] = readFileSync(new URL(e.name, dir), 'utf8');
+// Solo los ficheros versionados: lo que haya suelto en la carpeta (p. ej. una copia `.fabrica/` bajada por el CI) no cuenta.
+// `git ls-files` no mira el historial, solo el índice: el resultado no depende de qué commits haya.
+function ficherosDeTexto(raiz = new URL('..', import.meta.url), salida = {}) {
+  const lista = execFileSync('git', ['ls-files', '-z'], { cwd: raiz, encoding: 'utf8' }).split('\0').filter(Boolean);
+  for (const f of lista) {
+    if (f === 'test/token-clientid.test.js' || !TEXTO.test(f)) continue;
+    salida[f] = readFileSync(new URL(f, raiz), 'utf8');
   }
   return salida;
 }
