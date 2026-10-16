@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, CADUCA_DIAS } from '../scripts/lib/skills.mjs';
+import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, CADUCA_DIAS, leerFrontmatter } from '../scripts/lib/skills.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOY = '2026-10-15';
@@ -25,7 +25,7 @@ comprobado: 2026-10-01
 `;
 
 // Una skill de mentira en una raíz temporal que tiene el agente `constructor`.
-function skill(texto, extra = {}) {
+function skill(texto, extra = {}, hoy = HOY) {
   const raiz = mkdtempSync(path.join(tmpdir(), 'forja-'));
   mkdirSync(path.join(raiz, '.claude', 'agents'), { recursive: true });
   writeFileSync(path.join(raiz, '.claude', 'agents', 'constructor.md'), '---\nname: constructor\n---\n');
@@ -36,14 +36,16 @@ function skill(texto, extra = {}) {
     mkdirSync(path.dirname(path.join(carpeta, ruta)), { recursive: true });
     writeFileSync(path.join(carpeta, ruta), contenido);
   }
-  return comprobarSkill(carpeta, { raiz, hoy: HOY });
+  return comprobarSkill(carpeta, { raiz, hoy });
 }
 
 test('toda skill de .claude/skills/ tiene la forma de base/skill.md', () => {
   const carpetas = carpetasDeSkills(RAIZ);
   assert.ok(carpetas.length > 0, 'no hay ninguna skill que comprobar');
   for (const c of carpetas) {
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Sin reloj: «hoy» es la propia fecha de la skill, así no caduca ni queda en el futuro.
+    const hoy = leerFrontmatter(readFileSync(path.join(c, 'SKILL.md'), 'utf8'))?.comprobado;
+    assert.ok(hoy, `${path.basename(c)}: sin fecha comprobado`);
     assert.deepEqual(comprobarSkill(c, { raiz: RAIZ, hoy }), [], path.basename(c));
   }
 });
@@ -80,6 +82,12 @@ test('cada regla de la forma se ve fallar', () => {
   for (const [nombre, texto, esperado] of casos) {
     assert.match(skill(texto).join('\n'), esperado, nombre);
   }
+});
+
+test('caduca pasados los 90 días, y a los 90 justos aún vale', () => {
+  const vieja = BIEN.replace('2026-10-01', '2026-10-15');
+  assert.match(skill(vieja, {}, '2027-02-01').join('\n'), /caducó/);
+  assert.deepEqual(skill(vieja, {}, '2027-01-13'), []);
 });
 
 test('una referencia que SKILL.md no cita es huérfana, y una carpeta ajena sobra', () => {
