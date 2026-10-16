@@ -1,7 +1,7 @@
 // What a PR body must contain. SECTIONS is the single definition; the template and the checks derive from it.
 export const SECTIONS = [
   { name: 'What changes', needs: 'always', hint: 'What this PR changes and why, in a few lines.' },
-  { name: 'Evidence', needs: 'always', hint: 'Each claim with the command and its output, pasted inside a code block.' },
+  { name: 'Evidence', needs: 'always', hint: 'Paste the output of `npm run evidence` (add `-- --focus <testfile>` for your tests); other claims need their command and output in a code block.' },
   { name: 'Red before', needs: 'tests', hint: 'How each new test was seen failing before the change (command and output). Required when a file under test/ changes.' },
   { name: 'Not verified', needs: 'always', hint: 'What you could not check. Write "Nothing" if there is nothing.' },
 ];

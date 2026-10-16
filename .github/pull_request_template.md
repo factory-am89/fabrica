@@ -4,7 +4,7 @@
 
 ## Evidence
 
-<!-- Each claim with the command and its output, pasted inside a code block. -->
+<!-- Paste the output of `npm run evidence` (add `-- --focus <testfile>` for your tests); other claims need their command and output in a code block. -->
 
 ## Red before
 
