@@ -12,6 +12,7 @@
     "limpiar": "node scripts/limpiar.mjs",
     "lecturas-op": "node scripts/lecturas-op.mjs",
     "llamadas-gh": "node scripts/llamadas-gh.mjs",
+    "hitl": "node scripts/hitl.mjs",
     "skills-viejas": "node scripts/skills-viejas.mjs",
     "hora": "node scripts/hora.mjs",
     "lint": "eslint . --max-warnings 0",

@@ -8,6 +8,8 @@ Formato, una línea por intervención, la más nueva abajo:
 
 Tipos: `permiso`, `decisión`, `clic`, `arreglo`.
 
+Los avisos de permiso y los comandos `!` ya se cuentan solos, sin texto, en `~/.fabrica/intervenciones.jsonl` (hooks en `.claude/settings.json`); `npm run hitl -- --json` los cuenta por clase. Esta tabla es para lo que ningún hook ve.
+
 Motivo `arbitro` (decisión del orquestador): un PR que toca el árbitro (`.github/`, `scripts/veredicto.mjs`, `estandares/`, `.claude/`) no lo aprueba el revisor automático: lo aprueba Pablo con **Approve** y un **Re-run** del job `revisor`. Cada vez es una línea (tipo `clic`, por qué `arbitro`, repetida: sí). Es el diseño y no se automatiza: quien cambia al árbitro no puede aprobarse a sí mismo.
 
 
