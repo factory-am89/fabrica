@@ -91,6 +91,16 @@ test('una salida ilegible sale 1: no cuenta como respuesta vacía', () => {
   assert.equal(cli('--outputs', outputs).status, 1);
 });
 
+test('una salida que es JSON pero viene vacía o incompleta sale 1: sin respuesta no es «no hay no»', () => {
+  const incompleta = JSON.stringify({ respuestas: [{ id: 'C5', respuesta: 'sí', prueba: 'x' }] });
+  const sinPrueba = JSON.stringify({ respuestas: reviewerIds.map((id) => ({ id, respuesta: 'basura', prueba: 'x' })) });
+  for (const texto of ['{}', '{"respuestas":[]}', incompleta, sinPrueba]) {
+    const outputs = escribir((c) => (c.id === 'caso-07' ? texto : perfecto(c)));
+    assert.throws(() => run({ outputs }), /incomplete output: caso-07\/1\.json/, texto);
+    assert.equal(cli('--outputs', outputs).status, 1, texto);
+  }
+});
+
 test('con 3 intentos manda la mayoría: 2 de 3 detectan, 1 de 3 no', () => {
   const dos = escribir((c, t) => (c.expect === 'C6' && t === 3 ? salida() : perfecto(c)), 3);
   assert.equal(run({ outputs: dos, trials: 3 }).informe.deteccion.C6.tasa, 1);
@@ -99,10 +109,11 @@ test('con 3 intentos manda la mayoría: 2 de 3 detectan, 1 de 3 no', () => {
   assert.throws(() => run({ outputs: dos, trials: 4 }), /missing outputs \(9\)/);
 });
 
-test('answersOf lee por decidir: un id repetido o ajeno no vale como respuesta', () => {
-  const doble = JSON.stringify({ respuestas: [{ id: 'C6', respuesta: 'no', prueba: 'x' }, { id: 'C6', respuesta: 'sí', prueba: 'x' }, { id: 'P1', respuesta: 'no', prueba: 'x' }] });
-  assert.equal(answersOf(doble, preguntas, 'x').C6, null);
-  assert.equal(answersOf(salida(['C6']), preguntas, 'x').C6, 'no');
+test('answersOf lee por decidir: un id repetido no vale como respuesta y uno ajeno no cambia nada', () => {
+  const respuestas = (extra) => JSON.stringify({ respuestas: [...reviewerIds.map((id) => ({ id, respuesta: id === 'C6' ? 'no' : 'sí', prueba: 'x' })), ...extra] });
+  const ajeno = { id: 'P1', respuesta: 'no', prueba: 'x' };
+  assert.equal(answersOf(respuestas([ajeno]), preguntas, 'x').C6, 'no');
+  assert.throws(() => answersOf(respuestas([{ id: 'C6', respuesta: 'sí', prueba: 'x' }]), preguntas, 'x'), /no usable answer for C6/);
 });
 
 test('un corpus roto falla en alto: carpeta sin expectativa, pregunta que no es del revisor, fichero vacío', () => {

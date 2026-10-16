@@ -73,10 +73,13 @@ export function loadOutputs(dir, cases, trials) {
   return outputs;
 }
 
-// One output -> { <question id>: 'sí'|'no'|'no aplica'|null } through decidir. Unreadable text is an error, not an empty answer.
+// One output -> { <question id>: 'sí'|'no'|'no aplica' } through decidir. Throws when the text is unreadable or when any reviewer
+// question has no usable answer (missing, repeated, not in the vocabulary): an empty answer is never read as "no no".
 export function answersOf(text, preguntas, label) {
   const v = decidir(text, preguntas, CTX);
   if (v.respuestas === null) throw new Error(`unreadable output: ${label}`);
+  const sinRespuesta = Object.entries(v.respuestas.answers).filter(([, a]) => a === null).map(([id]) => id);
+  if (sinRespuesta.length) throw new Error(`incomplete output: ${label} has no usable answer for ${sinRespuesta.join(', ')}`);
   return v.respuestas.answers;
 }
 
