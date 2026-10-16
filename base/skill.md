@@ -17,8 +17,9 @@ comprobado: AAAA-MM-DD
 ```
 
 - **Solo esos cuatro campos.** `description` lleva «Úsala» y «No para:», y como mucho 600 caracteres.
-- **`comprobado` caduca a los 90 días** (o si está en el futuro): se renueva volviendo a comprobar
-  la skill, no cambiando la fecha.
+- **`comprobado` es la fecha de la última revisión** (AAAA-MM-DD, nunca en el futuro). Renovarla es volver a
+  comprobar la skill, nunca cambiar la fecha sin hacerlo. No caduca: `npm run skills-viejas` lista las que
+  llevan más de 90 días sin revisar (informa, no bloquea).
 - **`SKILL.md` de 120 líneas como mucho.** El detalle largo va a `referencias/<tema>.md`, y `SKILL.md`
   lo cita por su ruta (`referencias/<tema>.md`): lo que no se cita es un huérfano. En la carpeta
   no hay nada más que `SKILL.md` y `referencias/`.
