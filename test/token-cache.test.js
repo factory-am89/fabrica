@@ -4,17 +4,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
+import * as fsReal from 'node:fs';
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
-import { clavePrivada, ErrorToken, MOTIVOS, obtenerToken } from '../scripts/token.mjs';
+import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/cache-token.mjs';
+import { avisoCache, obtenerToken } from '../scripts/token.mjs';
 
 const TOKEN = `ghs_${'a1B2c3D4'.repeat(5)}`;
-const OTRO = `ghs_${'Z9y8X7w6'.repeat(5)}`;
 const CLIENT = 'Iv_test_client';
 const HORA = 60 * 60 * 1000;
 const { privateKey: PEM } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+
+// Every cache reason observed during this file; the last test checks the whole vocabulary was seen.
+const vistos = new Set();
 
 // A clock that only moves when the test says so (sleeping in the lock loop moves it too).
 function relojFalso() {
@@ -43,15 +46,16 @@ function entorno({ cliente = CLIENT } = {}) {
   const github = githubFalso(reloj);
   const e = { dir, reloj, github, lecturas: 0, ruta: join(dir, 'Fabrica', 'token-cache.json') };
   e.leer = () => { e.lecturas++; return PEM; };
-  e.cache = { ruta: e.ruta, proteger: () => true, permisosBien: () => true, dormir: async (ms) => reloj.avanzar(ms) };
+  e.avisos = [];
+  e.cache = { ruta: e.ruta, proteger: () => true, permisosBien: () => true, dormir: async (ms) => reloj.avanzar(ms), avisar: (m) => { e.avisos.push(m); vistos.add(m); } };
   e.pedir = (extra = {}) => obtenerToken({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: cliente }, leer: e.leer, fetchFn: github.fetch, reloj: reloj.ahora, cache: e.cache, ...extra });
   e.limpiar = () => rmSync(dir, { recursive: true, force: true });
   return e;
 }
 
 function guardado(e, { restante = HORA, token = TOKEN, appId = CLIENT } = {}) {
-  const ok = escribirCache({ ruta: e.ruta, proteger: () => true, datos: { token, expiraEn: iso(e.reloj.ahora() + restante), appId, installationId: 77 } });
-  assert.ok(ok);
+  const r = escribirCache({ ruta: e.ruta, proteger: () => true, datos: { token, expiraEn: iso(e.reloj.ahora() + restante), appId } });
+  assert.equal(r, MOTIVO.ok);
 }
 
 test('cache path: inside the user profile, never OneDrive, with a fallback', () => {
@@ -65,21 +69,31 @@ test('cache path: inside the user profile, never OneDrive, with a fallback', () 
 test('leerCache: absent, wrong permissions, corrupt, wrong shape, wrong app, expired and ok, each with its reason', () => {
   const e = entorno();
   try {
-    const leer = (extra = {}) => leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra });
+    const leer = (extra = {}) => {
+      const r = leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra });
+      vistos.add(r.motivo);
+      return r;
+    };
     assert.equal(leer().motivo, 'ausente');
     guardado(e);
-    assert.equal(leer().motivo, 'ok');
+    assert.deepEqual(leer().entrada, { token: TOKEN });
     assert.equal(leer({ permisosBien: () => false }).motivo, 'permisos');
     assert.equal(leer({ ids: { appId: 'otra' } }).motivo, 'otra-app');
     e.reloj.avanzar(HORA + 1000);
     assert.equal(leer().motivo, 'caducado');
     writeFileSync(e.ruta, '{no es json');
     assert.equal(leer().motivo, 'corrupto');
-    writeFileSync(e.ruta, JSON.stringify({ v: 1, token: TOKEN, expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT, installationId: 77, extra: 1 }));
+    writeFileSync(e.ruta, JSON.stringify({ v: 1, token: TOKEN, expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT, extra: 1 }));
     assert.equal(leer().motivo, 'forma');
-    writeFileSync(e.ruta, JSON.stringify({ v: 1, token: 'ghs_corto', expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT, installationId: 77 }));
+    writeFileSync(e.ruta, JSON.stringify({ v: 1, token: 'ghs_corto', expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT }));
     assert.equal(leer().motivo, 'forma');
-    for (const m of ['ausente', 'permisos', 'otra-app', 'caducado', 'corrupto', 'forma']) assert.ok(MOTIVOS_CACHE.includes(m));
+    // a file that cannot be inspected or read is `disco`, not `ausente`
+    const roto = (cual) => ({ ...fsReal, [cual]: () => { throw Object.assign(new Error('x'), { code: 'EACCES' }); } });
+    assert.equal(leer({ fs: roto('statSync') }).motivo, 'disco');
+    assert.equal(leer({ fs: roto('readFileSync') }).motivo, 'disco');
+    // an old entry that still carries the installation id has an unexpected shape
+    writeFileSync(e.ruta, JSON.stringify({ v: 1, token: TOKEN, expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT, installationId: 77 }));
+    assert.equal(leer().motivo, 'forma');
   } finally { e.limpiar(); }
 });
 
@@ -103,9 +117,12 @@ test('leerCache: an expiry further away than a token can live is rejected', () =
 test('escribirCache: if permissions cannot be closed nothing is written, not even the temp file', () => {
   const e = entorno();
   try {
-    const ok = escribirCache({ ruta: e.ruta, proteger: () => false, datos: { token: TOKEN, expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT, installationId: 77 } });
-    assert.equal(ok, false);
+    const datos = { token: TOKEN, expiraEn: iso(e.reloj.ahora() + HORA), appId: CLIENT };
+    assert.equal(escribirCache({ ruta: e.ruta, proteger: () => false, datos }), MOTIVO.permisos);
     assert.deepEqual(readdirSync(join(e.dir, 'Fabrica')), []);
+    assert.equal(escribirCache({ ruta: e.ruta, proteger: () => true, datos: { ...datos, token: 'ghs_corto' } }), MOTIVO.forma);
+    assert.equal(escribirCache({ ruta: e.ruta, proteger: () => true, datos, fs: { ...fsReal, renameSync: () => { throw new Error('x'); } } }), MOTIVO.disco);
+    assert.deepEqual(readdirSync(join(e.dir, 'Fabrica')), [], 'no temp file is left behind');
   } finally { e.limpiar(); }
 });
 
@@ -176,20 +193,25 @@ test('obtenerToken: with less than 15 minutes left it exchanges again', async ()
   } finally { e.limpiar(); }
 });
 
-test('obtenerToken: expired, corrupt, wrong-permissions and wrong-app caches all lead to a fresh read', async () => {
+test('obtenerToken: each unusable cache leads to a fresh read and says its reason on stderr; ausente and a normal refresh stay silent', async () => {
   const casos = {
-    expired: (e) => { guardado(e); e.reloj.avanzar(2 * HORA); },
-    corrupt: (e) => { guardado(e); writeFileSync(e.ruta, '{roto'); },
-    permissions: (e) => { guardado(e); e.cache.permisosBien = () => false; },
-    'wrong app': (e) => guardado(e, { appId: 'otra-app' }),
+    expired: [(e) => { guardado(e); e.reloj.avanzar(2 * HORA); }, ['caducado']],
+    corrupt: [(e) => { guardado(e); writeFileSync(e.ruta, '{roto'); }, ['corrupto']],
+    shape: [(e) => { guardado(e); writeFileSync(e.ruta, JSON.stringify({ v: 2 })); }, ['forma']],
+    permissions: [(e) => { guardado(e); e.cache.permisosBien = () => false; }, ['permisos']],
+    'wrong app': [(e) => guardado(e, { appId: 'otra-app' }), ['otra-app']],
+    unreadable: [(e) => { guardado(e); e.cache.fs = { ...fsReal, readFileSync: () => { throw new Error('x'); } }; }, ['disco']],
+    absent: [() => {}, []],
+    'under 15 min': [(e) => guardado(e, { restante: MARGEN_MS - 1000 }), []],
   };
-  for (const [nombre, prepara] of Object.entries(casos)) {
+  for (const [nombre, [prepara, avisos]] of Object.entries(casos)) {
     const e = entorno();
     try {
       prepara(e);
       const r = await e.pedir();
       assert.equal(r.token, TOKEN, nombre);
       assert.equal(e.lecturas, 1, nombre);
+      assert.deepEqual(e.avisos, avisos, nombre);
     } finally { e.limpiar(); }
   }
 });
@@ -199,7 +221,7 @@ test('obtenerToken: lock busy -> bloqueo-ocupado, no .pem read', async () => {
   try {
     await conBloqueo({ ruta: e.ruta, fn: async () => {} });
     writeFileSync(`${e.ruta}.lock`, '1');
-    await assert.rejects(e.pedir(), (x) => x instanceof ErrorToken && x.motivo === 'bloqueo-ocupado');
+    await assert.rejects(e.pedir(), /^Error: bloqueo-ocupado: /);
     assert.equal(e.lecturas, 0);
   } finally { e.limpiar(); }
 });
@@ -213,7 +235,7 @@ test('obtenerToken: the .pem and the token never leak beyond the one token field
       const texto = readFileSync(join(e.dir, 'Fabrica', f), 'utf8');
       assert.ok(!texto.includes('PRIVATE KEY') && !texto.includes(cuerpoPem), `${f} holds the .pem`);
     }
-    assert.deepEqual(Object.keys(JSON.parse(readFileSync(e.ruta, 'utf8'))).sort(), ['appId', 'expiraEn', 'installationId', 'token', 'v']);
+    assert.deepEqual(Object.keys(JSON.parse(readFileSync(e.ruta, 'utf8'))).sort(), ['appId', 'expiraEn', 'token', 'v']);
   } finally { e.limpiar(); }
 });
 
@@ -227,52 +249,52 @@ test('obtenerToken: another owner\'s repo bypasses the cache (the cache cannot t
   } finally { e.limpiar(); }
 });
 
-// op fake: one result per call, counting calls.
-const opFalso = (resultado) => { const f = () => { f.llamadas++; return resultado; }; f.llamadas = 0; return f; };
-const LIMITE = { status: 1, stdout: '', stderr: '[ERROR] 2026/10/16 Too many requests. Try again in 3 hours. op_SECRETO_VALOR' };
-
-test('clavePrivada: "Too many requests" -> limite-de-1password, one op call, no retry, no op output in the message', () => {
-  const op = opFalso(LIMITE);
-  assert.throws(
-    () => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op),
-    (x) => x instanceof ErrorToken && x.motivo === 'limite-de-1password' && !x.message.includes('SECRETO') && !x.message.includes('\n'),
-  );
-  assert.equal(op.llamadas, 1);
+test('obtenerToken: a cache that cannot be saved still returns the token and says why', async () => {
+  const casos = {
+    permisos: (e) => { e.cache.proteger = () => false; },
+    disco: (e) => { e.cache.fs = { ...fsReal, renameSync: () => { throw new Error('x'); } }; },
+  };
+  for (const [motivo, prepara] of Object.entries(casos)) {
+    const e = entorno();
+    try {
+      prepara(e);
+      assert.equal((await e.pedir()).token, TOKEN);
+      assert.deepEqual(e.avisos, [motivo]);
+      assert.equal(existsSync(e.ruta), false);
+    } finally { e.limpiar(); }
+  }
 });
 
-test('clavePrivada: another failure is sin-clave; success returns the key; the vault is the configured one only', () => {
-  assert.throws(() => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, opFalso({ status: 1, stdout: '', stderr: 'no access' })), (x) => x.motivo === 'sin-clave');
-  const vistos = [];
-  const op = (args) => { vistos.push(args); return { status: 0, stdout: PEM, stderr: '' }; };
-  assert.equal(clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', OP_VAULT: 'V' }, op), PEM);
-  assert.deepEqual(vistos, [['document', 'get', 'fabrica-constructor.pem', '--vault', 'V']]);
-});
-
-test('obtenerToken: rate limited with no saved token -> limite-de-1password, one read, no second attempt', async () => {
+test('obtenerToken: a lock that cannot be created is reported (disco) and the exchange goes ahead', async () => {
   const e = entorno();
-  const op = opFalso(LIMITE);
   try {
-    await assert.rejects(e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op) }), (x) => x.motivo === 'limite-de-1password');
-    assert.equal(op.llamadas, 1);
+    e.cache.fs = { ...fsReal, writeFileSync: () => { throw Object.assign(new Error('x'), { code: 'EPERM' }); } };
+    assert.equal((await e.pedir()).token, TOKEN);
+    assert.deepEqual(e.avisos, ['disco', 'disco']); // the lock, then the save
   } finally { e.limpiar(); }
 });
 
-test('obtenerToken: rate limited with a saved token still alive (but under 15 min) -> uses it and says why', async () => {
+test('obtenerToken: a disabled cache is reported (sin-ruta, otro-dueno) and still exchanges', async () => {
   const e = entorno();
-  const op = opFalso(LIMITE);
   try {
-    guardado(e, { restante: 5 * 60 * 1000, token: OTRO });
-    const r = await e.pedir({ leer: (env) => clavePrivada({ ...env, OP_SERVICE_ACCOUNT_TOKEN: 'ops_x' }, op) });
-    assert.equal(r.token, OTRO);
-    assert.match(r.aviso, /^limite-de-1password: /);
-    assert.ok(!r.aviso.includes('\n'));
-    assert.equal(op.llamadas, 1);
+    e.cache.ruta = null;
+    assert.equal((await e.pedir()).token, TOKEN);
+    assert.deepEqual(e.avisos, ['sin-ruta']);
+    e.avisos.length = 0;
+    e.cache.ruta = e.ruta;
+    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' } });
+    assert.deepEqual(e.avisos, ['otro-dueno']);
   } finally { e.limpiar(); }
 });
 
-test('MOTIVOS: a closed list with a distinct non-zero exit code for each reason', () => {
-  const codigos = Object.values(MOTIVOS);
-  assert.equal(new Set(codigos).size, codigos.length);
-  assert.ok(codigos.every((c) => Number.isInteger(c) && c > 1));
-  assert.throws(() => new ErrorToken('inventado', 'x'));
+test('avisoCache: one stderr line with the reason; a reason outside the vocabulary throws', (t) => {
+  const lineas = [];
+  t.mock.method(console, 'error', (l) => lineas.push(l));
+  avisoCache(MOTIVO.permisos);
+  assert.deepEqual(lineas, ['cache: permisos']);
+  assert.throws(() => avisoCache('inventado'), /outside the vocabulary/);
+});
+
+test('MOTIVOS_CACHE: every reason of the vocabulary was produced by the code in this file', () => {
+  assert.deepEqual([...MOTIVOS_CACHE].sort(), [...vistos].sort());
 });

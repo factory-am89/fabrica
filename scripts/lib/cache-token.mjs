@@ -6,8 +6,8 @@
 // An installation token lives 1 hour: it is saved and reused until MARGEN_MS before it expires.
 //
 // One file per Windows user, outside the repo and OneDrive (%LOCALAPPDATA%\Fabrica\token-cache.json;
-// elsewhere ~/.fabrica/), readable only by that user (icacls ACL; 0600 on POSIX). It holds the token,
-// its expiry, the App client id and the installation id, and nothing else: NEVER the .pem.
+// elsewhere ~/.fabrica/; see rutaDeCache), readable only by that user (icacls ACL; 0600 on POSIX). It
+// holds the token, its expiry and the App client id, and nothing else: NEVER the .pem.
 // Disk and clock are injectable so tests use a temp directory.
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -28,10 +28,19 @@ export const BLOQUEO_VIEJO_MS = 20_000;
 export const FORMA_FECHA = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
 const FORMA_APP = /^[A-Za-z0-9._-]{1,64}$/;
 const VERSION = 1;
-const CLAVES = ['v', 'token', 'expiraEn', 'appId', 'installationId'];
+const CLAVES = ['v', 'token', 'expiraEn', 'appId'];
 
-// Why a cache entry is not usable (closed vocabulary). `ok` means usable.
-export const MOTIVOS_CACHE = ['ok', 'ausente', 'corrupto', 'forma', 'caducado', 'otra-app', 'permisos'];
+// Closed vocabulary of why the cache is not used (or not saved). Code refers to MOTIVO.<name>; `ok` means
+// usable / saved. leerCache and escribirCache return these; token.mjs prints them as `cache: <reason>`.
+//   ausente: no file (normal, silent) · corrupto / forma: unreadable or unexpected content · caducado: expired
+//   otra-app: saved for another client id · permisos: not closed to the user alone
+//   disco: the file system failed (cannot stat, read, create the lock or write)
+//   sin-ruta: no valid cache folder · otro-dueno: FABRICA_REPO belongs to another owner
+export const MOTIVO = Object.freeze({
+  ok: 'ok', ausente: 'ausente', corrupto: 'corrupto', forma: 'forma', caducado: 'caducado', 'otra-app': 'otra-app',
+  permisos: 'permisos', disco: 'disco', 'sin-ruta': 'sin-ruta', 'otro-dueno': 'otro-dueno',
+});
+export const MOTIVOS_CACHE = Object.values(MOTIVO);
 
 const normaliza = (r) => String(r).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
@@ -114,67 +123,75 @@ export function permisosDelUsuario(ruta, yo = null) {
 }
 
 // Reads and validates the cache. Returns { motivo, entrada?, restanteMs? }: `motivo` is one of
-// MOTIVOS_CACHE and only with `ok` is there an `entrada` ({ token, expiraEn, appId, installationId }).
-// `ids`: { appId } (the App client id; the installation id is not known without the key, so the saved one is accepted).
+// MOTIVOS_CACHE and only with `ok` is there an `entrada` ({ token }).
+// `ids`: { appId } (the App client id).
 export function leerCache({ ruta, ids, reloj = Date.now, fs = fsReal, permisosBien = permisosDelUsuario }) {
   try {
     fs.statSync(ruta);
-  } catch {
-    // on purpose: no file means no cache; the caller exchanges
-    return { motivo: 'ausente' };
+  } catch (e) {
+    // no file is the normal first run; any other failure (permissions, disk) is reported by the caller
+    return { motivo: e?.code === 'ENOENT' ? MOTIVO.ausente : MOTIVO.disco };
   }
   // Permissions are checked BEFORE reading the content: a file that is not the user's alone is not opened
-  if (!permisosBien(ruta)) return { motivo: 'permisos' };
+  if (!permisosBien(ruta)) return { motivo: MOTIVO.permisos };
   let crudo;
   try {
     crudo = fs.readFileSync(ruta, 'utf8');
   } catch {
-    // on purpose: unreadable is the same as absent; the caller exchanges
-    return { motivo: 'ausente' };
+    // the reason is returned and the caller prints it
+    return { motivo: MOTIVO.disco };
   }
   let d;
   try {
     d = JSON.parse(crudo);
   } catch {
-    // on purpose: broken JSON is "corrupto"; the reason is returned right below
-    return { motivo: 'corrupto' };
+    // the reason is returned and the caller prints it
+    return { motivo: MOTIVO.corrupto };
   }
-  if (!d || typeof d !== 'object' || Array.isArray(d)) return { motivo: 'corrupto' };
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return { motivo: MOTIVO.corrupto };
   const claves = Object.keys(d);
-  if (claves.length !== CLAVES.length || !CLAVES.every((k) => claves.includes(k)) || d.v !== VERSION) return { motivo: 'forma' };
-  if (typeof d.token !== 'string' || !FORMA_TOKEN.test(d.token)) return { motivo: 'forma' };
-  if (typeof d.expiraEn !== 'string' || !FORMA_FECHA.test(d.expiraEn)) return { motivo: 'forma' };
-  if (typeof d.appId !== 'string' || !FORMA_APP.test(d.appId) || !/^\d{1,12}$/.test(String(d.installationId))) return { motivo: 'forma' };
+  if (claves.length !== CLAVES.length || !CLAVES.every((k) => claves.includes(k)) || d.v !== VERSION) return { motivo: MOTIVO.forma };
+  if (typeof d.token !== 'string' || !FORMA_TOKEN.test(d.token)) return { motivo: MOTIVO.forma };
+  if (typeof d.expiraEn !== 'string' || !FORMA_FECHA.test(d.expiraEn)) return { motivo: MOTIVO.forma };
+  if (typeof d.appId !== 'string' || !FORMA_APP.test(d.appId)) return { motivo: MOTIVO.forma };
   const expira = Date.parse(d.expiraEn);
-  if (!Number.isFinite(expira)) return { motivo: 'forma' };
-  if (d.appId !== String(ids.appId)) return { motivo: 'otra-app' };
+  if (!Number.isFinite(expira)) return { motivo: MOTIVO.forma };
+  if (d.appId !== String(ids.appId)) return { motivo: MOTIVO['otra-app'] };
   const restanteMs = expira - reloj();
-  if (restanteMs > VIDA_MAX_MS) return { motivo: 'forma' };
-  if (restanteMs <= 0) return { motivo: 'caducado' };
-  return { motivo: 'ok', restanteMs, entrada: { token: d.token, expiraEn: d.expiraEn, appId: d.appId, installationId: d.installationId } };
+  if (restanteMs > VIDA_MAX_MS) return { motivo: MOTIVO.forma };
+  if (restanteMs <= 0) return { motivo: MOTIVO.caducado };
+  return { motivo: MOTIVO.ok, restanteMs, entrada: { token: d.token } };
 }
 
 // Saves the cache atomically: an empty temp file with its permissions closed BEFORE the token is
-// written, then `rename` over the final one. Returns true if it was written.
+// written, then `rename` over the final one. Returns MOTIVO.ok if it was written, else the reason
+// (permisos, forma or disco); the caller prints it, so a cache that cannot be saved is never silent.
 export function escribirCache({ ruta, datos, fs = fsReal, proteger = protegerFichero }) {
   const tmp = `${ruta}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  let motivo = MOTIVO.disco;
   try {
     fs.mkdirSync(dirname(ruta), { recursive: true, mode: 0o700 });
     fs.writeFileSync(tmp, '', { flag: 'wx', mode: 0o600 });
-    if (!proteger(tmp)) throw new Error('permissions');
-    const { token, expiraEn, appId, installationId } = datos;
-    if (!FORMA_FECHA.test(String(expiraEn)) || !FORMA_TOKEN.test(String(token))) throw new Error('shape');
-    fs.writeFileSync(tmp, JSON.stringify({ v: VERSION, token, expiraEn, appId, installationId }));
+    if (!proteger(tmp)) {
+      motivo = MOTIVO.permisos;
+      throw new Error('permissions');
+    }
+    const { token, expiraEn, appId } = datos;
+    if (!FORMA_FECHA.test(String(expiraEn)) || !FORMA_TOKEN.test(String(token))) {
+      motivo = MOTIVO.forma;
+      throw new Error('shape');
+    }
+    fs.writeFileSync(tmp, JSON.stringify({ v: VERSION, token, expiraEn, appId }));
     fs.renameSync(tmp, ruta);
-    return true;
+    return MOTIVO.ok;
   } catch {
-    // on purpose: not saving the cache only costs another exchange; it never breaks the call
+    // not saving the cache only costs another exchange, so it does not break the call; the reason is returned
     try {
       fs.unlinkSync(tmp);
     } catch {
       // on purpose: the temp file may not have been created
     }
-    return false;
+    return motivo;
   }
 }
 
