@@ -58,6 +58,17 @@ test('a 403 from GitHub is an error, never an empty answer', async () => {
   await assert.rejects(readState(api, PROJECT), /403/);
 });
 
+test('a 200 whose body is not JSON is an error, not an empty answer', async () => {
+  const api = makeApi('t', async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }));
+  await assert.rejects(api('/repos/x/y'), /no es JSON/);
+});
+
+test('a list that fills its page stops in the open (no silent cut)', async () => {
+  const full = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+  const { api } = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo/rulesets': [200, full] });
+  await assert.rejects(readState(api, PROJECT), /no pagina/);
+});
+
 test('makeApi sends GET only', async () => {
   const sent = [];
   const api = makeApi('t', async (url, init) => { sent.push(init.method); return { ok: true, status: 200, json: async () => ({}) }; });

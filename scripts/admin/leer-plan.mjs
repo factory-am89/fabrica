@@ -20,13 +20,26 @@ export function makeApi(token, fetchFn = fetch) {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
     });
     if (res.status === 204) return { status: 204, body: null };
-    if (res.ok || allow.includes(res.status)) return { status: res.status, body: await res.json().catch(() => null) };
+    if (allow.includes(res.status)) return { status: res.status, body: null };
+    if (res.ok) {
+      try {
+        return { status: res.status, body: await res.json() };
+      } catch (e) {
+        throw new Error(`GET ${route}: la respuesta ${res.status} no es JSON`, { cause: e });
+      }
+    }
     const text = await res.text().catch(() => '');
     throw new Error(`GET ${route} -> ${res.status} ${text.slice(0, 200)}`);
   };
 }
 
 const enc = encodeURIComponent;
+const PER_PAGE = 100;
+// A list that fills its page may have more: stop in the open instead of planning over a cut list.
+const whole = (items, route) => {
+  if (items.length >= PER_PAGE) throw new Error(`GET ${route}: ${items.length} elementos, puede haber mas de una pagina; el codigo no pagina`);
+  return items;
+};
 
 // The state object planProject expects (see checkState in proyecto.mjs), read with GET calls.
 export async function readState(api, project) {
@@ -41,7 +54,7 @@ export async function readState(api, project) {
     // A public repo is readable with any token, so reading it proves nothing about the installation: ask the installation.
     const names = [];
     for (let page = 1; page <= 20; page++) {
-      const inst = await api(`/installation/repositories?per_page=100&page=${page}`);
+      const inst = await api(`/installation/repositories?per_page=${PER_PAGE}&page=${page}`);
       names.push(...inst.body.repositories.map((x) => x.full_name));
       if (inst.body.repositories.length < 100) break;
     }
@@ -61,16 +74,17 @@ export async function readState(api, project) {
   let environment = null;
   let secretNames = [];
   if (env.status === 200) {
-    const pol = await api(`/repos/${r}/environments/${REVISOR_ENV}/deployment-branch-policies`);
+    const pol = await api(`/repos/${r}/environments/${REVISOR_ENV}/deployment-branch-policies?per_page=${PER_PAGE}`);
     environment = {
       customBranchPolicies: env.body.deployment_branch_policy?.custom_branch_policies === true,
-      branches: pol.body.branch_policies.map((p) => p.name),
+      branches: whole(pol.body.branch_policies, 'branch policies').map((p) => p.name),
     };
-    secretNames = (await api(`/repos/${r}/environments/${REVISOR_ENV}/secrets?per_page=100`)).body.secrets.map((s) => s.name);
+    const secrets = await api(`/repos/${r}/environments/${REVISOR_ENV}/secrets?per_page=${PER_PAGE}`);
+    secretNames = whole(secrets.body.secrets, 'secrets').map((x) => x.name);
   }
-  const list = await api(`/repos/${r}/rulesets?per_page=100`);
+  const list = await api(`/repos/${r}/rulesets?per_page=${PER_PAGE}`);
   const rulesets = [];
-  for (const s of list.body) rulesets.push((await api(`/repos/${r}/rulesets/${s.id}`)).body);
+  for (const s of whole(list.body, 'rulesets')) rulesets.push((await api(`/repos/${r}/rulesets/${s.id}`)).body);
   const ref = await api(`/repos/${r}/git/ref/heads/${SMOKE_BRANCH}`, [404]);
   const branchExists = ref.status === 200;
   const fileOnBranch = branchExists && (await api(`/repos/${r}/contents/${FICHA}?ref=${enc(SMOKE_BRANCH)}`, [404])).status === 200;
