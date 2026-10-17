@@ -83,6 +83,10 @@ function reglaDeWorkflow(texto) {
   }
   const tokens = permisosDelToken(doc);
   if (tokens.length !== 1) fallos.push(`exactly one App-token step is expected, found ${tokens.length}`);
+  for (const st of Object.values(doc.jobs ?? {}).flatMap((j) => j.steps ?? []).filter((x) => String(x.uses ?? '').startsWith('actions/create-github-app-token'))) {
+    // Without owner the action scopes the token to the current repository only (action.yml: repositories defaults to it).
+    if (!st.with?.owner) fallos.push('the App-token step must set owner (without it the token sees only this repository)');
+  }
   for (const t of tokens) {
     const a = JSON.stringify(Object.entries(t).sort());
     if (a !== JSON.stringify(Object.entries(PERMISOS_MANIFIESTO).sort())) fallos.push(`token permissions must equal the manifest of ${ADMIN_APP_SLUG}: has ${a}`);
@@ -152,6 +156,7 @@ jobs:
         with:
           client-id: \${{ secrets.ADMIN_CLIENT_ID }}
           private-key: \${{ secrets.ADMIN_APP_KEY }}
+          owner: factory-am89
 ${Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`).join('')}`;
 
 const BUEN_CODIGO = `const cuerpo = { name: 'main', enforcement: 'active', bypass_actors: [],
