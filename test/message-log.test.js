@@ -73,7 +73,7 @@ test('the count names a line it cannot read, never skips it', () => conCasa((_c,
   writeFileSync(ruta, `${readFileSync(ruta, 'utf8')}{roto\n{"t":"${new Date(T0).toISOString()}","sesion":"${ID_A}","texto":"${TEXTO}"}\n{"t":"ayer","sesion":"${ID_A}"}\n`);
   const c = contarMensajes({ ruta });
   assert.deepEqual([c.total, c.corruptas, c.porSesion[ID_A]], [4, [2, 3, 4], 1]);
-  assert.deepEqual(contarMensajes({ ruta: join(ruta, 'no-existe') }), { total: 0, porSesion: {}, corruptas: [] });
+  assert.deepEqual(contarMensajes({ ruta: join(tmpdir(), 'fabrica-msg-no-existe', 'mensajes.jsonl') }), { total: 0, porSesion: {}, corruptas: [] });
 }));
 
 test('the hook runs for real: stdin JSON writes the line in the fake HOME; a missing event or broken JSON exits 1', () => conCasa((casa, dir, ruta) => {
