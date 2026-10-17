@@ -10,6 +10,8 @@ name: administrar
 #             secretos del environment; la tabla de permisos de GitHub pide `environments`, no `secrets`), metadata: read.
 # Trozo 4: leer-plan.mjs imprime en el resumen lo que le falta a cada repo de proyectos/ y solo envia GET.
 # Trozo 5: secretos.mjs escribe el environment `revisor` y sus tres secretos (cifrados) y nada mas del plan.
+# Trozo 6: aplicar.mjs (paso `aplicar`: token con administration, contents y workflows en write) ajusta, sube los ficheros a main y
+#          crea o completa el ruleset; solo corre si el paso de secretos acabo bien.
 # Los tres valores viven en el environment `administrador` de esta repo; si falta alguno, el paso falla ANTES de escribir
 # y dice los NOMBRES que faltan (nunca valores). El ultimo paso falla el run si el log propio contiene una clave privada.
 on:
@@ -86,6 +88,27 @@ jobs:
           REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ORIGEN_SECRETOS: el environment `administrador` de factory-am89/fabrica (Settings, Environments)
+
+      # Trozo 6. Va DESPUES del paso de secretos y SIN `if` ni continue-on-error: si los secretos fallan (faltan valores, un 403), este
+      # paso y su token no se ejecutan y main no se protege (proteger sin los secretos del environment revisor dejaria sus PR bloqueados).
+      # Ademas aplicar.mjs vuelve a leer y se niega si el environment no tiene los tres nombres. test/admin-aplicar.test.js vigila el orden.
+      - id: aplicar
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.ADMIN_CLIENT_ID }}
+          private-key: ${{ secrets.ADMIN_APP_KEY }}
+          owner: factory-am89
+          # Ajustes y ruleset (administration), ficheros directos a main (contents) y los de .github/workflows (workflows).
+          permission-administration: write
+          permission-contents: write
+          permission-workflows: write
+          permission-metadata: read
+
+      # Ajustes, ficheros directos en main y ruleset de main de cada repo de proyectos/, en ese orden. Nunca pausa ni borra un ruleset.
+      - run: node scripts/admin/aplicar.mjs 2>&1 | tee -a "$RUNNER_TEMP/administrar.log"
+        env:
+          GH_TOKEN_LECTURA: ${{ steps.lectura.outputs.token }}
+          GH_TOKEN_APLICAR: ${{ steps.aplicar.outputs.token }}
 
       # Falla el run si lo que imprimieron los pasos de arriba contiene una clave privada. Solo mira lo que imprimen nuestros
       # scripts (el log de GitHub enmascara los secretos por su cuenta); corre siempre, tambien si el paso de secretos fallo.
