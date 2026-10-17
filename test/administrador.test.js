@@ -9,9 +9,12 @@
 //   2. Its triggers are a closed list: push to main on proyectos/** and scripts/admin/**, and schedule.
 //      Anything else (pull_request_target, workflow_dispatch, workflow_call, issues...) lets code that did not
 //      pass `tests` and `revisor` run with the key.
-//   3. Its `permissions` are exactly `contents: read`, and the `permission-*` inputs of its App-token step equal,
-//      key and level, the default_permissions of the administrator App read from the real manifest in
-//      apps/crear-apps.html (never a copied list): asking for more than the App has, or less, is a difference.
+//   3. Its `permissions` are exactly `contents: read`, and the `permission-*` inputs of EACH App-token step are a
+//      non-empty SUBSET of the default_permissions of the administrator App read from the real manifest in
+//      apps/crear-apps.html (never a copied list): a key the App does not have, or a level above the App's, is a
+//      violation; asking for less is the point (a step mints only what it needs, so the step that only reads holds
+//      a read-only token). Before, the rule demanded EQUALITY, which forced the read-only step to hold a write token.
+//      A token step with id `lectura` must be read-only at every key.
 //   4. scripts/admin/ never deletes a repo, never grants bypass, and never creates a ruleset without
 //      `tests` and `revisor` as required checks and `enforcement: active`.
 // Limits, not checked here: a secret named through a computed expression (${{ secrets[format(...)] }}), and
@@ -37,10 +40,8 @@ const PERMISOS_MANIFIESTO = Object.fromEntries(Object.entries(
   manifiestos().find((m) => m.name === ADMIN_APP_SLUG).default_permissions,
 ).map(([k, v]) => [`permission-${k.replaceAll('_', '-')}`, v]));
 
-function permisosDelToken(doc) {
-  const pasos = Object.values(doc.jobs ?? {}).flatMap((j) => j.steps ?? []).filter((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
-  return pasos.map((p) => Object.fromEntries(Object.entries(p.with ?? {}).filter(([k]) => k.startsWith('permission-'))));
-}
+const NIVEL = { read: 1, write: 2, admin: 3 };
+const PASO_DE_LECTURA = 'lectura'; // id of the token step that only reads (it feeds the plan)
 
 const NOMBRA_LA_CLAVE = /\bADMIN_(?:APP_KEY|CLIENT_ID)\b|\badministrador\b/i;
 const PUSH_PATHS = ['proyectos/**', `${CODIGO}/**`];
@@ -81,15 +82,18 @@ function reglaDeWorkflow(texto) {
   for (const [nombre, job] of Object.entries(doc.jobs ?? {})) {
     if (job.permissions !== undefined && !permisosOk(job.permissions)) fallos.push(`job ${nombre}: permissions must be exactly {contents: read}`);
   }
-  const tokens = permisosDelToken(doc);
-  if (tokens.length !== 1) fallos.push(`exactly one App-token step is expected, found ${tokens.length}`);
-  for (const st of Object.values(doc.jobs ?? {}).flatMap((j) => j.steps ?? []).filter((x) => String(x.uses ?? '').startsWith('actions/create-github-app-token'))) {
+  const pasos = Object.values(doc.jobs ?? {}).flatMap((j) => j.steps ?? []).filter((x) => String(x.uses ?? '').startsWith('actions/create-github-app-token'));
+  if (pasos.length < 1) fallos.push('at least one App-token step is expected, found 0');
+  for (const st of pasos) {
     // Without owner the action scopes the token to the current repository only (action.yml: repositories defaults to it).
     if (!st.with?.owner) fallos.push('the App-token step must set owner (without it the token sees only this repository)');
-  }
-  for (const t of tokens) {
-    const a = JSON.stringify(Object.entries(t).sort());
-    if (a !== JSON.stringify(Object.entries(PERMISOS_MANIFIESTO).sort())) fallos.push(`token permissions must equal the manifest of ${ADMIN_APP_SLUG}: has ${a}`);
+    const t = Object.fromEntries(Object.entries(st.with ?? {}).filter(([k]) => k.startsWith('permission-')));
+    if (Object.keys(t).length === 0) fallos.push('an App-token step with no permission-* inputs gets every permission of the App: list the ones it needs');
+    for (const [k, v] of Object.entries(t)) {
+      if (!(k in PERMISOS_MANIFIESTO)) fallos.push(`token permission ${k} is not in the manifest of ${ADMIN_APP_SLUG}`);
+      else if (!(v in NIVEL) || NIVEL[v] > NIVEL[PERMISOS_MANIFIESTO[k]]) fallos.push(`token permission ${k}: ${v} is above the manifest level (${PERMISOS_MANIFIESTO[k]})`);
+    }
+    if (st.id === PASO_DE_LECTURA && Object.values(t).some((v) => v !== 'read')) fallos.push(`the token step ${PASO_DE_LECTURA} must be read-only, has ${JSON.stringify(t)}`);
   }
   return fallos;
 }
@@ -152,12 +156,24 @@ jobs:
     runs-on: ubuntu-latest
     environment: administrador
     steps:
-      - uses: actions/create-github-app-token@0000000000000000000000000000000000000000
+      - id: lectura
+        uses: actions/create-github-app-token@0000000000000000000000000000000000000000
         with:
           client-id: \${{ secrets.ADMIN_CLIENT_ID }}
           private-key: \${{ secrets.ADMIN_APP_KEY }}
           owner: factory-am89
-${Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`).join('')}`;
+          permission-contents: read
+          permission-metadata: read
+      - id: escritura
+        uses: actions/create-github-app-token@0000000000000000000000000000000000000000
+        with:
+          client-id: \${{ secrets.ADMIN_CLIENT_ID }}
+          private-key: \${{ secrets.ADMIN_APP_KEY }}
+          owner: factory-am89
+          permission-administration: write
+          permission-environments: write
+          permission-metadata: read
+`;
 
 const BUEN_CODIGO = `const cuerpo = { name: 'main', enforcement: 'active', bypass_actors: [],
   rules: [{ type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'tests / tests' }, { context: 'revisor' }] } }] };
@@ -211,15 +227,27 @@ test('rule 3 (red): permissions beyond contents: read', () => {
   assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permissions:\n  contents: read\n', '') }).join('\n'), /permissions must be exactly/);
 });
 
-test('rule 3 (red): the token permissions must equal the real manifest, key and level', () => {
+test('rule 3 (red): each token step must be a subset of the real manifest, key and level', () => {
   assert.ok(Object.keys(PERMISOS_MANIFIESTO).length >= 8, 'the manifest was not read');
-  const lineas = Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`);
-  const sin = (n) => BUEN_WORKFLOW.replace(lineas[n], '');
-  assert.match(motivos({ [WORKFLOW]: sin(0) }).join('\n'), /token permissions must equal the manifest/);
-  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW + '          permission-issues: write\n' }).join('\n'), /token permissions must equal the manifest/);
-  const [k0, v0] = Object.entries(PERMISOS_MANIFIESTO)[0];
-  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(`${k0}: ${v0}`, `${k0}: ${v0 === 'write' ? 'read' : 'write'}`) }).join('\n'), /token permissions must equal the manifest/);
-  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(/ {6}- uses:[\s\S]*$/, '      - run: echo\n') }).join('\n'), /exactly one App-token step/);
+  const [k0, v0] = Object.entries(PERMISOS_MANIFIESTO).find(([, v]) => v === 'read');
+  // A key the App does not have.
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW + '          permission-issues: write\n' }).join('\n'), /permission-issues is not in the manifest/);
+  // A level above the App's: the manifest has it as read, the token asks write.
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW + `          ${k0}: write\n` }).join('\n'), new RegExp(`${k0}: write is above the manifest level \\(${v0}\\)`));
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW + '          permission-pull-requests: admin\n' }).join('\n'), /is above the manifest level/);
+  // Asking for the whole set is still a subset (the shape the rule used to demand), and asking for less is allowed.
+  const todo = Object.entries(PERMISOS_MANIFIESTO).map(([k, v]) => `          ${k}: ${v}\n`).join('');
+  const unPaso = '      - uses: actions/create-github-app-token@0\n        with:\n          owner: factory-am89\n' + todo;
+  assert.deepEqual(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(/ {6}- id: lectura[\s\S]*$/, unPaso) }), []);
+  // A step with no permission-* inputs: the action would then grant everything the App has.
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('          permission-contents: read\n          permission-metadata: read\n', '') }).join('\n'), /no permission-\* inputs/);
+  assert.match(motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace(/ {6}- id: lectura[\s\S]*$/, '      - run: echo\n') }).join('\n'), /at least one App-token step/);
+});
+
+test('rule 3 (red): the step that only reads cannot hold a write level', () => {
+  const m = motivos({ [WORKFLOW]: BUEN_WORKFLOW.replace('permission-contents: read', 'permission-contents: write') }).join('\n');
+  assert.match(m, /the token step lectura must be read-only/);
+  assert.doesNotMatch(motivos({ [WORKFLOW]: BUEN_WORKFLOW }).join('\n'), /read-only/);
 });
 
 test('rule 4 (red): scripts/admin deleting a repo, granting bypass, or a weak ruleset', () => {

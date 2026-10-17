@@ -1,12 +1,17 @@
 name: administrar
 
 # El unico workflow que usa la clave de la App fabrica-administrador (plans/app-admin.md, punto 2). test/administrador.test.js
-# vigila: solo estos disparadores, permisos del workflow exactamente contents: read, y los permisos del token iguales,
-# clave y nivel, a los del manifiesto de la App.
+# vigila: solo estos disparadores, permisos del workflow exactamente contents: read, y los permisos de CADA token un
+# subconjunto, clave y nivel, de los del manifiesto de la App (nunca una clave que la App no tiene ni un nivel mas alto).
 #
-# Trozo 4: SOLO LECTURA. Imprime en el resumen lo que le falta a cada repo de proyectos/ y no aplica nada.
-# Aviso honesto: el guardia exige que el token pida los permisos del manifiesto (incluidos los de escritura), asi que
-# la lectura sola no la impone el token sino el codigo: scripts/admin/leer-plan.mjs solo envia GET.
+# Cada paso pide solo lo que necesita:
+#   lectura   token solo de lectura: lee el estado real y alimenta el plan (leer-plan.mjs) y la segunda lectura de secretos.mjs.
+#   escritura administration: write (crear el environment y su politica de ramas) y environments: write (clave publica y
+#             secretos del environment; la tabla de permisos de GitHub pide `environments`, no `secrets`), metadata: read.
+# Trozo 4: leer-plan.mjs imprime en el resumen lo que le falta a cada repo de proyectos/ y solo envia GET.
+# Trozo 5: secretos.mjs escribe el environment `revisor` y sus tres secretos (cifrados) y nada mas del plan.
+# Los tres valores viven en el environment `administrador` de esta repo; si falta alguno, el paso falla ANTES de escribir
+# y dice los NOMBRES que faltan (nunca valores). El ultimo paso falla el run si el log propio contiene una clave privada.
 on:
   push:
     branches: [main]
@@ -25,6 +30,9 @@ jobs:
     timeout-minutes: 10
     # Los secretos viven en este environment, limitado a la rama main: una rama no puede desplegar en el.
     environment: administrador
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,23 +42,58 @@ jobs:
         with:
           node-version: 22
 
-      - id: app
+      # secretos.mjs usa libsodium (cifrar con la clave publica del environment). Antes de acuñar ningun token y sin scripts de instalacion.
+      - run: npm ci --ignore-scripts
+
+      # Copia de lo que imprimen los pasos de abajo, para el ultimo paso.
+      - run: touch "$RUNNER_TEMP/administrar.log"
+
+      - id: lectura
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.ADMIN_CLIENT_ID }}
           private-key: ${{ secrets.ADMIN_APP_KEY }}
           # Sin owner la accion limita el token al repo actual: no veria los proyectos.
           owner: factory-am89
-          permission-administration: write
-          permission-contents: write
-          permission-workflows: write
-          permission-environments: write
-          permission-pull-requests: write
-          permission-checks: read
           permission-actions: read
+          permission-contents: read
+          permission-environments: read
+          permission-pull-requests: read
           permission-metadata: read
 
       # Lee el estado real (solo GET) e imprime el plan en el resumen del job.
-      - run: node scripts/admin/leer-plan.mjs
+      - run: node scripts/admin/leer-plan.mjs 2>&1 | tee -a "$RUNNER_TEMP/administrar.log"
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ steps.lectura.outputs.token }}
+
+      - id: escritura
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.ADMIN_CLIENT_ID }}
+          private-key: ${{ secrets.ADMIN_APP_KEY }}
+          owner: factory-am89
+          permission-administration: write
+          permission-environments: write
+          permission-metadata: read
+
+      # Escribe el environment `revisor` (solo main) y sus tres secretos cifrados en cada repo de proyectos/.
+      - id: secretos
+        run: node scripts/admin/secretos.mjs 2>&1 | tee -a "$RUNNER_TEMP/administrar.log"
+        env:
+          GH_TOKEN_LECTURA: ${{ steps.lectura.outputs.token }}
+          GH_TOKEN_ESCRITURA: ${{ steps.escritura.outputs.token }}
+          REVISOR_APP_KEY: ${{ secrets.REVISOR_APP_KEY }}
+          REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ORIGEN_SECRETOS: el environment `administrador` de factory-am89/fabrica (Settings, Environments)
+
+      # Falla el run si lo que imprimieron los pasos de arriba contiene una clave privada. Solo mira lo que imprimen nuestros
+      # scripts (el log de GitHub enmascara los secretos por su cuenta); corre siempre, tambien si el paso de secretos fallo.
+      - if: always()
+        run: |
+          set +e
+          grep -q 'PRIVATE KEY' "$RUNNER_TEMP/administrar.log"
+          codigo=$?
+          if [ "$codigo" -eq 0 ]; then echo "::error::lo impreso por los pasos de este run contiene una clave privada"; exit 1; fi
+          if [ "$codigo" -ne 1 ]; then echo "::error::no se pudo leer el log propio (grep dio $codigo)"; exit "$codigo"; fi
+          echo "El log propio no contiene una clave privada."

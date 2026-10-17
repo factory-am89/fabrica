@@ -30,5 +30,8 @@
     "eslint": "^9.0.0",
     "globals": "^16.0.0",
     "js-yaml": "^4.1.0"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "0.8.4"
   }
 }
