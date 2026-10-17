@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import {
-  ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
+  ACTIONS_APP_ID, ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
 } from '../scripts/admin/proyecto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
@@ -185,7 +185,7 @@ test('ruleset body: tests / tests from Actions and revisor from its App, PR requ
   assert.deepEqual(b.conditions.ref_name.include, ['~DEFAULT_BRANCH']);
   assert.deepEqual(b.rules.map((r) => r.type), ['pull_request', 'required_status_checks', 'non_fast_forward', 'deletion']);
   assert.deepEqual(b.rules[1].parameters.required_status_checks, [
-    { context: 'tests / tests', integration_id: 15368 },
+    { context: 'tests / tests', integration_id: ACTIONS_APP_ID },
     { context: 'revisor', integration_id: REVISOR_APP_ID },
   ]);
   assert.throws(() => rulesetBody({}), /revisorAppId/);
@@ -208,6 +208,13 @@ test('ruleset body equals Cuerpo-Ruleset in apps/lib-gh.ps1 in rule types, PR pa
   assert.match(cuerpo, /ref_name = @\{ include = @\('~DEFAULT_BRANCH'\)/);
   assert.match(cuerpo, /context = \$ContextoTests; integration_id = \$IdActions/);
   assert.match(cuerpo, /context = 'revisor'; integration_id = \$IdRevisor/);
+});
+
+test('the Actions App id is the one apps/ruleset.ps1 uses (until that copy is retired), and is the known 15368', () => {
+  const m = leer(RAIZ, 'apps', 'ruleset.ps1').match(/\$IdGitHubActions\s*=\s*(\d+)/);
+  assert.ok(m, 'cannot find $IdGitHubActions in apps/ruleset.ps1');
+  assert.equal(ACTIONS_APP_ID, Number(m[1]));
+  assert.equal(ACTIONS_APP_ID, 15368);
 });
 
 test('SecretosRevisor and ArchivosProyecto in apps/lib-proyecto.ps1 list what this module lists (until chunk 10 deletes them)', () => {

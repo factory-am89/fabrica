@@ -11,7 +11,7 @@
 // in lib-proyecto.ps1) are retired in chunk 10; test/admin-proyecto.test.js ties the copies to this file meanwhile.
 export const ORG = 'factory-am89';
 export const REVISOR_SECRETS = ['CLAUDE_CODE_OAUTH_TOKEN', 'REVISOR_CLIENT_ID', 'REVISOR_APP_KEY'];
-const ACTIONS_APP_ID = 15368; // GitHub Actions: where the `tests / tests` check comes from
+export const ACTIONS_APP_ID = 15368; // GitHub Actions: where the `tests / tests` check comes from
 const SMOKE_BRANCH = 'ops/fabrica-ficha';
 const REVISOR_ENV = 'revisor';
 export const FICHA = '.fabrica.json';
