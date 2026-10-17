@@ -54,8 +54,14 @@ test('the App not installed on the repo fails loudly with that cause (a public r
 });
 
 test('a 403 from GitHub is an error, never an empty answer', async () => {
-  const { api } = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo/rulesets': [403, null] });
-  await assert.rejects(readState(api, PROJECT), /403/);
+  // Through the real makeApi: a fake fetch answers 403 for the rulesets route and 200 for the rest.
+  const routes = { ...UNPROTECTED, '/repos/factory-am89/demo/rulesets': [403, null] };
+  const fetchFn = async (url) => {
+    const hit = routes[new URL(url).pathname];
+    if (!hit) return { ok: false, status: 500, text: async () => 'unexpected route' };
+    return { ok: hit[0] < 400, status: hit[0], json: async () => hit[1], text: async () => 'forbidden' };
+  };
+  await assert.rejects(readState(makeApi('t', fetchFn), PROJECT), /rulesets.*403/);
 });
 
 test('a 200 whose body is not JSON is an error, not an empty answer', async () => {

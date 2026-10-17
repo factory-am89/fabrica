@@ -26,7 +26,8 @@ export const PROJECT_FILES = [
   { path: 'package-lock.json', template: 'package-lock.json', soloVacio: true },
 ];
 // Every template planProject can ask for: the ones above plus the smoke PR's.
-export const TEMPLATE_NAMES = [...PROJECT_FILES.map((f) => f.template), 'ficha.json'];
+export const FICHA_TEMPLATE = 'ficha.json';
+export const TEMPLATE_NAMES = [...PROJECT_FILES.map((f) => f.template), FICHA_TEMPLATE];
 
 // The closed list of calls: operation, method and the shape of the path. `planProject` returns nothing else,
 // and the list has no deletion on purpose (the guard test fails if one appears).
@@ -185,7 +186,7 @@ function smokeCalls(project, state, templates) {
     out.push(call('create-ref', 'POST', `/repos/${r}/git/refs`, { ref: `refs/heads/${SMOKE_BRANCH}`, sha: state.mainSha }));
   }
   if (!branchExists || !fileOnBranch) {
-    out.push(call('put-file', 'PUT', `/repos/${r}/contents/${FICHA}`, { message: `Fabrica: ${FICHA}`, content: b64(render(templateText(templates, 'ficha.json'), project)), branch: SMOKE_BRANCH }));
+    out.push(call('put-file', 'PUT', `/repos/${r}/contents/${FICHA}`, { message: `Fabrica: ${FICHA}`, content: b64(render(templateText(templates, FICHA_TEMPLATE), project)), branch: SMOKE_BRANCH }));
   }
   out.push(call('open-pr', 'POST', `/repos/${r}/pulls`, { title: 'Ficha de la Fabrica', head: SMOKE_BRANCH, base: 'main', body: `Deja la ficha ${FICHA} en ${r}. La abre la App de la Fabrica; GitHub la fusiona cuando tests y revisor estan en verde.` }));
   return out;
