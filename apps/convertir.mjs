@@ -5,13 +5,17 @@
 // Uso: node apps/convertir.mjs <code>
 // Variables opcionales: REPO (por defecto, el de scripts/lib/repo.mjs), OP_VAULT (bóveda de 1Password).
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO as REPO_FABRICA, ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
 
 const REPO = process.env.REPO ?? REPO_FABRICA;
+// Marker that starts the fallback message. apps/arranque.ps1 (Rescatar-Pem) reads the same file to find the key file.
+export const MARCA_RESCATE = readFileSync(new URL('./marca-rescate.txt', import.meta.url), 'utf8').trim();
+// Names of the private-key secrets, one per environment.
+export const SECRETO_CLAVE = { revisor: 'REVISOR_APP_KEY', administrador: 'ADMIN_APP_KEY' };
 export const ENTORNO = 'revisor'; // los secretos del revisor viven en este environment (solo main), no en el repo
 
 // Argumentos de `gh secret set` para un secreto del revisor: siempre en su environment.
@@ -41,7 +45,7 @@ function conStdin(programa, args, secreto) {
 // Exact commands to upload the key from the fallback file (the key itself is never printed).
 function comandosSubida(slug, ruta, entorno) {
   if (!entorno) return `op document create "${ruta}" --title ${slug}.pem`;
-  const nombre = entorno === ENTORNO_ADMIN ? 'ADMIN_APP_KEY' : 'REVISOR_APP_KEY';
+  const nombre = SECRETO_CLAVE[entorno];
   return `Get-Content -Raw "${ruta}" | gh secret set ${nombre} --repo ${REPO} --env ${entorno}`;
 }
 
@@ -50,7 +54,7 @@ function guardarEnFichero(slug, pem, motivo, entorno) {
   const ruta = join(carpeta, `${slug}.pem`);
   writeFileSync(ruta, pem, { mode: 0o600 });
   chmodSync(ruta, 0o600); // on Windows this does not really restrict: upload and delete at once
-  console.log(`WARNING: ${motivo}. The private key is in ${ruta} (GitHub cannot show it again; losing it means regenerating it).`);
+  console.log(`${MARCA_RESCATE}: ${motivo}. The private key is in ${ruta} (GitHub cannot show it again; losing it means regenerating it).`);
   console.log(`1. Upload it: ${comandosSubida(slug, ruta, entorno)}`);
   console.log(`2. Delete the folder: Remove-Item -Recurse -Force "${carpeta}"`);
 }
@@ -61,9 +65,9 @@ function guardarAdmin(app) {
   if (r.status !== 0) {
     return guardarEnFichero(app.slug, app.pem, `el environment ${ENTORNO_ADMIN} no quedó limitado a main, no escribo secretos (${r.error?.message ?? (r.stdout + r.stderr).trim()})`, ENTORNO_ADMIN);
   }
-  const clave = conStdin('gh', argsSecreto('ADMIN_APP_KEY', REPO, ENTORNO_ADMIN), app.pem);
+  const clave = conStdin('gh', argsSecreto(SECRETO_CLAVE[ENTORNO_ADMIN], REPO, ENTORNO_ADMIN), app.pem);
   const id = conStdin('gh', argsSecreto('ADMIN_CLIENT_ID', REPO, ENTORNO_ADMIN), String(app.client_id));
-  if (clave.ok && id.ok) return console.log(`Secretos ADMIN_APP_KEY y ADMIN_CLIENT_ID guardados en el environment ${ENTORNO_ADMIN} de ${REPO}.`);
+  if (clave.ok && id.ok) return console.log(`Secretos ${SECRETO_CLAVE[ENTORNO_ADMIN]} y ADMIN_CLIENT_ID guardados en el environment ${ENTORNO_ADMIN} de ${REPO}.`);
   guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`, ENTORNO_ADMIN);
 }
 
@@ -76,9 +80,9 @@ function guardar(app, quien) {
     return guardarEnFichero(app.slug, app.pem, `no pude escribir en 1Password (${r.error})`);
   }
   if (quien === 'administrador') return guardarAdmin(app);
-  const clave = conStdin('gh', argsSecreto('REVISOR_APP_KEY'), app.pem);
+  const clave = conStdin('gh', argsSecreto(SECRETO_CLAVE[ENTORNO]), app.pem);
   const id = conStdin('gh', argsSecreto('REVISOR_CLIENT_ID'), String(app.client_id));
-  if (clave.ok && id.ok) return console.log(`Secretos REVISOR_APP_KEY y REVISOR_CLIENT_ID guardados en el environment ${ENTORNO} de ${REPO}.`);
+  if (clave.ok && id.ok) return console.log(`Secretos ${SECRETO_CLAVE[ENTORNO]} y REVISOR_CLIENT_ID guardados en el environment ${ENTORNO} de ${REPO}.`);
   guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`, ENTORNO);
   console.log(`Cuando puedas: gh secret set REVISOR_CLIENT_ID --repo ${REPO} --env ${ENTORNO} (el client id es ${app.client_id}, no es secreto). ¿Existe el environment ${ENTORNO}? Es el paso 2 de PASOS-PABLO.md.`);
 }
@@ -90,20 +94,28 @@ const run = (programa, args) => spawnSync(programa, args, { encoding: 'utf8', sh
 // exists only in memory once it is exchanged. Returns the list of problems (empty = go ahead). Nothing is consumed.
 export function previos(runner = run, repo = REPO) {
   const problemas = [];
+  const again = 'then the same command again: the code is still valid for up to one hour.';
+  const causa = (r) => r.error?.message ?? (String(r.stderr ?? '').trim() || `exit ${r.status}`);
   const auth = runner('gh', ['auth', 'status']);
-  if (auth.error || auth.status !== 0) {
-    problemas.push('gh is not logged in. Run `gh auth login`, then the same command again: the code is still valid for up to one hour.');
+  if (auth.error) {
+    problemas.push(`Could not run gh (${auth.error.message}). Install gh and run \`gh auth login\`, ${again}`);
+  } else if (auth.status !== 0) {
+    problemas.push(`gh is not logged in (${causa(auth)}). Run \`gh auth login\`, ${again}`);
   } else {
     const api = runner('gh', ['api', `repos/${repo}`]);
-    let admin = false;
-    try { admin = api.status === 0 && JSON.parse(api.stdout).permissions?.admin === true; } catch { admin = false; }
-    if (!admin) {
-      problemas.push(`The gh account cannot administer ${repo}. Run \`gh auth login\` with an administrator account, then the same command again: the code is still valid for up to one hour.`);
+    let datos = null;
+    let fallo = null;
+    if (api.error || api.status !== 0) fallo = `gh api repos/${repo} failed: ${causa(api)}`;
+    else {
+      try { datos = JSON.parse(api.stdout); } catch (e) { fallo = `gh api repos/${repo} returned invalid JSON: ${e.message}`; }
     }
+    if (fallo) problemas.push(`${fallo}. Fix that, ${again}`);
+    else if (datos?.permissions?.admin === false) problemas.push(`The gh account cannot administer ${repo}. Run \`gh auth login\` with an administrator account, ${again}`);
+    else if (datos?.permissions?.admin !== true) problemas.push(`gh api repos/${repo} did not report permissions.admin, so admin rights cannot be confirmed. Run \`gh auth login\` with an administrator account, ${again}`);
   }
   const ps = runner(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
   if (ps.error || ps.status !== 0) {
-    problemas.push(`${POWERSHELL} is not available, so apps/entorno.ps1 cannot create the environment. Install it, then run the same command again: the code is still valid for up to one hour.`);
+    problemas.push(`${POWERSHELL} is not available (${causa(ps)}), so apps/entorno.ps1 cannot create the environment. Install it, ${again}`);
   }
   return problemas;
 }
