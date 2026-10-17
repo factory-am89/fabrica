@@ -37,10 +37,10 @@ export async function sealSecret(value, publicKeyB64) {
   return sodium.to_base64(sodium.crypto_box_seal(sodium.from_string(value), key), b64);
 }
 
-// The only door that writes. The path is checked against the closed list; an error carries method, path and status, never a body.
-export function makeWriteApi(token, fetchFn = fetch) {
+// The only door that writes (aplicar.mjs passes its own `check` for its own operations). The call is checked against the closed list; an error carries method, path and status, never a body.
+export function makeWriteApi(token, fetchFn = fetch, check = assertAllowed) {
   return async function writeApi(call, body) {
-    assertAllowed(call);
+    check(call);
     const res = await fetchFn(`${API}${call.path}`, {
       method: call.method,
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
