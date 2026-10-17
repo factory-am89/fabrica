@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { REPO } from '../scripts/lib/repo.mjs';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import {
   ACTIONS_APP_ID, ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
 } from '../scripts/admin/proyecto.mjs';
@@ -215,6 +217,11 @@ test('the Actions App id is the one apps/ruleset.ps1 uses (until that copy is re
   assert.ok(m, 'cannot find $IdGitHubActions in apps/ruleset.ps1');
   assert.equal(ACTIONS_APP_ID, Number(m[1]));
   assert.equal(ACTIONS_APP_ID, 15368);
+});
+
+test('the card file name and the organization are the ones the rest of the Factory uses (scripts/admin/ imports nothing: it runs with the key)', () => {
+  assert.equal(FICHA, NOMBRE_FICHA);
+  assert.equal(ORG, REPO.split('/')[0]);
 });
 
 test('SecretosRevisor and ArchivosProyecto in apps/lib-proyecto.ps1 list what this module lists (until chunk 10 deletes them)', () => {
