@@ -77,7 +77,7 @@ export async function readState(api, project) {
   const fileOnBranch = branchExists && (await api(`/repos/${r}/contents/.fabrica.json?ref=${enc(SMOKE_BRANCH)}`, [404])).status === 200;
   const prs = await api(`/repos/${r}/pulls?state=all&head=${enc(`${project.owner}:${SMOKE_BRANCH}`)}`);
   const p = prs.body[0];
-  const pr = p ? { number: p.number, state: p.state, merged: p.merged_at != null, autoMerge: p.auto_merge != null, nodeId: p.node_id } : null;
+  const pr = p ? { number: p.number, state: p.state, merged: p.merged_at !== null, autoMerge: p.auto_merge !== null, nodeId: p.node_id } : null;
   return { repo, files, environment, secretNames, rulesets, revisorAppId: appId, mainSha, smoke: { branchExists, fileOnBranch, pr } };
 }
 
