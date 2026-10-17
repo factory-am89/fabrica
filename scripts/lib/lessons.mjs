@@ -13,7 +13,7 @@ export const LESSON_FAULTS = Object.freeze(
     'BAD_VERSION',
     'UNKNOWN_CLASS',
     'BAD_SOURCE',
-    'SOURCE_NOT_ROW',
+    'SOURCE_IS_LINE',
     'BAD_MECHANISM_KIND',
     'MECHANISM_MISSING',
     'MECHANISM_NO_MARK',
@@ -28,7 +28,8 @@ const NO_CLASS = 'none';
 const HUMAN_ORIGIN = 'pablo';
 const ID_RE = /^[a-z0-9-]+$/;
 const PR_SOURCE = /^#[1-9]\d*$/;
-const ROW_SOURCE = /^intervenciones\.md:([1-9]\d*)$/;
+// A line number points at the wrong row as soon as main adds rows (merge=union hides the shift): refused.
+const LINE_SOURCE = /:[1-9]\d*$/;
 const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
 const REPEATED = 'repetida: sí';
 const STANDARDS = ['standards/code.md', 'standards/plan.md'];
@@ -71,7 +72,7 @@ const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x))
 // lessons: [{id, text, file?}], ctx: see lessonContext. Returns [{code, where, message}] (empty = green).
 export function lessonFaults(lessons, ctx) {
   const faults = [];
-  const rowSources = new Set();
+  const ids = lessons.map((l) => l.id);
   for (const l of lessons) {
     const where = `lessons/${l.file ?? `${l.id}.json`}`;
     const add = (code, message) => faults.push({ code, where, message });
@@ -85,13 +86,10 @@ export function lessonFaults(lessons, ctx) {
     if (d.v !== VERSION) add(LESSON_FAULTS.BAD_VERSION, `v must be ${VERSION}`);
     if (!ctx.classes.includes(d.class)) add(LESSON_FAULTS.UNKNOWN_CLASS, `class ${JSON.stringify(d.class)} is not a question id nor «${NO_CLASS}»`);
     if (!ctx.origins.includes(d.origin)) add(LESSON_FAULTS.UNKNOWN_ORIGIN, `origin ${JSON.stringify(d.origin)} is not an agent of .claude/agents/ nor «${HUMAN_ORIGIN}»`);
-    const row = typeof d.source === 'string' ? d.source.match(ROW_SOURCE) : null;
-    if (!PR_SOURCE.test(d.source) && !row) {
-      add(LESSON_FAULTS.BAD_SOURCE, `source ${JSON.stringify(d.source)} must be #<n> or intervenciones.md:<line>`);
-    } else if (row) {
-      const n = Number(row[1]);
-      rowSources.add(n);
-      if (!DATED_ROW.test(ctx.intervenciones.split('\n')[n - 1] ?? '')) add(LESSON_FAULTS.SOURCE_NOT_ROW, `intervenciones.md:${n} is not a dated row`);
+    if (typeof d.source === 'string' && LINE_SOURCE.test(d.source)) {
+      add(LESSON_FAULTS.SOURCE_IS_LINE, `source ${JSON.stringify(d.source)} cites a line number, which moves when main adds rows; cite the PR as #<n>`);
+    } else if (typeof d.source !== 'string' || !PR_SOURCE.test(d.source)) {
+      add(LESSON_FAULTS.BAD_SOURCE, `source ${JSON.stringify(d.source)} must be #<n>`);
     }
     if (mechanismKind(d.mechanism) === null) {
       add(LESSON_FAULTS.BAD_MECHANISM_KIND, `mechanism ${JSON.stringify(d.mechanism)} is not a test, hook, skill, standard or script path`);
@@ -102,8 +100,8 @@ export function lessonFaults(lessons, ctx) {
     }
   }
   ctx.intervenciones.split('\n').forEach((line, i) => {
-    if (DATED_ROW.test(line) && line.split(' | ').at(-1).startsWith(REPEATED) && !rowSources.has(i + 1)) {
-      faults.push({ code: LESSON_FAULTS.REPEATED_WITHOUT_LESSON, where: `intervenciones.md:${i + 1}`, message: `a row marked «${REPEATED}» is the source of no lesson` });
+    if (DATED_ROW.test(line) && line.split(' | ').at(-1).startsWith(REPEATED) && !ids.some((id) => line.includes(`lessons/${id}.json`))) {
+      faults.push({ code: LESSON_FAULTS.REPEATED_WITHOUT_LESSON, where: `intervenciones.md:${i + 1}`, message: `a row marked «${REPEATED}» cites no lessons/<id>.json of a lesson present` });
     }
   });
   return faults;

@@ -12,13 +12,13 @@ import { LESSON_FAULTS, lessonContext, lessonFaults, mechanismKind, readLessons 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REAL = lessonContext(RAIZ);
 
-// Fixture: line 1 is not a row, line 2 is a row, line 3 is a row marked repeated. The good lesson points to line 3.
-const INTERVENCIONES = ['# header', '2026-01-01 | clic | a | b | repetida: no', '2026-01-02 | decisión | a | b | repetida: sí (#9)'].join('\n');
+// Fixture: line 3 is a row marked repeated that cites lessons/good-one.json; the good lesson has source #9.
+const INTERVENCIONES = ['# header', '2026-01-01 | clic | a | b | repetida: no', '2026-01-02 | decisión | a | b | repetida: sí (`lessons/good-one.json`)'].join('\n');
 const GOOD_FILES = { 'test/example.test.js': '// lesson: good-one\n' };
 const good = () => ({
   id: 'good-one',
   file: 'good-one.json',
-  data: { v: 1, class: REAL.classes[0], source: 'intervenciones.md:3', mechanism: 'test/example.test.js', origin: REAL.origins[0] },
+  data: { v: 1, class: REAL.classes[0], source: '#9', mechanism: 'test/example.test.js', origin: REAL.origins[0] },
   files: { ...GOOD_FILES },
 });
 const ctxOf = (fx) => ({ ...REAL, intervenciones: INTERVENCIONES, fileText: (p) => fx.files[p] ?? null });
@@ -42,10 +42,10 @@ const MUTATIONS = {
   ],
   BAD_VERSION: [['v is 2', set('v', 2)]],
   UNKNOWN_CLASS: [['class C999', set('class', 'C999')], ['class with a trailing space', set('class', 'none ')]],
-  BAD_SOURCE: [['plain text', set('source', 'see the chat')], ['PR number zero', set('source', '#0')], ['not a string', set('source', 7)]],
-  SOURCE_NOT_ROW: [
-    ['line 1 is the header', set('source', 'intervenciones.md:1')],
-    ['line past the end', set('source', 'intervenciones.md:99')],
+  BAD_SOURCE: [['plain text', set('source', 'see the chat')], ['PR number zero', set('source', '#0')], ['not a string', set('source', 7)], ['PR number with text', set('source', '#9 y más')]],
+  SOURCE_IS_LINE: [
+    ['intervenciones.md line', set('source', 'intervenciones.md:3')],
+    ['any file and line', set('source', 'standards/code.md:12')],
   ],
   BAD_MECHANISM_KIND: [
     ['path of no known kind', set('mechanism', 'README.md')],
@@ -58,7 +58,7 @@ const MUTATIONS = {
     ['mark of a longer id', (fx) => ({ ...fx, files: { 'test/example.test.js': '// lesson: good-one-more\n' } })],
   ],
   UNKNOWN_ORIGIN: [['origin nobody', set('origin', 'nobody')]],
-  REPEATED_WITHOUT_LESSON: [['the repeated row has no lesson', set('source', '#5')]],
+  REPEATED_WITHOUT_LESSON: [['the repeated row cites a lesson that is not there', (fx) => ({ ...fx, id: 'other-one', file: 'other-one.json', files: { 'test/example.test.js': '// lesson: other-one\n' } })]],
 };
 
 test('every fault code has a mutation row and every row names a real code', () => {

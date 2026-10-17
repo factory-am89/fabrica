@@ -28,7 +28,7 @@ function fixtureRoot(t, lessons) {
   }
   return root;
 }
-const lesson = (over) => ({ v: 1, class: REAL.classes[0], source: 'intervenciones.md:2', mechanism: 'test/a.test.js', origin: REAL.origins[0], ...over });
+const lesson = (over) => ({ v: 1, class: REAL.classes[0], source: '#2', mechanism: 'test/a.test.js', origin: REAL.origins[0], ...over });
 
 const THREE = () => ({
   one: lesson({ mechanism: 'test/a.test.js' }),
