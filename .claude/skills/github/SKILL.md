@@ -72,6 +72,7 @@ nothing else). A bare `gh` is not counted.
 
 - **2026-10-16 · PR #20 entered `main` without the `revisor` check.** Cause: the ruleset was lifted for a moment to merge
   #19 (an owner action Pablo approved), and GitHub merged at once every other PR with auto-merge armed (#20 at 10:57:32
+  UTC, before its `tests` and `revisor` finished; `revisor` then said «no»). It happened again with #52: a PR can be born
   armed inside the window. Fix: pausing the ruleset is forbidden with no exception (`intervenciones.md`, row of 2026-10-17;
   rule in `standards/intervention.md`, «Who decides a merge»); the way out of a wrong «no» is Pablo's Approve. The old
   `npm run ventana` is gone. A machine enforces it: `test/ruleset-never-paused.test.js`. The findings of #20 went to PR #23.

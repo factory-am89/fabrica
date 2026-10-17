@@ -6,7 +6,8 @@
 // No network, no clock: the real tree is read, the bad cases are text fixtures in memory.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +46,7 @@ function ficheros(dir) {
 
 export function escanear(raiz) {
   return CARPETAS.flatMap((c) => {
-    try { return ficheros(join(raiz, c)); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+    return existsSync(join(raiz, c)) ? ficheros(join(raiz, c)) : [];
   }).flatMap((p) => escanearTexto(relative(raiz, p).split(sep).join('/'), readFileSync(p, 'utf8')));
 }
 
@@ -100,4 +101,15 @@ test('bad fixtures fail with file:line: DELETE to a rulesets endpoint, in every 
   // The endpoint on the line after the method flag still counts.
   const dos = escanearTexto('scripts/malo.mjs', "run(['api', '-X', 'DELETE',\n  `repos/${r}/rulesets/${id}`]);\n");
   assert.deepEqual(dos.map((x) => x.regla), ['delete-ruleset']);
+});
+
+test('a root that does not exist is skipped, but a root that cannot be read throws (a read error is never swallowed)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fabrica-nopause-'));
+  try {
+    assert.deepEqual(escanear(dir), [], 'no apps/, scripts/ or .github/: nothing to scan');
+    writeFileSync(join(dir, 'apps'), 'a file where the folder should be');
+    assert.throws(() => escanear(dir), /ENOTDIR/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

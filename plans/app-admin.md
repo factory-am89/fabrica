@@ -3,7 +3,7 @@
 Fecha: 16 oct 2026. Base leída: `origin/main` en b7f5c46 (incluye #52 y #63); los «Existing:» se volvieron a comprobar con `git grep` sobre esa base.
 Estado: plan; el trozo T2 ya está fusionado (#57), el resto sin código. Ningún valor de secreto se ha leído ni impreso.
 
-Verdict: viable y recomendable, pero la clave administradora es un superpoder (puede borrar repos y quitar protecciones); su única frontera real es lo que entra en `main` de fabrica, así que la «ventana» (pausar el ruleset) era el agujero principal; la decisión A (cerrada con la opción 1, `intervenciones.md`, fila del 2026-10-17) la prohíbe sin excepción, `npm run ventana` ya no existe y `test/ruleset-never-paused.test.js` lo vigila.
+Verdict: viable y recomendable, pero la clave administradora es un superpoder (puede borrar repos y quitar protecciones); su única frontera real es lo que entra en `main` de fabrica, así que la «ventana» (pausar el ruleset) deja de ser un riesgo menor y pasa a ser el agujero principal: con esta App, la ventana debe desaparecer, no automatizarse.
 
 ---
 
@@ -62,10 +62,10 @@ también tiene poder sobre `fabrica` y `fabrica-privado`.
   aflojar el check de máquina es «debilitar un check» (lista cerrada) → para y pregunta a Pablo antes de construir.
   Verdad incómoda: si un PR engaña a la vez al test y al revisor, el workflow fusionado corre con la clave. La frontera real es
   el `main` de fabrica, igual que hoy para el juez.
-- **Agujero principal (cerrado por la decisión A, opción 1): la ventana.** Con el ruleset pausado, cualquiera con escritura (el constructor) puede empujar directo a
+- **Agujero principal: la ventana.** Con el ruleset pausado, cualquiera con escritura (el constructor) puede empujar directo a
   `main`, y ese push dispara `administrar.yml` con código suyo y la clave al alcance. Ningún paso del propio workflow lo puede
-  impedir (correría el código empujado). Por eso: la App administradora NUNCA pausa ni relaja un ruleset, y nadie lo hace: pausar está prohibido sin excepción,
-  `npm run ventana` se retiró y un test falla si el código escribe un ruleset no activo o lo borra. Ver la decisión A.
+  impedir (correría el código empujado). Por eso: la App administradora NUNCA pausa ni relaja un ruleset, y mientras exista
+  `npm run ventana abrir` la clave queda expuesta en cada apertura. Ver la decisión A.
 
 ## 3. Flujo «proyecto nuevo» sin Pablo
 
@@ -116,7 +116,7 @@ Elimina:
 NO elimina, a propósito (fronteras):
 - Crear Apps, ampliar sus permisos, generar o rotar claves privadas (ninguna App puede, y está prohibido a agentes).
 - Pausar o relajar un ruleset («ventana») y arreglar un juez roto que no puede juzgar su propio arreglo: es saltarse la
-  puerta; si lo hiciera una máquina, cualquiera que la engañe se la salta. Nadie lo hace: la decisión A (opción 1) lo prohíbe sin excepción; un juez roto se resuelve con el Approve de Pablo o con un PR que el juez actual pueda aprobar.
+  puerta; si lo hiciera una máquina, cualquiera que la engañe se la salta. Queda de Pablo hasta que la decisión A lo elimine.
 - Borrar repos; cambiar el plan de pago; repos privados (sin ruleset en plan gratuito: `fabrica-privado` queda fuera).
 - El OK previo de Pablo a trozos que tocan caminos cerrados (`apps/**`, `.github/workflows/**`): casi todos los de este plan.
   Recomendación: un solo OK para el plan entero, apuntado en `intervenciones.md`.
@@ -238,7 +238,7 @@ Hace: el workflow pide los permisos de escritura y aplica el resto del plan a ho
 Files: `.github/workflows/administrar.yml`
 Depends on: 5
 Blocked by: A, B
-Existing: el ruleset de homenu-panel hoy lo crean a mano los scripts de PowerShell; en Node nada lo crea ni lo toca (`npm run ventana` se retiró con la decisión A); `.github/workflows/anulacion.yml` solo lo nombra en un comentario.
+Existing: el ruleset de homenu-panel hoy lo crean a mano los scripts de PowerShell; en Node solo `scripts/ventana.mjs` lo pausa y lo rearma (no lo crea); `.github/workflows/anulacion.yml` solo lo nombra en un comentario.
 ```
 $ git grep -il "ruleset" -- apps scripts .github
 .github/workflows/anulacion.yml
@@ -248,6 +248,8 @@ apps/lib-proyecto.ps1
 apps/proyecto-nuevo.ps1
 apps/proyecto-nuevo/tests.yml
 apps/ruleset.ps1
+scripts/lib/ventana.mjs
+scripts/ventana.mjs
 ```
 Not done: PR de humo, crear repos.
 Done: el ruleset de `main` de homenu-panel incluye `required_status_checks` con los contextos `tests / tests` y `revisor`, sin faltar ninguna regla del cuerpo del ruleset; un segundo run del workflow informa «0 cambios».
@@ -329,7 +331,7 @@ npm test
 ## Decisions for Pablo
 
 ### A. Con esta App, cada ventana (pausar el ruleset) expone la clave administradora: ¿qué se hace con la ventana? (antes D1)
-CERRADA con la opción 1 (prohibir la ventana, sin excepción de emergencia): fila del 2026-10-17 en `intervenciones.md`. La tomó la sesión coordinadora (fabrica-80) con la delegación de Pablo («a ver, haz lo que veas, sabiendo que queremos optimizar para 0% hitl, maxima escalabilidad y optimización de coding e infra por y para agentes», 17 oct 2026, dicha dos veces), no Pablo con una frase suya sobre este punto. Cómo se cumple: `npm run ventana` se retiró, `standards/intervention.md` («Who decides a merge») lo prohíbe y `test/ruleset-never-paused.test.js` falla si el código escribe un ruleset no activo o lo borra. Un juez roto se resuelve con el Approve de Pablo (#61) o con un PR que el juez actual pueda aprobar. Las opciones se conservan como registro de lo que se decidió.
+Decidida solo en parte, y no con estas opciones: `intervenciones.md:26` (16 oct 2026; la tomó la sesión coordinadora con la delegación de Pablo, no una frase suya) prohíbe pausar el ruleset «como práctica», pero deja `npm run ventana` para emergencias. Así que la ventana sigue existiendo y el agujero principal del punto 2 sigue abierto mientras haya una emergencia posible. Con la anulación de #61 (ya en `main`, b7f5c46), un juez roto ya no necesita la ventana, porque basta el Approve de Pablo. Queda por decidir qué pasa con la clave en una emergencia; hasta entonces, ningún trozo que instale la clave empieza.
 1. Prohibir la ventana: un juez roto se arregla con un PR que el juez viejo pueda aprobar, y si no puede, Pablo hace el arreglo como dueño sin pausar el ruleset para todos (recommended)
 2. Mantener la ventana pero desactivar antes el environment `administrador` (un clic más de Pablo cada vez)
 3. Aceptar el riesgo y apuntarlo
@@ -349,7 +351,7 @@ Un solo OK para el plan entero, apuntado en `intervenciones.md`.
 5. Si existen rulesets de organización en plan gratuito para repos públicos (no se usan; solo cambiaría el diseño a futuro).
 6. Que `tests / tests` sea el nombre del check en un repo creado desde las plantillas (PASOS-PABLO.md lo da por visto en homenu-panel; yo no lo he visto).
 7. `gh` no tiene sesión en este PC: no he mirado nada en GitHub en vivo (rulesets, instalaciones, secretos).
-8. `npm run ventana` (#53) se retiró con la decisión A; el plan original no lo leyó.
+8. `npm run ventana` existe ya en `origin/main` (#53); el plan original no lo leyó y esta versión tampoco.
 
 ## Dudas del arquitecto (no son decisiones de Pablo)
 
