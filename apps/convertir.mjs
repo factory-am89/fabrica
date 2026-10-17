@@ -38,24 +38,33 @@ function conStdin(programa, args, secreto) {
   return { ok: r.status === 0, error: r.error?.message ?? r.stderr?.trim() };
 }
 
-function guardarEnFichero(slug, pem, motivo) {
+// Exact commands to upload the key from the fallback file (the key itself is never printed).
+function comandosSubida(slug, ruta, entorno) {
+  if (!entorno) return `op document create "${ruta}" --title ${slug}.pem`;
+  const nombre = entorno === ENTORNO_ADMIN ? 'ADMIN_APP_KEY' : 'REVISOR_APP_KEY';
+  return `Get-Content -Raw "${ruta}" | gh secret set ${nombre} --repo ${REPO} --env ${entorno}`;
+}
+
+function guardarEnFichero(slug, pem, motivo, entorno) {
   const carpeta = mkdtempSync(join(tmpdir(), 'fabrica-'));
   const ruta = join(carpeta, `${slug}.pem`);
   writeFileSync(ruta, pem, { mode: 0o600 });
-  chmodSync(ruta, 0o600); // en Windows no restringe de verdad: muévela y bórrala enseguida
-  console.log(`AVISO: ${motivo}. La clave está en ${ruta}. Guárdala donde toque y borra el fichero.`);
+  chmodSync(ruta, 0o600); // on Windows this does not really restrict: upload and delete at once
+  console.log(`WARNING: ${motivo}. The private key is in ${ruta} (GitHub cannot show it again; losing it means regenerating it).`);
+  console.log(`1. Upload it: ${comandosSubida(slug, ruta, entorno)}`);
+  console.log(`2. Delete the folder: Remove-Item -Recurse -Force "${carpeta}"`);
 }
 
 function guardarAdmin(app) {
   // Sin environment comprobado y limitado a main no se escribe ningún secreto.
-  const r = spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', argsEntornoPs(REPO, ENTORNO_ADMIN), { encoding: 'utf8' });
+  const r = spawnSync(POWERSHELL, argsEntornoPs(REPO, ENTORNO_ADMIN), { encoding: 'utf8' });
   if (r.status !== 0) {
-    return guardarEnFichero(app.slug, app.pem, `el environment ${ENTORNO_ADMIN} no quedó limitado a main, no escribo secretos (${r.error?.message ?? (r.stdout + r.stderr).trim()})`);
+    return guardarEnFichero(app.slug, app.pem, `el environment ${ENTORNO_ADMIN} no quedó limitado a main, no escribo secretos (${r.error?.message ?? (r.stdout + r.stderr).trim()})`, ENTORNO_ADMIN);
   }
   const clave = conStdin('gh', argsSecreto('ADMIN_APP_KEY', REPO, ENTORNO_ADMIN), app.pem);
   const id = conStdin('gh', argsSecreto('ADMIN_CLIENT_ID', REPO, ENTORNO_ADMIN), String(app.client_id));
   if (clave.ok && id.ok) return console.log(`Secretos ADMIN_APP_KEY y ADMIN_CLIENT_ID guardados en el environment ${ENTORNO_ADMIN} de ${REPO}.`);
-  guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`);
+  guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`, ENTORNO_ADMIN);
 }
 
 function guardar(app, quien) {
@@ -70,14 +79,40 @@ function guardar(app, quien) {
   const clave = conStdin('gh', argsSecreto('REVISOR_APP_KEY'), app.pem);
   const id = conStdin('gh', argsSecreto('REVISOR_CLIENT_ID'), String(app.client_id));
   if (clave.ok && id.ok) return console.log(`Secretos REVISOR_APP_KEY y REVISOR_CLIENT_ID guardados en el environment ${ENTORNO} de ${REPO}.`);
-  guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`);
+  guardarEnFichero(app.slug, app.pem, `no pude escribir los secretos de ${REPO} (${clave.error ?? id.error})`, ENTORNO);
   console.log(`Cuando puedas: gh secret set REVISOR_CLIENT_ID --repo ${REPO} --env ${ENTORNO} (el client id es ${app.client_id}, no es secreto). ¿Existe el environment ${ENTORNO}? Es el paso 2 de PASOS-PABLO.md.`);
 }
 
-async function main() {
-  const code = process.argv[2];
+const POWERSHELL = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
+const run = (programa, args) => spawnSync(programa, args, { encoding: 'utf8', shell: process.platform === 'win32' && programa === 'gh' });
+
+// Everything the code exchange needs afterwards, checked BEFORE it: the code is single-use and the private key
+// exists only in memory once it is exchanged. Returns the list of problems (empty = go ahead). Nothing is consumed.
+export function previos(runner = run, repo = REPO) {
+  const problemas = [];
+  const auth = runner('gh', ['auth', 'status']);
+  if (auth.error || auth.status !== 0) {
+    problemas.push('gh is not logged in. Run `gh auth login`, then the same command again: the code is still valid for up to one hour.');
+  } else {
+    const api = runner('gh', ['api', `repos/${repo}`]);
+    let admin = false;
+    try { admin = api.status === 0 && JSON.parse(api.stdout).permissions?.admin === true; } catch { admin = false; }
+    if (!admin) {
+      problemas.push(`The gh account cannot administer ${repo}. Run \`gh auth login\` with an administrator account, then the same command again: the code is still valid for up to one hour.`);
+    }
+  }
+  const ps = runner(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
+  if (ps.error || ps.status !== 0) {
+    problemas.push(`${POWERSHELL} is not available, so apps/entorno.ps1 cannot create the environment. Install it, then run the same command again: the code is still valid for up to one hour.`);
+  }
+  return problemas;
+}
+
+export async function convertir(code, { fetchFn = fetch, runner = run } = {}) {
   if (!code) throw new Error('Uso: node apps/convertir.mjs <code>');
-  const res = await fetch(`https://api.github.com/app-manifests/${encodeURIComponent(code)}/conversions`, {
+  const problemas = previos(runner);
+  if (problemas.length) throw new Error(`Code NOT exchanged (still unused):\n- ${problemas.join('\n- ')}`);
+  const res = await fetchFn(`https://api.github.com/app-manifests/${encodeURIComponent(code)}/conversions`, {
     method: 'POST',
     headers: { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
   });
@@ -88,9 +123,17 @@ async function main() {
   guardar(app, quien);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
+// Exit code of the command: 0 done, 1 any failure (message on stderr).
+export async function cli(args, deps) {
+  try {
+    await convertir(args[0], deps);
+    return 0;
+  } catch (e) {
     console.error(e.message);
-    process.exit(1);
-  });
+    return 1;
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exit(await cli(process.argv.slice(2)));
 }
