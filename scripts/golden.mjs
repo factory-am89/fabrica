@@ -12,21 +12,19 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE } from './lib/questions.mjs';
+import { CASE_FILES, CLEAN, EXPECTED_FILE, GOLDEN_DIR, checkFloorShape, plain } from './lib/golden-guard.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
-export const CORPUS = path.join(RAIZ, 'test', 'fixtures', 'golden', 'review');
+export const CORPUS = path.join(RAIZ, ...GOLDEN_DIR.split('/'));
 export const STANDARD = 'standards/code.md';
 export const AUTHORS = ['sonnet', 'opus', 'human'];
-export const CLEAN = 'clean';
+export { CLEAN };
 export const MIN_CASES_PER_CELL = 5;
-const CASE_FILES = ['pr.diff', 'body.md'];
-const EXPECTED = 'expected.json';
 // decidir also checks that the judged commit is the PR head; here there is no PR, so both are the same fixed value.
 const CTX = { sha: 'corpus', cabeza: 'corpus' };
 
-const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const rate = (n, d) => (d === 0 ? null : n / d);
 const readJson = (file, what) => {
   try {
@@ -38,7 +36,7 @@ const readJson = (file, what) => {
 
 // Reads the corpus and checks it against the standard's reviewer questions. Throws on the first malformed thing.
 export function loadCorpus(dir, preguntas) {
-  const expected = readJson(path.join(dir, EXPECTED), 'corpus');
+  const expected = readJson(path.join(dir, EXPECTED_FILE), 'corpus');
   if (!plain(expected)) throw new Error('corpus: expected.json must be an object');
   const folders = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
   const ids = Object.keys(expected).sort();
@@ -119,9 +117,7 @@ export function score(cases, answers) {
 
 // Floor -> list of faults of `informe` against it (empty when it holds). Throws on a malformed floor.
 export function belowFloor(informe, floor) {
-  if (!plain(floor) || Object.keys(floor).sort().join() !== 'deteccion,falsosNo') throw new Error('floor: must have exactly deteccion and falsosNo');
-  const inRange = (x) => typeof x === 'number' && x >= 0 && x <= 1;
-  if (!plain(floor.deteccion) || !inRange(floor.falsosNo) || !Object.values(floor.deteccion).every(inRange)) throw new Error('floor: values must be numbers between 0 and 1');
+  checkFloorShape(floor);
   const faults = [];
   for (const [id, min] of Object.entries(floor.deteccion)) {
     const d = informe.deteccion[id];

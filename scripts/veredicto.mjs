@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
+import { checkGolden } from './lib/golden-guard.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from './lib/repo.mjs';
 import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
@@ -51,11 +52,12 @@ function normalizar(r) {
 }
 
 // salida: texto JSON {respuestas:[{id, respuesta, prueba}]}
-// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR) }
+// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR), golden (motivos cerrados del freno del corpus dorado, scripts/lib/golden-guard.mjs; vacío o ausente = ninguno) }
 // Solo ids, respuestas y veredicto salen de aquí: ningún texto libre del modelo.
 export function decidir(salida, preguntas, ctx = {}) {
   const fallos = [];
   if (!ctx.sha || ctx.sha !== ctx.cabeza) fallos.push('la cabeza del PR ya no es el SHA juzgado');
+  fallos.push(...(ctx.golden ?? []));
   let datos;
   try {
     datos = JSON.parse(salida);
@@ -153,6 +155,36 @@ async function leerContexto({ repo, pr, sha, token }) {
   return { sha, cabeza: datosPr.head.sha, reviews: await reviewsDe({ repo, pr, token }) };
 }
 
+// El freno del corpus dorado: lee el PR por la API con el token de solo lectura del workflow (LECTOR; el de la App no tiene
+// contents) y no ejecuta nada del PR. Devuelve los motivos cerrados de scripts/lib/golden-guard.mjs.
+async function frenoDorado({ repo, base, sha, token }) {
+  const get = async (ruta, accept) => {
+    const res = await fetch(`https://api.github.com${ruta}`, { headers: { authorization: `Bearer ${token}`, accept, 'x-github-api-version': '2022-11-28' } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`GET ${ruta} → ${res.status}`);
+    return res;
+  };
+  return checkGolden({
+    base,
+    head: sha,
+    listFiles: async () => {
+      const todos = [];
+      for (let pagina = 1; ; pagina += 1) {
+        const res = await get(`/repos/${repo}/compare/${base}...${sha}?per_page=100&page=${pagina}`, 'application/vnd.github+json');
+        if (!res) throw new Error('compare not found');
+        const { files } = await res.json();
+        if (!Array.isArray(files)) throw new Error('the compare has no file list');
+        todos.push(...files);
+        if (files.length < 100) return todos;
+      }
+    },
+    read: async (ref, ruta) => {
+      const res = await get(`/repos/${repo}/contents/${ruta}?ref=${ref}`, 'application/vnd.github.raw+json');
+      return res ? res.text() : null;
+    },
+  });
+}
+
 const publicarCheck = (repo, sha, token, conclusion, output) =>
   api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, status: 'completed', conclusion, output });
 
@@ -191,11 +223,12 @@ async function main() {
     for (const k of ['REPO', 'PR', 'TOKEN']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
     return anular(process.env);
   }
-  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD } = process.env;
-  for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN })) {
+  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR } = process.env;
+  for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN, BASE, LECTOR })) {
     if (!v) throw new Error(`falta la variable ${k}`);
   }
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
+  ctx.golden = await frenoDorado({ repo: REPO, base: BASE, sha: SHA, token: LECTOR });
   let preguntas;
   let errorEstandar = null;
   try {
@@ -204,7 +237,7 @@ async function main() {
     errorEstandar = e;
   }
   // Un estándar inválido es un no publicado (nunca un sí) y el script sale con error.
-  const veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar'] } : decidir(SALIDA ?? '', preguntas, ctx);
+  const veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar', ...ctx.golden] } : decidir(SALIDA ?? '', preguntas, ctx);
   // El registro nunca cambia el veredicto: si no se puede construir, el veredicto se publica igual (sin registro) y el script falla en alto.
   let registro = null;
   let errorRegistro = null;
