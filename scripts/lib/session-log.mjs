@@ -24,7 +24,7 @@ export const rutaDeSesiones = (casa = homedir) => join(casa(), '.fabrica', 'sesi
 // A value is checked against its shape only if it is a string (String(undefined) would pass as «undefined»).
 const con = (re, x) => typeof x === 'string' && re.test(x);
 export const idValido = (x) => con(FORMA_ID, x);
-const esHora = (x) => typeof x === 'string' && !Number.isNaN(Date.parse(x));
+export const esHora = (x) => typeof x === 'string' && !Number.isNaN(Date.parse(x));
 const ESTA_LIB = 'session register:';
 
 // Throws unless the object is a valid file; returns it. Used when writing and when reading.

@@ -4,6 +4,9 @@
 //     tocar  UserPromptSubmit and PostToolBatch: the session did something -> its `ultima` is updated (a session that has
 //            no file yet, e.g. started before this existed, gets one). Documented events with session_id and cwd in the
 //            common input (https://code.claude.com/docs/en/hooks).
+//            The hook JSON must carry hook_event_name (UserPromptSubmit or PostToolBatch; anything else fails): on
+//            UserPromptSubmit a line {t, sesion} (never the text) is also appended to ~/.fabrica/mensajes.jsonl (lib/message-log.mjs).
+//            A hook run for a subagent (agent_id in the input) writes no message line.
 //     fin    SessionEnd: the session closed -> its file is deleted.
 // The register itself (one line per session at start) is the step `sesiones` of scripts/al-arrancar.mjs.
 // A failure in a hook mode is said on stderr and exits 1 (a non-blocking error for Claude Code): the session goes on, the failure is seen.
@@ -13,6 +16,7 @@ import { git, principal } from './lib/folders.mjs';
 import {
   ACTIVA_H, CADUCA_H, SIN_RAMA, idValido, apuntarSesion, leerFicha, leerSesiones, purgarViejas, quitarSesion, rutaDeSesiones,
 } from './lib/session-log.mjs';
+import { registrarMensaje, rutaDeMensajes } from './lib/message-log.mjs';
 import { choques, leerReparto, reservasVivasAjenas } from './lib/work-split.mjs';
 
 // The branch of a folder; a detached HEAD is SIN_RAMA. A folder that is not a repo throws.
@@ -65,9 +69,15 @@ export const pasoSesiones = ({
 });
 
 // Hook mode `tocar`. `entrada` is the hook JSON. Returns the file written.
-export function tocar(entrada, { dir = rutaDeSesiones(), reloj = Date.now, rama = ramaDe, fs } = {}) {
+export const EVENTOS_TOCAR = ['UserPromptSubmit', 'PostToolBatch'];
+
+export function tocar(entrada, {
+  dir = rutaDeSesiones(), reloj = Date.now, rama = ramaDe, fs, rutaMensajes = rutaDeMensajes(),
+} = {}) {
   const id = entrada?.session_id;
   if (!idValido(id)) throw new Error('hook input without a valid session_id');
+  const evento = entrada.hook_event_name;
+  if (!EVENTOS_TOCAR.includes(evento)) throw new Error(`hook input without a known hook_event_name (${EVENTOS_TOCAR.join(' or ')}): ${JSON.stringify(evento ?? null)}`);
   const opciones = { dir, reloj, ...(fs ? { fs } : {}) };
   const previa = leerFicha(id, opciones);
   const hayCwd = typeof entrada.cwd === 'string' && entrada.cwd !== '';
@@ -75,7 +85,9 @@ export function tocar(entrada, { dir = rutaDeSesiones(), reloj = Date.now, rama 
   // The folder and the branch come from the hook's cwd every time: a session that moves or switches branch is not left stale.
   // Without cwd in the input the stored folder is used (never the current folder of this process).
   const carpeta = hayCwd ? entrada.cwd : previa.carpeta;
-  return apuntarSesion({ id, carpeta, rama: rama(carpeta) }, opciones);
+  const ficha = apuntarSesion({ id, carpeta, rama: rama(carpeta) }, opciones);
+  if (evento === 'UserPromptSubmit' && !entrada.agent_id) registrarMensaje({ sesion: id, ruta: rutaMensajes, reloj, ...(fs ? { fs } : {}) });
+  return ficha;
 }
 
 export function fin(entrada, opciones = {}) {

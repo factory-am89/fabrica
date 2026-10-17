@@ -119,27 +119,27 @@ test('a file that cannot be read is named, never skipped: the listing says it an
 
 test('hook tocar: updates ultima and takes folder and branch from the hook cwd (a session that moves or switches branch is not left stale); creates the file when there is none; fin deletes it', () => conCasa((_c, dir) => {
   sesion(dir, ID_A, 'feat/uno', () => T0, 'C:/dev/fabrica-uno');
-  const f = tocar({ session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'feat/otra' : 'mal') });
+  const f = tocar({ hook_event_name: 'PostToolBatch', session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'feat/otra' : 'mal') });
   assert.deepEqual([f.carpeta, f.rama, f.ultima, f.inicio], ['C:/dev/fabrica-otra', 'feat/otra', new Date(T0 + H).toISOString(), new Date(T0).toISOString()]);
-  const mismaCarpeta = tocar({ session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + 2 * H, rama: () => 'fix/cambiada' });
+  const mismaCarpeta = tocar({ hook_event_name: 'PostToolBatch', session_id: ID_A, cwd: 'C:/dev/fabrica-otra' }, { dir, reloj: () => T0 + 2 * H, rama: () => 'fix/cambiada' });
   assert.equal(mismaCarpeta.rama, 'fix/cambiada');
-  const sinCwd = tocar({ session_id: ID_A }, { dir, reloj: () => T0 + 3 * H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'fix/cambiada' : 'mal') });
+  const sinCwd = tocar({ hook_event_name: 'PostToolBatch', session_id: ID_A }, { dir, reloj: () => T0 + 3 * H, rama: (c) => (c === 'C:/dev/fabrica-otra' ? 'fix/cambiada' : 'mal') });
   assert.equal(sinCwd.carpeta, 'C:/dev/fabrica-otra');
-  const nueva = tocar({ session_id: ID_B, cwd: 'C:/dev/fabrica-dos' }, { dir, reloj: () => T0, rama: () => 'fix/dos' });
+  const nueva = tocar({ hook_event_name: 'PostToolBatch', session_id: ID_B, cwd: 'C:/dev/fabrica-dos' }, { dir, reloj: () => T0, rama: () => 'fix/dos' });
   assert.deepEqual([nueva.carpeta, nueva.rama], ['C:/dev/fabrica-dos', 'fix/dos']);
-  assert.throws(() => tocar({ cwd: 'x' }, { dir }), /valid session_id/);
+  assert.throws(() => tocar({ hook_event_name: 'PostToolBatch', cwd: 'x' }, { dir }), /valid session_id/);
   fin({ session_id: ID_A }, { dir });
   assert.deepEqual(readdirSync(dir), [ID_B + '.json']);
 }));
 
 test('hook modes run for real: tocar and fin read the hook JSON on stdin', () => conCasa((casa, dir) => {
   const hook = (modo, entrada) => spawnSync(process.execPath, [join(RAIZ, 'scripts', 'sesiones.mjs'), modo], { input: JSON.stringify(entrada), encoding: 'utf8', env: { ...process.env, HOME: casa, USERPROFILE: casa } });
-  const r = hook('tocar', { session_id: ID_A, cwd: RAIZ });
+  const r = hook('tocar', { hook_event_name: 'PostToolBatch', session_id: ID_A, cwd: RAIZ });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(readdirSync(dir), [`${ID_A}.json`]);
   assert.equal(hook('fin', { session_id: ID_A }).status, 0);
   assert.deepEqual(readdirSync(dir), []);
-  const mala = hook('tocar', { cwd: RAIZ });
+  const mala = hook('tocar', { hook_event_name: 'PostToolBatch', cwd: RAIZ });
   assert.equal(mala.status, 1);
   assert.match(mala.stderr, /valid session_id/);
 }));
@@ -288,6 +288,6 @@ test('a missing cwd is not replaced by the current folder: the step and the toca
   const r = reparto(mkdtempSync(join(casa, 'rep-')), []);
   const paso = pasoSesiones({ dir, reloj: () => T0, memoria: () => ({ libre: 1048576, total: 2097152 }), rama: () => 'feat/mia', raiz: () => r });
   assert.match(ejecutar(paso, { session_id: ID_B }).error.message, /cwd/);
-  assert.throws(() => tocar({ session_id: ID_B }, { dir, reloj: () => T0, rama: () => 'feat/mia' }), /cwd/);
+  assert.throws(() => tocar({ hook_event_name: 'PostToolBatch', session_id: ID_B }, { dir, reloj: () => T0, rama: () => 'feat/mia' }), /cwd/);
   assert.equal(existsSync(dir), false);
 }));
