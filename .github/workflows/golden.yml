@@ -1,0 +1,104 @@
+name: golden
+
+# Mide al revisor de verdad: corre el `claude` del juez sobre el corpus de test/fixtures/golden/review
+# (9 casos x 3 intentos = 27 llamadas, unos 10 $ por pasada) y publica el informe (detección por pregunta,
+# falsos «no», varianza) como resumen del job y como artefacto. Todavía NO hay suelo: este workflow solo
+# falla si una salida falta, es ilegible o claude da error, nunca por detección baja. El suelo se añade
+# cuando la varianza esté medida.
+#
+# Cuándo corre: cada lunes, al fusionar a main un cambio del rol del revisor, de un estándar o del
+# juez, y a mano (workflow_dispatch). Siempre en main: el environment `revisor` solo admite esa rama.
+#
+# Mismo secreto que el revisor (CLAUDE_CODE_OAUTH_TOKEN del environment `revisor`); no hay secretos
+# nuevos ni permisos más allá de contents: read. El prompt, el modelo y el schema salen de revisor.yml
+# (lo lee scripts/golden-run.mjs): aquí no se copian.
+#
+# Orden: el corpus sin expected.json -> pasos con Claude (solo ahí existe el token) -> expected.json ->
+# informe. El juez que ve Claude se extrae de git SIN test/fixtures/golden, y la comprobación del
+# esperado se baja después de que Claude haya terminado.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - '.claude/agents/revisor.md'
+      - 'standards/**'
+      - '.github/workflows/revisor.yml'
+      - 'scripts/veredicto.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: golden
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Los secretos viven en el environment `revisor`, limitado a la rama main.
+    environment: revisor
+    steps:
+      # Todo salvo expected.json: los esperados no están en disco mientras Claude corre.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/test/fixtures/golden/review/expected.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Versión fija del CLI: lo que se mide es el juez, no una actualización de la herramienta. Sin el token.
+      - name: Instalar claude
+        run: npm install --global @anthropic-ai/claude-code@2.1.301
+
+      # Único paso con el token. Falla (y la pasada para) si claude da error o su salida no se lee.
+      - name: Pasada del revisor sobre el corpus (sin esperados)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/golden"
+          node scripts/golden-run.mjs --phase collect --out "$RUNNER_TEMP/golden/salidas" | tee "$RUNNER_TEMP/golden/pasada.log"
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      # Ya sin Claude: ahora sí se bajan los esperados.
+      - name: Bajar los esperados
+        run: git sparse-checkout disable
+
+      - name: Informe
+        run: node scripts/golden-run.mjs --phase score --out "$RUNNER_TEMP/golden/salidas" > "$RUNNER_TEMP/golden/informe.txt"
+
+      - name: Informe en el resumen del job
+        if: always()
+        run: |
+          {
+            echo '## Pasada del revisor sobre el corpus'
+            echo
+            if [ -f "$RUNNER_TEMP/golden/informe.txt" ]; then
+              echo '```'
+              cat "$RUNNER_TEMP/golden/informe.txt"
+              echo '```'
+            else
+              echo 'Sin informe: la pasada falló antes de puntuar (mira el log del job).'
+            fi
+            if [ -f "$RUNNER_TEMP/golden/pasada.log" ]; then
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/golden/pasada.log"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: golden-${{ github.run_id }}
+          path: ${{ runner.temp }}/golden
+          if-no-files-found: error

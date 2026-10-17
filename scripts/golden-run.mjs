@@ -1,5 +1,7 @@
 // Runs the real reviewer (`claude -p`) on the reviewer corpus, locally: no workflow, no new secret (it uses the session's own login).
-//   node scripts/golden-run.mjs [--trials N] [--ref GIT_REF] [--out DIR] [--workflow FILE] [--corpus DIR]
+//   node scripts/golden-run.mjs [--trials N] [--ref GIT_REF] [--out DIR] [--workflow FILE] [--corpus DIR] [--phase all|collect|score]
+// --phase collect only calls the reviewer and writes the outputs: it never reads expected.json (CI runs it before the expectations
+// are on disk). --phase score only reads the outputs in --out and prints the report: it never calls the reviewer. Default: all.
 // Prompt, model, max turns, allowed tools and schema are READ from .github/workflows/revisor.yml (step `claude`) with js-yaml:
 // that file is their only source. The only changes made to the prompt are the PR number, the diff path and the sentence that
 // sends the reviewer to `gh pr view` (there is no PR here: it points to body.md instead); Bash tools are dropped for the same reason.
@@ -9,7 +11,7 @@
 // them (no floor) and the report adds the variance: how many cases get an unstable verdict across the trials.
 // GOLDEN_CLAUDE_BIN replaces the claude binary (tests: test/fixtures/claude-falso.mjs).
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +23,7 @@ import { cargarPreguntas } from './veredicto.mjs';
 const RAIZ = path.resolve(import.meta.dirname, '..');
 export const MAX_CALLS = 27;
 export const DEFAULT_TRIALS = 3;
+export const PHASES = ['all', 'collect', 'score'];
 const WORKFLOW = path.join(RAIZ, '.github', 'workflows', 'revisor.yml');
 const EXCLUDED = 'test/fixtures/golden';
 const FAKE_PR = '0';
@@ -181,14 +184,16 @@ function oneCall({ root, judge, corpus, c, t, claude, reviewer }) {
   }
 }
 
-export function runPass({ trials = DEFAULT_TRIALS, ref = 'HEAD', out, workflow = WORKFLOW, corpus = CORPUS, log = console.log }) {
-  const preguntas = cargarPreguntas(STANDARD, RAIZ);
-  const cases = loadCorpus(corpus, preguntas);
+// The cases of a corpus without its expectations (phase collect): one per folder, sorted, as loadCorpus orders them.
+function foldersOf(corpus) {
+  return readdirSync(corpus, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => ({ id: e.name })).sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+function collect({ cases, trials, ref, outputs, workflow, corpus, log }) {
   const calls = cases.length * trials;
   if (calls > MAX_CALLS) throw new Error(`${calls} calls (${cases.length} cases x ${trials} trials) is over the limit of ${MAX_CALLS}`);
   const reviewer = readReviewer(workflow);
   const claude = resolveClaude();
-  const outputs = out ?? mkdtempSync(path.join(tmpdir(), 'fabrica-golden-outputs-'));
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-golden-run-'));
   log(`${calls} calls (${cases.length} cases x ${trials} trials), model ${reviewer.model}, max ${MAX_CALLS}; outputs in ${outputs}`);
   try {
@@ -207,6 +212,19 @@ export function runPass({ trials = DEFAULT_TRIALS, ref = 'HEAD', out, workflow =
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+}
+
+export function runPass({ trials = DEFAULT_TRIALS, ref = 'HEAD', out, workflow = WORKFLOW, corpus = CORPUS, phase = 'all', log = console.log }) {
+  if (!PHASES.includes(phase)) throw new Error(`--phase must be one of ${PHASES.join(', ')}`);
+  if (phase === 'score' && !out) throw new Error('--phase score needs --out: the outputs to score');
+  const outputs = out ?? mkdtempSync(path.join(tmpdir(), 'fabrica-golden-outputs-'));
+  if (phase === 'collect') {
+    collect({ cases: foldersOf(corpus), trials, ref, outputs, workflow, corpus, log });
+    return `collected ${trials} trials per case in ${outputs}`;
+  }
+  const preguntas = cargarPreguntas(STANDARD, RAIZ);
+  const cases = loadCorpus(corpus, preguntas);
+  if (phase === 'all') collect({ cases, trials, ref, outputs, workflow, corpus, log });
   const texts = loadOutputs(outputs, cases, trials);
   const answers = Object.fromEntries(cases.map((c) => [c.id, texts[c.id].map((x, i) => answersOf(x, preguntas, `${c.id}/${i + 1}.json`))]));
   return `${format(score(cases, answers), [])}\n${formatVariance(variance(cases, answers), trials)}`;
@@ -214,7 +232,7 @@ export function runPass({ trials = DEFAULT_TRIALS, ref = 'HEAD', out, workflow =
 
 function parseArgs(argv) {
   const opts = {};
-  const known = { '--trials': 'trials', '--ref': 'ref', '--out': 'out', '--workflow': 'workflow', '--corpus': 'corpus' };
+  const known = { '--trials': 'trials', '--ref': 'ref', '--out': 'out', '--workflow': 'workflow', '--corpus': 'corpus', '--phase': 'phase' };
   for (let i = 0; i < argv.length; i += 1) {
     if (known[argv[i]] && argv[i + 1] !== undefined) opts[known[argv[i]]] = argv[++i];
     else throw new Error(`unknown or incomplete argument: ${argv[i]}`);
