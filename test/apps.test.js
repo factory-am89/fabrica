@@ -5,7 +5,7 @@ import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { destino, argsSecreto, argsEntornoPs, ENTORNO_ADMIN } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
 import { leer, manifiestos } from './apoyo/fabrica.mjs';
-import { ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { ADMIN_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 
 test('convertir.mjs guarda los secretos del revisor en su environment', () => {
   assert.deepEqual(argsSecreto('REVISOR_APP_KEY').slice(-2), ['--env', 'revisor']);
@@ -83,4 +83,13 @@ test('token.mjs: JWT RS256 con el client id, orden tras -- y sin escribir en dis
   assert.deepEqual(orden(['--', 'gh', 'pr', 'list']), ['gh', 'pr', 'list']);
   assert.throws(() => orden(['gh']));
   assert.doesNotMatch(leer('scripts/token.mjs'), /writeFile|appendFile|console\.log\(.*token/);
+});
+
+// The Apps belong to the organization that owns REPO (fabrica-constructor and fabrica-revisor are owned by
+// factory-am89): a private App created under a personal account cannot be installed on the organization.
+test('every form in crear-apps.html creates the App under the organization that owns REPO', () => {
+  const org = REPO.split('/')[0];
+  const acciones = [...leer('apps/crear-apps.html').matchAll(/<form action="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(acciones.length, 3, 'expected one form per App');
+  for (const a of acciones) assert.equal(a, `https://github.com/organizations/${org}/settings/apps/new`);
 });
