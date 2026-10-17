@@ -13,7 +13,7 @@ import yaml from 'js-yaml';
 import { APPLY_OPS, applyCalls, assertAllowed, main, missingBeforeProtecting } from '../scripts/admin/aplicar.mjs';
 import { makeWriteApi } from '../scripts/admin/secretos.mjs';
 import { makeApi } from '../scripts/admin/leer-plan.mjs';
-import { REVISOR_SECRETS, rulesetBody } from '../scripts/admin/proyecto.mjs';
+import { rulesetBody } from '../scripts/admin/proyecto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const APP_ID = 1234567;
@@ -106,10 +106,11 @@ test('the lock is for all projects at once: one project not ready stops the writ
   assert.deepEqual(fake.gh.written, []);
 });
 
-test('missing names are named, never values (pure)', () => {
-  const m = missingBeforeProtecting({ environment: { customBranchPolicies: true, branches: ['main'] }, secretNames: ['REVISOR_APP_KEY'] });
-  assert.deepEqual(m, ['secreto CLAUDE_CODE_OAUTH_TOKEN', 'secreto REVISOR_CLIENT_ID']);
-  assert.deepEqual(missingBeforeProtecting({ environment: { customBranchPolicies: true, branches: ['main'] }, secretNames: REVISOR_SECRETS }), []);
+test('what is missing is named by operation and path, never a value (pure)', () => {
+  const R = '/repos/factory-am89/demo/environments/revisor';
+  const m = missingBeforeProtecting([{ op: 'put-file', path: 'x' }, { op: 'put-secret', path: `${R}/secrets/REVISOR_CLIENT_ID`, body: { valueFrom: 'workflow-secret' } }, { op: 'create-ruleset', path: 'y' }]);
+  assert.deepEqual(m, [`put-secret ${R}/secrets/REVISOR_CLIENT_ID`]);
+  assert.deepEqual(missingBeforeProtecting([{ op: 'create-ruleset', path: 'y' }]), []);
 });
 
 test('ready repo with nothing done: the three files on main, then settings, then the ruleset; nothing else; second run writes nothing', async () => {

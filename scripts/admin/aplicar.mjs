@@ -16,31 +16,26 @@
 // A ruleset is only ever written `active`, with an empty bypass_actors, and is never paused nor removed.
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { ALLOWED_CALLS, REVISOR_ENV, REVISOR_SECRETS, parseProject, planProject } from './proyecto.mjs';
+import { ALLOWED_CALLS, REVISOR_ENV, parseProject, planProject } from './proyecto.mjs';
 import { loadTemplates, makeApi, readState } from './leer-plan.mjs';
-import { makeWriteApi } from './secretos.mjs';
+import { makeWriteApi, secretCalls } from './secretos.mjs';
 
 export const APPLY_OPS = ['update-settings', 'put-file', 'create-ruleset', 'update-ruleset'];
 
-// The calls of this chunk. A put-file to another branch (the smoke PR's ficha) is not ours.
-export const applyCalls = (calls) => calls.filter((c) => APPLY_OPS.includes(c.op) && (c.op !== 'put-file' || c.body?.branch === 'main'));
+// One predicate for "this call is of this chunk". A put-file to another branch (the smoke PR's ficha) is not ours.
+const isOurs = (c) => APPLY_OPS.includes(c.op) && (c.op !== 'put-file' || c.body?.branch === 'main');
+export const applyCalls = (calls) => calls.filter(isOurs);
 
 export function assertAllowed(call) {
   const rule = ALLOWED_CALLS.find((a) => a.op === call.op);
-  const ours = APPLY_OPS.includes(call.op) && (call.op !== 'put-file' || call.body?.branch === 'main');
-  if (!ours || !rule || rule.method !== call.method || !rule.path.test(call.path)) {
+  if (!isOurs(call) || !rule || rule.method !== call.method || !rule.path.test(call.path)) {
     throw new Error(`llamada no permitida en aplicar.mjs: ${call.op} ${call.method} ${call.path}`);
   }
 }
 
-// Lock 2: what is missing for `state` to be ready to be protected. [] means the environment and its secrets are there.
-export function missingBeforeProtecting(state) {
-  const out = [];
-  const env = state.environment;
-  if (!env || !env.customBranchPolicies || !env.branches.includes('main')) out.push(`environment ${REVISOR_ENV} limitado a main`);
-  for (const n of REVISOR_SECRETS) if (!state.secretNames.includes(n)) out.push(`secreto ${n}`);
-  return out;
-}
+// Lock 2: what chunk 5 would still have to write for `calls` (the whole plan of a project). [] means the environment, its
+// branch policy and the three secret names are there. The rule lives in planProject (environmentCalls); it is not rewritten here.
+export const missingBeforeProtecting = (calls) => secretCalls(calls).map((c) => `${c.op} ${c.path}`);
 
 export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), readApi, writeApi, summaryFile } = {}) {
   const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
@@ -53,11 +48,12 @@ export async function main({ dir = 'proyectos', templatesDir = path.join('apps',
     const project = parseProject(JSON.parse(readFileSync(path.join(dir, f), 'utf8')), { fileName: f });
     const state = await readState(readApi, project);
     if (!state.repo) throw new Error(`${project.repo} no existe: este run solo ajusta y protege repos que ya existen, crear repos es otro trozo`);
-    const missing = missingBeforeProtecting(state);
+    const plan = planProject(project, state, templates);
+    const missing = missingBeforeProtecting(plan);
     if (missing.length > 0) {
       throw new Error(`${project.repo}: no se protege main todavia, falta en su environment ${REVISOR_ENV}: ${missing.join(', ')}. No se ha escrito nada en ningun repo.`);
     }
-    planned.push({ project, calls: applyCalls(planProject(project, state, templates)) });
+    planned.push({ project, calls: applyCalls(plan) });
   }
   for (const { project, calls } of planned) {
     say(`### ${project.repo}`);
