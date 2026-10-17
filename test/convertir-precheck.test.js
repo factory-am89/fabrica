@@ -3,8 +3,7 @@
 // lesson: convertir-consumes-code-before-prechecks
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cli, previos } from '../apps/convertir.mjs';
-import { REPO } from '../scripts/lib/repo.mjs';
+import { cli, previos, REPO } from '../apps/convertir.mjs';
 import { leer } from './apoyo/fabrica.mjs';
 
 // Fake runner: `gh auth status` and `gh api repos/<REPO>` answer as told; everything else (powershell) works.

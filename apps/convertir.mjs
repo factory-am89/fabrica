@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO as REPO_FABRICA, ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
 
-const REPO = process.env.REPO ?? REPO_FABRICA;
+export const REPO = process.env.REPO ?? REPO_FABRICA; // tests compare against this, not repo.mjs, so a REPO in the environment cannot break them
 // Marker that starts the fallback message. apps/arranque.ps1 (Rescatar-Pem) reads the same file to find the key file.
 export const MARCA_RESCATE = readFileSync(new URL('./marca-rescate.txt', import.meta.url), 'utf8').trim();
 // Names of the private-key secrets, one per environment.
