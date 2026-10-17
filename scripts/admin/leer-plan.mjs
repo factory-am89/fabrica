@@ -6,11 +6,10 @@
 // The token comes in GH_TOKEN (the caller mints it); this file never names where it comes from and never prints it.
 import { readFileSync, readdirSync, existsSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
-import { parseProject, planProject } from './proyecto.mjs';
+import { FICHA, REVISOR_ENV, SMOKE_BRANCH, TEMPLATE_NAMES, parseProject, planProject } from './proyecto.mjs';
+import { REVISOR_APP_SLUG } from '../lib/repo.mjs';
 
 const API = 'https://api.github.com';
-const TEMPLATES = ['tests.yml', 'revisor.yml', 'CLAUDE.md', 'ficha.json', 'package.json', 'package-lock.json'];
-const SMOKE_BRANCH = 'ops/fabrica-ficha';
 
 // The only door to GitHub: GET. `allow` lists the statuses that are an answer (not an error); anything else throws
 // with the status and the path, so a 403 (App not installed, missing permission) is read as such, never as "empty".
@@ -50,7 +49,7 @@ export async function readState(api, project) {
       throw new Error(`la App no esta instalada en ${r} (la instalacion solo ve ${names.length} repos): instalala en ese repo o en All repositories; eso lo hace Pablo`);
     }
   }
-  const appId = (await api('/apps/fabrica-revisor')).body.id;
+  const appId = (await api(`/apps/${REVISOR_APP_SLUG}`)).body.id;
   if (!repo) {
     return { repo, files: [], environment: null, secretNames: [], rulesets: [], revisorAppId: appId, mainSha: null, smoke: { branchExists: false, fileOnBranch: false, pr: null } };
   }
@@ -58,23 +57,23 @@ export async function readState(api, project) {
   if (tree.body?.truncated) throw new Error(`${r}: el arbol de main es demasiado grande para listarlo entero`);
   const files = tree.status === 200 ? tree.body.tree.filter((e) => e.type === 'blob').map((e) => e.path) : [];
   const mainSha = tree.status === 200 ? (await api(`/repos/${r}/commits/main`)).body.sha : null;
-  const env = await api(`/repos/${r}/environments/revisor`, [404]);
+  const env = await api(`/repos/${r}/environments/${REVISOR_ENV}`, [404]);
   let environment = null;
   let secretNames = [];
   if (env.status === 200) {
-    const pol = await api(`/repos/${r}/environments/revisor/deployment-branch-policies`);
+    const pol = await api(`/repos/${r}/environments/${REVISOR_ENV}/deployment-branch-policies`);
     environment = {
       customBranchPolicies: env.body.deployment_branch_policy?.custom_branch_policies === true,
       branches: pol.body.branch_policies.map((p) => p.name),
     };
-    secretNames = (await api(`/repos/${r}/environments/revisor/secrets?per_page=100`)).body.secrets.map((s) => s.name);
+    secretNames = (await api(`/repos/${r}/environments/${REVISOR_ENV}/secrets?per_page=100`)).body.secrets.map((s) => s.name);
   }
   const list = await api(`/repos/${r}/rulesets?per_page=100`);
   const rulesets = [];
   for (const s of list.body) rulesets.push((await api(`/repos/${r}/rulesets/${s.id}`)).body);
   const ref = await api(`/repos/${r}/git/ref/heads/${SMOKE_BRANCH}`, [404]);
   const branchExists = ref.status === 200;
-  const fileOnBranch = branchExists && (await api(`/repos/${r}/contents/.fabrica.json?ref=${enc(SMOKE_BRANCH)}`, [404])).status === 200;
+  const fileOnBranch = branchExists && (await api(`/repos/${r}/contents/${FICHA}?ref=${enc(SMOKE_BRANCH)}`, [404])).status === 200;
   const prs = await api(`/repos/${r}/pulls?state=all&head=${enc(`${project.owner}:${SMOKE_BRANCH}`)}`);
   const p = prs.body[0];
   const pr = p ? { number: p.number, state: p.state, merged: p.merged_at !== null, autoMerge: p.auto_merge !== null, nodeId: p.node_id } : null;
@@ -83,7 +82,7 @@ export async function readState(api, project) {
 
 export function loadTemplates(dir) {
   const out = {};
-  for (const n of TEMPLATES) if (existsSync(path.join(dir, n))) out[n] = readFileSync(path.join(dir, n), 'utf8');
+  for (const n of TEMPLATE_NAMES) if (existsSync(path.join(dir, n))) out[n] = readFileSync(path.join(dir, n), 'utf8');
   return out;
 }
 
