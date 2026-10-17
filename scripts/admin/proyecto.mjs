@@ -14,11 +14,11 @@ export const REVISOR_SECRETS = ['CLAUDE_CODE_OAUTH_TOKEN', 'REVISOR_CLIENT_ID', 
 const ACTIONS_APP_ID = 15368; // GitHub Actions: where the `tests / tests` check comes from
 const SMOKE_BRANCH = 'ops/fabrica-ficha';
 const REVISOR_ENV = 'revisor';
-const FICHA = '.fabrica.json';
+export const FICHA = '.fabrica.json';
 
 // Files left straight on `main` BEFORE protecting it (a PR cannot be judged in a repo with no reviewer yet).
 // `soloVacio`: only for an empty repo, which `tests.yml` needs to run. `.fabrica.json` is not here: it is the smoke PR.
-const PROJECT_FILES = [
+export const PROJECT_FILES = [
   { path: '.github/workflows/tests.yml', template: 'tests.yml' },
   { path: '.github/workflows/revisor.yml', template: 'revisor.yml' },
   { path: 'CLAUDE.md', template: 'CLAUDE.md' },
@@ -120,6 +120,7 @@ function checkState(s) {
   const isBoolMap = (r) => isObject(r) && ['private', 'allow_auto_merge', 'delete_branch_on_merge'].every((k) => typeof r[k] === 'boolean');
   if (s.repo !== null && !isBoolMap(s.repo)) fail('estado.repo: null o un objeto con private, allow_auto_merge y delete_branch_on_merge (booleanos)');
   for (const k of ['files', 'secretNames', 'rulesets']) if (!Array.isArray(s[k])) fail(`estado.${k}: tiene que ser una lista`);
+  if (!s.rulesets.every((r) => isObject(r) && Number.isInteger(r.id))) fail('estado.rulesets: cada ruleset tiene que traer su id numerico');
   if (!Number.isInteger(s.revisorAppId) || s.revisorAppId <= 0) fail('estado.revisorAppId: tiene que ser el App ID numerico de la App revisora');
   if (s.environment !== null && !(isObject(s.environment) && typeof s.environment.customBranchPolicies === 'boolean' && Array.isArray(s.environment.branches))) {
     fail('estado.environment: null o { customBranchPolicies, branches }');

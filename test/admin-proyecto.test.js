@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import {
-  ALLOWED_CALLS, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
+  ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
 } from '../scripts/admin/proyecto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
@@ -192,14 +192,31 @@ test('ruleset body: tests / tests from Actions and revisor from its App, PR requ
   assert.throws(() => rulesetBody({ revisorAppId: 'x' }), /revisorAppId/);
 });
 
-test('ruleset body keeps the same rule types and PR parameters as Cuerpo-Ruleset in apps/lib-gh.ps1 (until that copy is retired)', () => {
+test('ruleset body equals Cuerpo-Ruleset in apps/lib-gh.ps1 in rule types, PR parameters with their values and checks (until that copy is retired)', () => {
   const ps = leer(RAIZ, 'apps', 'lib-gh.ps1');
   const desde = ps.slice(ps.indexOf('function Cuerpo-Ruleset'));
   const cuerpo = desde.slice(0, desde.indexOf('# ---------- llavero'));
   const tipos = [...cuerpo.matchAll(/type = '([a-z_]+)'/g)].map((m) => m[1]);
   const b = rulesetBody({ revisorAppId: REVISOR_APP_ID });
   assert.deepEqual(b.rules.map((r) => r.type), tipos);
-  for (const k of Object.keys(b.rules[0].parameters)) assert.match(cuerpo, new RegExp(`${k}\\s*=`), `${k} is missing from the PowerShell copy`);
+  const bloquePr = cuerpo.slice(cuerpo.indexOf("type = 'pull_request'"), cuerpo.indexOf("type = 'required_status_checks'"));
+  const valor = { 0: 0, $false: false, $true: true };
+  const delPs = Object.fromEntries([...bloquePr.matchAll(/(\w+)\s*=\s*(0|\$false|\$true)(?![\w])/g)].map((m) => [m[1], valor[m[2]]]));
+  assert.deepEqual(b.rules[0].parameters, delPs, 'the PR parameters (names and values) differ from the PowerShell copy');
+  assert.match(cuerpo, /enforcement\s*=\s*'active'/);
+  assert.match(cuerpo, /bypass_actors\s*=\s*@\(\)/);
+  assert.match(cuerpo, /ref_name = @\{ include = @\('~DEFAULT_BRANCH'\)/);
+  assert.match(cuerpo, /context = \$ContextoTests; integration_id = \$IdActions/);
+  assert.match(cuerpo, /context = 'revisor'; integration_id = \$IdRevisor/);
+});
+
+test('SecretosRevisor and ArchivosProyecto in apps/lib-proyecto.ps1 list what this module lists (until chunk 10 deletes them)', () => {
+  const lib = leer(RAIZ, 'apps', 'lib-proyecto.ps1');
+  const secretos = [...lib.match(/\$script:SecretosRevisor = @\(([^)]*)\)/)[1].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(secretos, [...REVISOR_SECRETS]);
+  const archivos = [...lib.matchAll(/Ruta = '([^']+)'; Plantilla = '([^']+)'/g)].map((m) => [m[1], m[2]]);
+  const mios = PROJECT_FILES.filter((f) => !f.soloVacio).map((f) => [f.path, f.template]).concat([[FICHA, 'ficha.json']]);
+  assert.deepEqual(archivos, mios);
 });
 
 test('the secrets the project gets are the ones revisor.yml declares in workflow_call', () => {
@@ -229,6 +246,7 @@ test('the real state is validated too: malformed state, missing template and mis
   assert.throws(() => plan({ ...completo(), files: 'x' }), /files/);
   assert.throws(() => plan({ ...completo(), repo: { private: 'no' } }), /repo/);
   assert.throws(() => plan({ ...completo(), revisorAppId: undefined }), /revisorAppId/);
+  assert.throws(() => plan({ ...completo(), rulesets: [{ name: 'main' }] }), /id numerico/);
   assert.throws(() => planProject(parseProject(PROJECT), { ...completo(), files: [] }, { ...TEMPLATES, 'tests.yml': undefined }), /tests\.yml/);
   assert.throws(() => plan({ ...completo(), surprise: 1 }), /surprise/);
 });
