@@ -50,7 +50,7 @@ privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambi
 ## La cuota de GitHub
 
 Figures here were measured in MenuPlan and are NOT verified for this repo (we do not know how many points the Fábrica
-spends, nor the real quota of the App token). Measure first: `npm run llamadas-gh` counts the calls that went
+spends, nor the real quota of the App token). Measure first: `npm run gh-calls` counts the calls that went
 through `node scripts/token.mjs -- gh ...` per API and per hour (file of `rutaDeRegistroGh` in `scripts/lib/gh-log.mjs`: time, caller, api, result;
 nothing else). A bare `gh` is not counted.
 
@@ -82,7 +82,7 @@ nothing else). A bare `gh` is not counted.
   test (the rules for agents above). Here: `test/gh-quota.test.js` (no `--watch`, no list in a loop) and `test/gh-log.test.js` + `test/token-gh.test.js` (the accounting line); no ceiling test yet, first measure.
 - **2026-10-14 · from MenuPlan, unverified here: each full read of the issues cost ~450 points, peak hour 6,108.** Cause, measured there: ~1.08
   points per requested issue (cost follows `first:`). Fix there: a published snapshot; not needed here yet. Backed here
-  only by `test/gh-quota.test.js` (no list in a loop) and the count of `npm run llamadas-gh`.
+  only by `test/gh-quota.test.js` (no list in a loop) and the count of `npm run gh-calls`.
 - **2026-10-09 · un PR abierto con `GITHUB_TOKEN` no lanzó `tests.yml`.** Causa: GitHub no dispara
   workflows con ese token. Arreglo: abrir los PR con el token de la App (`scripts/token.mjs`), o lanzarlo con `gh workflow run`.
 - **2026-10-09 · ruleset con la integración de Actions como excepción: 422 «Actor GitHub Actions
@@ -107,7 +107,7 @@ nothing else). A bare `gh` is not counted.
   lo reescribe; en `name:` un ` #` empieza un comentario.
 - **2026-10-08 · `gh` colgado con «TLS handshake timeout».** Causa: la red. Arreglo: `timeout 60 gh …` y repetir.
 - **2026-10 · `git worktree remove` falla en Windows con «Filename too long».** Causa: rutas largas dentro de
-  `node_modules`. Arreglo: `git config core.longpaths true`, o `scripts/retirar.mjs`, que quita antes `node_modules`.
+  `node_modules`. Arreglo: `git config core.longpaths true`, o `scripts/retire.mjs`, que quita antes `node_modules`.
 
 ## Qué requiere el OK de Pablo
 

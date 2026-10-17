@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { alDia, pasoAlDia } from '../scripts/al-dia.mjs';
+import { alDia, pasoAlDia } from '../scripts/pull-main.mjs';
 import { arrancar, PASOS } from '../scripts/al-arrancar.mjs';
 import { decidir } from '../.claude/hooks/carpeta-principal.mjs';
 

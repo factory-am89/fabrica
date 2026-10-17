@@ -7,11 +7,11 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ORIGEN, instalar, confirmarEnTerminal } from '../scripts/instalar-pc.mjs';
+import { ORIGEN, instalar, confirmarEnTerminal } from '../scripts/install-pc.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');
+const SCRIPT = path.join(RAIZ, 'scripts', 'install-pc.mjs');
 const base = () => JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'settings-base.json'), 'utf8'));
 
 // --- la mecánica ---

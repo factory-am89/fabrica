@@ -1,5 +1,5 @@
-// Cierra una carpeta de trabajo: node scripts/retirar.mjs <nombre>
-//   node scripts/retirar.mjs --json <nombre>   (output rule and exit codes: see scripts/lib/exit.mjs)
+// Cierra una carpeta de trabajo: node scripts/retire.mjs <nombre>
+//   node scripts/retire.mjs --json <nombre>   (output rule and exit codes: see scripts/lib/exit.mjs)
 // Solo la borra si su rama ya está fusionada y no hay cambios sin guardar.
 import { lstatSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
@@ -45,7 +45,7 @@ export function retirar(nombre, { cwd = process.cwd(), consultarPR = (rama, punt
 export function cliRetirar(argv, opts = {}) {
   return runCommand(argv, {
     run: ([nombre]) => {
-      if (!nombre) throw new ExitError('USAGE', 'Falta el nombre de la carpeta: node scripts/retirar.mjs <nombre>');
+      if (!nombre) throw new ExitError('USAGE', 'Falta el nombre de la carpeta: node scripts/retire.mjs <nombre>');
       return { result: RETIRE_RESULT.REMOVED, ...retirar(nombre, opts) };
     },
     human: ({ carpeta, rama, union }) => `retirar carpeta: ${carpeta} rama: ${rama} union-quitada: ${union}`,

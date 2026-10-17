@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
-import { limpiar, opciones, imprimir } from '../scripts/limpiar.mjs';
+import { limpiar, opciones, imprimir } from '../scripts/clean.mjs';
 import { leerFicha } from '../scripts/lib/repo-card.mjs';
 import { IDENTIDADES, identidadDe } from '../scripts/lib/identities.mjs';
 import { consultar, rutaDe } from '../scripts/lib/gh-public.mjs';

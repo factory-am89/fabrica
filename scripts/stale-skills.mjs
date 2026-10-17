@@ -1,5 +1,5 @@
 // Lists the skills not reviewed for more than REVISAR_DIAS days (the reader of `comprobado`). Reports, never blocks.
-//   npm run skills-viejas        (optional argv[2]: repo root, for tests)
+//   npm run stale-skills        (optional argv[2]: repo root, for tests)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { skillsViejas, REVISAR_DIAS } from './lib/skills.mjs';

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/instalar-pc.mjs';
+import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
 import { ampliaciones } from '../scripts/lib/settings-widening.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
 

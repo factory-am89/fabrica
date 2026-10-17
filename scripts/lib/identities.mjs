@@ -1,5 +1,5 @@
 // Las identidades con las que se habla a GitHub: UN solo mapa, del que salen la validación de la ficha
-// (lib/repo-card.mjs), el lanzador de las órdenes y si se pueden borrar ramas remotas (limpiar.mjs).
+// (lib/repo-card.mjs), el lanzador de las órdenes y si se pueden borrar ramas remotas (clean.mjs).
 //   lanzador      script que lanza `-- gh api <ruta>` / `-- git ...` con esa identidad
 //   borraRemotas  si con ella se pueden borrar ramas remotas
 //   dueno         el único dueño de repos donde vale (null: cualquiera)

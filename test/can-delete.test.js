@@ -7,13 +7,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
-import { retirar } from '../scripts/retirar.mjs';
+import { retirar } from '../scripts/retire.mjs';
 import { prFusionado } from '../scripts/lib/can-delete.mjs';
 
 const fuente = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
 
 test('retirar y limpiar usan la misma regla y ninguno la repite', () => {
-  for (const f of ['retirar.mjs', 'limpiar.mjs']) {
+  for (const f of ['retire.mjs', 'clean.mjs']) {
     const s = fuente(f);
     assert.match(s, /from '\.\/lib\/can-delete\.mjs'/, `${f} importa la regla común`);
     assert.doesNotMatch(s, /status', '--porcelain'/, `${f} no repite la comprobación de cambios sin guardar`);
