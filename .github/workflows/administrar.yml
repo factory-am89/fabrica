@@ -1,0 +1,54 @@
+name: administrar
+
+# El unico workflow que usa la clave de la App fabrica-administrador (plans/app-admin.md, punto 2). test/administrador.test.js
+# vigila: solo estos disparadores, permisos del workflow exactamente contents: read, y los permisos del token iguales,
+# clave y nivel, a los del manifiesto de la App.
+#
+# Trozo 4: SOLO LECTURA. Imprime en el resumen lo que le falta a cada repo de proyectos/ y no aplica nada.
+# Aviso honesto: el guardia exige que el token pida los permisos del manifiesto (incluidos los de escritura), asi que
+# la lectura sola no la impone el token sino el codigo: scripts/admin/leer-plan.mjs solo envia GET.
+on:
+  push:
+    branches: [main]
+    paths: [proyectos/**, scripts/admin/**]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: administrar
+  cancel-in-progress: false
+
+jobs:
+  administrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Los secretos viven en este environment, limitado a la rama main: una rama no puede desplegar en el.
+    environment: administrador
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.ADMIN_CLIENT_ID }}
+          private-key: ${{ secrets.ADMIN_APP_KEY }}
+          permission-administration: write
+          permission-contents: write
+          permission-workflows: write
+          permission-environments: write
+          permission-pull-requests: write
+          permission-checks: read
+          permission-actions: read
+          permission-metadata: read
+
+      # Lee el estado real (solo GET) e imprime el plan en el resumen del job.
+      - run: node scripts/admin/leer-plan.mjs
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
