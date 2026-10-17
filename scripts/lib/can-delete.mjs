@@ -3,7 +3,7 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { gitOk, norm } from './carpetas.mjs';
+import { gitOk, norm } from './folders.mjs';
 import { REPO } from './repo.mjs';
 import { TOKEN } from './identities.mjs';
 import { ExitError } from './exit.mjs';

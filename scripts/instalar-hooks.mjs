@@ -4,7 +4,7 @@
 // El config es del repo y lo ven todas las carpetas de trabajo; los hooks se niegan a sí mismos
 // fuera de la principal (ver .githooks/denegar-principal.sh).
 import { fileURLToPath } from 'node:url';
-import { gitOk, principal } from './lib/carpetas.mjs';
+import { gitOk, principal } from './lib/folders.mjs';
 
 export function instalarHooks(cwd = process.cwd()) {
   const raiz = principal(cwd);

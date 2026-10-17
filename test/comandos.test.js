@@ -1,5 +1,5 @@
 // Commands an agent can orchestrate: exit code per failure class, --json output.
-// Existing behaviour of tarea/retirar (messages, folders, branches) is covered by carpetas.test.js.
+// Existing behaviour of tarea/retirar (messages, folders, branches) is covered by folders.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync, realpathSync } from 'node:fs';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { EXIT, RETIRE_RESULT, ExitError, runCommand } from '../scripts/lib/exit.mjs';
 import { cliRetirar } from '../scripts/retirar.mjs';
 import { prFusionado } from '../scripts/lib/can-delete.mjs';
-import { git as gitRaw } from '../scripts/lib/carpetas.mjs';
+import { git as gitRaw } from '../scripts/lib/folders.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
 import { git, repo as baseRepo } from './apoyo/repo.mjs';
 

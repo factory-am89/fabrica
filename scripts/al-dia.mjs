@@ -1,7 +1,7 @@
 // Paso «al-dia» del arranque: la carpeta principal avanza con `git pull --ff-only`.
 // Si no puede (cambios sin guardar, divergente, sin red, rama suelta) no toca nada y lo dice como fallo.
 // Nunca rebase, reset ni stash: solo avanza una rama que no tiene nada propio que perder.
-import { git, gitOk, principal } from './lib/carpetas.mjs';
+import { git, gitOk, principal } from './lib/folders.mjs';
 
 export function alDia(raiz = principal(process.cwd())) {
   const estado = git(['status', '--porcelain'], raiz);

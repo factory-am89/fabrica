@@ -9,7 +9,7 @@
 // A failure in a hook mode is said on stderr and exits 1 (a non-blocking error for Claude Code): the session goes on, the failure is seen.
 import { freemem, totalmem } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { git, principal } from './lib/carpetas.mjs';
+import { git, principal } from './lib/folders.mjs';
 import {
   ACTIVA_H, CADUCA_H, SIN_RAMA, idValido, apuntarSesion, leerFicha, leerSesiones, purgarViejas, quitarSesion, rutaDeSesiones,
 } from './lib/session-log.mjs';
