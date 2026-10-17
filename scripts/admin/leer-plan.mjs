@@ -59,7 +59,8 @@ export async function readState(api, project) {
       if (inst.body.repositories.length < PER_PAGE) break;
     }
     if (!names.includes(r)) {
-      throw new Error(`la App no esta instalada en ${r} (la instalacion solo ve ${names.length} repos): instalala en ese repo o en All repositories; eso lo hace Pablo`);
+      const seen = names.length <= 10 ? `: ${names.join(', ') || 'ninguno'}` : '';
+      throw new Error(`el token no ve ${r}; ve ${names.length} repos${seen}. Dos causas posibles, aqui no se distinguen: el token esta limitado a un repo (falta owner: o repositories: al crearlo) o la App no esta instalada en ${r}`);
     }
   }
   const appId = (await api(`/apps/${REVISOR_APP_SLUG}`)).body.id;

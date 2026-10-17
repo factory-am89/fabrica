@@ -48,9 +48,18 @@ test('an existing unprotected repo lists what it lacks, and nothing is applied',
   assert.doesNotMatch(text, /base64|"content"/, 'bodies (file contents) never reach the summary');
 });
 
-test('the App not installed on the repo fails loudly with that cause (a public repo is readable anyway)', async () => {
+// lesson: error-message-asserts-unproven-cause
+test('a repo the token does not see fails loudly saying what was observed and both possible causes, none asserted', async () => {
   const { api } = fakeApi({ ...UNPROTECTED, '/installation/repositories': [200, { repositories: [{ full_name: 'factory-am89/otro' }] }] });
-  await assert.rejects(readState(api, PROJECT), /no esta instalada en factory-am89\/demo/);
+  await assert.rejects(readState(api, PROJECT), (e) => {
+    assert.match(e.message, /el token no ve factory-am89\/demo/);
+    assert.match(e.message, /ve 1 repos/);
+    assert.match(e.message, /factory-am89\/otro/);
+    assert.match(e.message, /limitado a un repo/);
+    assert.match(e.message, /no esta instalada/);
+    assert.doesNotMatch(e.message, /eso lo hace Pablo/);
+    return true;
+  });
 });
 
 test('a 403 from GitHub is an error, never an empty answer', async () => {

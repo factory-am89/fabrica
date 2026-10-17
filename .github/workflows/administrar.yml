@@ -39,6 +39,8 @@ jobs:
         with:
           client-id: ${{ secrets.ADMIN_CLIENT_ID }}
           private-key: ${{ secrets.ADMIN_APP_KEY }}
+          # Sin owner la accion limita el token al repo actual: no veria los proyectos.
+          owner: factory-am89
           permission-administration: write
           permission-contents: write
           permission-workflows: write
