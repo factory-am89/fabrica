@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { contarMensajes, registrarMensaje, rutaDeMensajes } from '../scripts/lib/message-log.mjs';
-import { tocar } from '../scripts/sesiones.mjs';
+import { EVENTOS_TOCAR, tocar } from '../scripts/sesiones.mjs';
 
 const RAIZ = join(import.meta.dirname, '..');
 const T0 = Date.UTC(2026, 9, 17, 10, 0, 0);
@@ -67,13 +67,13 @@ test('bad: a session id with a wrong shape is refused and nothing is written', (
   assert.equal(existsSync(ruta), false);
 }));
 
-test('the count names a line it cannot read, never skips it', () => conCasa((_c, _d, ruta) => {
+test('the count names a line it cannot read, never skips it', () => conCasa((casa, _d, ruta) => {
   registrarMensaje({ sesion: ID_A, ruta, reloj: () => T0 });
   mkdirSync(join(ruta, '..'), { recursive: true });
   writeFileSync(ruta, `${readFileSync(ruta, 'utf8')}{roto\n{"t":"${new Date(T0).toISOString()}","sesion":"${ID_A}","texto":"${TEXTO}"}\n{"t":"ayer","sesion":"${ID_A}"}\n`);
   const c = contarMensajes({ ruta });
   assert.deepEqual([c.total, c.corruptas, c.porSesion[ID_A]], [4, [2, 3, 4], 1]);
-  assert.deepEqual(contarMensajes({ ruta: join(tmpdir(), 'fabrica-msg-no-existe', 'mensajes.jsonl') }), { total: 0, porSesion: {}, corruptas: [] });
+  assert.deepEqual(contarMensajes({ ruta: join(casa, 'no-existe', 'mensajes.jsonl') }), { total: 0, porSesion: {}, corruptas: [] });
 }));
 
 test('the hook runs for real: stdin JSON writes the line in the fake HOME; a missing event or broken JSON exits 1', () => conCasa((casa, dir, ruta) => {
@@ -92,3 +92,9 @@ test('the hook runs for real: stdin JSON writes the line in the fake HOME; a mis
   assert.equal(contarMensajes({ ruta }).total, 1);
   assert.equal(existsSync(dir), true);
 }));
+
+test('the events tocar accepts are exactly the settings.json hooks that call it', () => {
+  const s = JSON.parse(readFileSync(join(RAIZ, '.claude', 'settings.json'), 'utf8'));
+  const conTocar = Object.entries(s.hooks).filter(([, grupos]) => grupos.some((g) => g.hooks.some((h) => h.command.includes('scripts/sesiones.mjs') && h.command.endsWith(' tocar')))).map(([e]) => e);
+  assert.deepEqual(conTocar.sort(), [...EVENTOS_TOCAR].sort());
+});

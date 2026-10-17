@@ -6,7 +6,7 @@ import * as fsReal from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { anexarLinea } from './op-log.mjs';
-import { idValido } from './session-log.mjs';
+import { esHora, idValido } from './session-log.mjs';
 
 export const CAMPOS = ['t', 'sesion'];
 export const rutaDeMensajes = (casa = homedir) => join(casa(), '.fabrica', 'mensajes.jsonl');
@@ -38,7 +38,7 @@ export function contarMensajes({ ruta = rutaDeMensajes(), fs = fsReal } = {}) {
     }
     cuentas.total++;
     const valida = d !== null && typeof d === 'object' && Object.keys(d).sort().join() === [...CAMPOS].sort().join()
-      && idValido(d.sesion) && typeof d.t === 'string' && !Number.isNaN(Date.parse(d.t));
+      && idValido(d.sesion) && esHora(d.t);
     if (!valida) {
       cuentas.corruptas.push(i + 1);
       return;
