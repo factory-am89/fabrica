@@ -1,4 +1,5 @@
 // The PR body check: pure function, command, and the template derived from SECTIONS.
+// lesson: evidence-exact-commit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';

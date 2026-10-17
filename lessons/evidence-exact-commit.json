@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "class": "none",
+  "source": "intervenciones.md:32",
+  "mechanism": "test/pr-body.test.js",
+  "origin": "constructor"
+}
