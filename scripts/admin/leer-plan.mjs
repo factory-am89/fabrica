@@ -9,7 +9,7 @@ import path from 'node:path';
 import { FICHA, REVISOR_ENV, SMOKE_BRANCH, TEMPLATE_NAMES, parseProject, planProject } from './proyecto.mjs';
 import { REVISOR_APP_SLUG } from '../lib/repo.mjs';
 
-const API = 'https://api.github.com';
+export const API = 'https://api.github.com';
 
 // The only door to GitHub: GET. `allow` lists the statuses that are an answer (not an error); anything else throws
 // with the status and the path, so a 403 (App not installed, missing permission) is read as such, never as "empty".

@@ -18,7 +18,7 @@ Manifiesto (mismo formato que `apps/crear-apps.html`), `public: false`, `default
 | `administration` | write | Crear repos en la org (`POST /orgs/factory-am89/repos`), ajustes (`allow_auto_merge`, `delete_branch_on_merge`), crear el environment `revisor` y su política de ramas, crear el ruleset de `main`. Es el permiso peligroso: también permite borrar el repo y quitar rulesets; no se puede partir. |
 | `contents` | write | Subir los ficheros iniciales directo a `main` ANTES de proteger (en un repo recién creado no hay PR posible con revisor). Y abrir la rama del PR de humo. |
 | `workflows` | write | Los ficheros iniciales incluyen `.github/workflows/*.yml`; sin él GitHub rechaza el commit entero (pasó el 15 oct, skill github). |
-| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (y leer su clave pública para cifrarlos). SIN COMPROBAR si la API de secretos de environment pide `environments` o `secrets`; se comprueba en el trozo 5 y se pide solo el que haga falta. |
+| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (y leer su clave pública para cifrarlos). Comprobado en el trozo 5 contra la tabla de permisos de GitHub (no en vivo): la API de secretos de environment pide `environments` (clave publica: read; escribir el secreto: write), no `secrets`; crear el environment y su politica de ramas pide `administration: write`. |
 | `pull_requests` | write | Abrir el PR de humo y armar su fusión automática. |
 | `checks` | read | Leer el nombre real del check de tests y el resultado del PR de humo. |
 | `actions` | read | Leer el run de `tests` en `main` del repo nuevo. |
@@ -344,7 +344,7 @@ CERRADA con la opción 1 (OK al plan entero): fila del 2026-10-17 en `intervenci
 
 1. Si una App puede crear repos en una org con plan gratuito, y con qué permiso exacto (trozo 8).
 2. Si un repo creado por la App entra solo en su instalación con «Only select repositories» (decidiría no usar «All») (trozo 8).
-3. Qué permiso pide escribir un secreto de environment: `environments` o `secrets` (trozo 5).
+3. (Resuelto en el trozo 5, por la tabla de permisos de GitHub: `environments`. Falta verlo en vivo: lo hace el primer run de `administrar.yml` con los tres valores guardados.)
 4. Si `claude-code-action` rechaza un PR abierto por un bot no listado en `allowed_bots` (trozo 7).
 5. Si existen rulesets de organización en plan gratuito para repos públicos (no se usan; solo cambiaría el diseño a futuro).
 6. Que `tests / tests` sea el nombre del check en un repo creado desde las plantillas (PASOS-PABLO.md lo da por visto en homenu-panel; yo no lo he visto).
