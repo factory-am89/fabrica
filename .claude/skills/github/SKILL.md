@@ -72,12 +72,9 @@ nothing else). A bare `gh` is not counted.
 
 - **2026-10-16 · PR #20 entered `main` without the `revisor` check.** Cause: the ruleset was lifted for a moment to merge
   #19 (an owner action Pablo approved), and GitHub merged at once every other PR with auto-merge armed (#20 at 10:57:32
-  UTC, before its `tests` and `revisor` finished; `revisor` then said «no»). It happened again with #52: a PR can be born
-  armed inside the window. Fix: `npm run ventana -- abrir` right before Pablo pauses the ruleset (saves the armed PRs,
-  disarms all, fails if any stays armed; repeat it just before the pause) and `npm run ventana -- cerrar` after it is
-  back (re-arms only if the ruleset is `active`, never a PR with `revisor` red, and names any armed PR born inside the
-  window). It never touches the ruleset: that is Pablo's action (`scripts/lib/pause-window.mjs`, `test/pause-window.test.js`).
-  The findings of #20 went to PR #23.
+  armed inside the window. Fix: pausing the ruleset is forbidden with no exception (`intervenciones.md`, row of 2026-10-17;
+  rule in `standards/intervention.md`, «Who decides a merge»); the way out of a wrong «no» is Pablo's Approve. The old
+  `npm run ventana` is gone. A machine enforces it: `test/ruleset-never-paused.test.js`. The findings of #20 went to PR #23.
 - **2026-10-10 · from MenuPlan, unverified here: the GraphQL quota hit 0 twice while `gh api rate_limit` showed spare.** Cause: all
   sessions spent the same token (each startup read all issues, ~320 points; `gh pr checks --watch` kept querying) and
   `rate_limit` shows only REST. Fix there: caches, waiting for CI over REST, one accounting line per call, ceilings in a
