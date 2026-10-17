@@ -95,7 +95,7 @@ test('an existing repo with no environment gets the environment, the branch poli
   assert.deepEqual(fake.gh.written.map((w) => `${w.method} ${w.path.replace(R, '')}`), [
     'PUT /environments/revisor',
     'POST /environments/revisor/deployment-branch-policies',
-    ...['CLAUDE_CODE_OAUTH_TOKEN', 'REVISOR_CLIENT_ID', 'REVISOR_APP_KEY'].map((n) => `PUT /environments/revisor/secrets/${n}`),
+    ...REVISOR_SECRETS.map((n) => `PUT /environments/revisor/secrets/${n}`),
   ]);
   assert.deepEqual(fake.gh.env.branches, ['main']);
   for (const n of REVISOR_SECRETS) {
@@ -200,7 +200,9 @@ test('workflow: the reading token is read-only and the writing token has exactly
 test('workflow: the secrets step gets both tokens and the three values, and a later step fails the run if the log shows PRIVATE KEY', () => {
   const paso = pasos.find((p) => String(p.run ?? '').includes('scripts/admin/secretos.mjs'));
   assert.ok(paso, 'no step runs secretos.mjs');
-  assert.deepEqual(Object.keys(paso.env).sort(), ['CLAUDE_CODE_OAUTH_TOKEN', 'GH_TOKEN_ESCRITURA', 'GH_TOKEN_LECTURA', 'ORIGEN_SECRETOS', 'REVISOR_APP_KEY', 'REVISOR_CLIENT_ID']);
+  // The expected names come from REVISOR_SECRETS (one source): a fourth secret there that the workflow does not pass is red here.
+  assert.deepEqual(Object.keys(paso.env).sort(), [...REVISOR_SECRETS, 'GH_TOKEN_ESCRITURA', 'GH_TOKEN_LECTURA', 'ORIGEN_SECRETOS'].sort());
+  for (const n of REVISOR_SECRETS) assert.equal(paso.env[n], '$' + `{{ secrets.${n} }}`, n);
   const i = pasos.indexOf(paso);
   const guardia = pasos.slice(i + 1).find((p) => /PRIVATE KEY/.test(String(p.run ?? '')));
   assert.ok(guardia, 'no step greps the log for PRIVATE KEY');
