@@ -56,7 +56,7 @@ export async function readState(api, project) {
     for (let page = 1; page <= 20; page++) {
       const inst = await api(`/installation/repositories?per_page=${PER_PAGE}&page=${page}`);
       names.push(...inst.body.repositories.map((x) => x.full_name));
-      if (inst.body.repositories.length < 100) break;
+      if (inst.body.repositories.length < PER_PAGE) break;
     }
     if (!names.includes(r)) {
       throw new Error(`la App no esta instalada en ${r} (la instalacion solo ve ${names.length} repos): instalala en ese repo o en All repositories; eso lo hace Pablo`);
