@@ -1,7 +1,7 @@
 # Plan: App «fabrica-administrador» (tercera App) y proyecto nuevo sin Pablo
 
 Fecha: 16 oct 2026. Base leída: `origin/main` en b7f5c46 (incluye #52 y #63); los «Existing:» se volvieron a comprobar con `git grep` sobre esa base.
-Estado: plan; el trozo T2 ya está fusionado (#57), el resto sin código. Ningún valor de secreto se ha leído ni impreso.
+Estado: el trozo 2 está fusionado (#57), el 3 (#83), el 4 (#86, #87) y el 5 (#90); el resto sin código. La escritura real del trozo 5 sigue pendiente de los pasos 3 y 4 de Pablo (punto 6). Ningún valor de secreto se ha leído ni impreso.
 
 Verdict: viable y recomendable, pero la clave administradora es un superpoder (puede borrar repos y quitar protecciones); su única frontera real es lo que entra en `main` de fabrica, así que la «ventana» (pausar el ruleset) era el agujero principal; la decisión A (cerrada con la opción 1, `intervenciones.md`, fila del 2026-10-17) la prohíbe sin excepción, `npm run ventana` ya no existe y `test/ruleset-never-paused.test.js` lo vigila.
 
@@ -18,7 +18,7 @@ Manifiesto (mismo formato que `apps/crear-apps.html`), `public: false`, `default
 | `administration` | write | Crear repos en la org (`POST /orgs/factory-am89/repos`), ajustes (`allow_auto_merge`, `delete_branch_on_merge`), crear el environment `revisor` y su política de ramas, crear el ruleset de `main`. Es el permiso peligroso: también permite borrar el repo y quitar rulesets; no se puede partir. |
 | `contents` | write | Subir los ficheros iniciales directo a `main` ANTES de proteger (en un repo recién creado no hay PR posible con revisor). Y abrir la rama del PR de humo. |
 | `workflows` | write | Los ficheros iniciales incluyen `.github/workflows/*.yml`; sin él GitHub rechaza el commit entero (pasó el 15 oct, skill github). |
-| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (y leer su clave pública para cifrarlos). SIN COMPROBAR si la API de secretos de environment pide `environments` o `secrets`; se comprueba en el trozo 5 y se pide solo el que haga falta. |
+| `environments` | write | Escribir los secretos del environment `revisor` del repo destino (`PUT .../environments/{env}/secrets/{name}`: `environments:write`) y leer su clave pública para cifrarlos (`GET .../secrets/public-key`: `environments:read`). Fuente: la tabla de permisos servidor a servidor de la documentación de GitHub (`server-to-server-permissions.json` de github/docs), citada en #90; NO es una llamada real todavía: sigue sin confirmar hasta que un run lo haga. Crear el environment y su política de ramas (`PUT .../environments/{env}`, `POST .../deployment-branch-policies`) pide `administration:write`, que la App ya tiene; leer el environment (`GET .../environments/{env}`) pide `actions:read`, que también tiene. No hace falta ampliar la App. |
 | `pull_requests` | write | Abrir el PR de humo y armar su fusión automática. |
 | `checks` | read | Leer el nombre real del check de tests y el resultado del PR de humo. |
 | `actions` | read | Leer el run de `tests` en `main` del repo nuevo. |
@@ -55,7 +55,7 @@ también tiene poder sobre `fabrica` y `fabrica-privado`.
   `standards/intervention.md` donde aún no estén): `.github/workflows/administrar.yml`, `scripts/admin/**`,
   `test/administrador.test.js`. NO `proyectos/**`: añadir un proyecto es justo lo que debe hacer un agente sin Pablo.
 - **Check de máquina (principio 5)**, en `tests`: solo `administrar.yml` puede nombrar `administrador`/`ADMIN_APP_KEY`;
-  sus disparadores son exactamente los de arriba; el token se pide con la lista `permission-*` igual a la del manifiesto;
+  sus disparadores son exactamente los de arriba; cada paso que pide un token lleva una lista `permission-*` no vacía y subconjunto del manifiesto (clave y nivel), y el paso `lectura` es solo de lectura (regla 3, #90);
   el código de `scripts/admin/` solo hace llamadas de una lista permitida (nunca `DELETE /repos`, nunca `bypass_actors` no vacío,
   nunca un ruleset sin `tests` y `revisor`, nunca `enforcement` distinto de `active`).
 - **Si alguien cambia el workflow administrador**: pasa por PR → `tests` (con el check anterior) y `revisor` (C13). Quitar o
@@ -181,6 +181,7 @@ node --test test/administrador.test.js test/gate-files.test.js
 ```
 
 ### 3. Lógica pura en Node
+Ya fusionado en #83.
 Hace: `scripts/admin/proyecto.mjs`: de (estado real, `proyectos/<x>.json`) a una lista de llamadas de la lista permitida;
 cuerpo del ruleset en un solo módulo; esquema de `proyectos/*.json` validado (falla en alto ante clave desconocida,
 privado, dueño distinto de factory-am89).
@@ -199,6 +200,7 @@ node --test test/admin-proyecto.test.js
 ```
 
 ### 4. Workflow en modo solo lectura
+Ya fusionado en #86 y #87. Lección de #86/#87: el paso `create-github-app-token` necesita `owner: factory-am89`; sin él la acción limita el token al repo actual y no ve los proyectos (el primer run falló por eso, no por la instalación de la App).
 Hace: `.github/workflows/administrar.yml` (push a main con paths, environment `administrador`, token con permisos de
 SOLO LECTURA) que imprime el plan sin aplicarlo. Necesita los pasos 1 y 2 de Pablo hechos.
 Files: `.github/workflows/administrar.yml`, `proyectos/homenu-panel.json`
@@ -217,6 +219,7 @@ node --test test/administrador.test.js
 ```
 
 ### 5. Secretos del revisor por repo
+Ya fusionado en #90 (`scripts/admin/secretos.mjs` y el workflow con un paso `escritura`: `administration`, `environments` y `metadata`). La escritura real queda pendiente de los pasos 3 y 4 de Pablo (punto 6): hasta que guarde los secretos en `administrador`, ningún run la ha ejercido.
 Hace: environment `revisor` limitado a `main` y copia cifrada de los tres secretos desde `administrador`; comprueba qué
 permiso pide la API (punto 1); si pide uno que la App no tiene, para: ampliar la App es de Pablo. Va antes que el ruleset
 (proteger homenu-panel sin secretos dejaría sus PR bloqueados). Necesita los pasos 3 y 4 de Pablo hechos.
@@ -344,7 +347,7 @@ CERRADA con la opción 1 (OK al plan entero): fila del 2026-10-17 en `intervenci
 
 1. Si una App puede crear repos en una org con plan gratuito, y con qué permiso exacto (trozo 8).
 2. Si un repo creado por la App entra solo en su instalación con «Only select repositories» (decidiría no usar «All») (trozo 8).
-3. Qué permiso pide escribir un secreto de environment: `environments` o `secrets` (trozo 5).
+3. Qué permiso pide escribir un secreto de environment (trozo 5): según la documentación de GitHub, `environments` (read para la clave pública, write para el secreto), no `secrets`, y crear el environment pide `administration:write` (#90). Procede de la documentación, no de una llamada real; sigue sin confirmar hasta que un run con los pasos 3 y 4 de Pablo hechos lo ejerza.
 4. Si `claude-code-action` rechaza un PR abierto por un bot no listado en `allowed_bots` (trozo 7).
 5. Si existen rulesets de organización en plan gratuito para repos públicos (no se usan; solo cambiaría el diseño a futuro).
 6. Que `tests / tests` sea el nombre del check en un repo creado desde las plantillas (PASOS-PABLO.md lo da por visto en homenu-panel; yo no lo he visto).
