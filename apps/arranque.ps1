@@ -116,7 +116,8 @@ function Guardar-Pem([string]$Ruta, [string]$Rol, [string]$ClientId) {
 
 # Si convertir.mjs dejo la clave en un fichero temporal, la rescata y borra el fichero.
 function Rescatar-Pem([string]$Salida, [string]$Destino, [string]$ClientId) {
-  if ($Salida -notmatch 'AVISO') { return }
+  $marca = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'marca-rescate.txt')).Trim()   # la misma marca que imprime convertir.mjs (MARCA_RESCATE)
+  if ($Salida -notmatch [regex]::Escape($marca)) { return }
   if ($Salida -notmatch '([A-Za-z]:\\[^\r\n]*?\.pem)') { return }
   $ruta = $Matches[1]
   if (-not (Test-Path $ruta)) { return }
