@@ -5,7 +5,7 @@
 // de git de `.githooks/` (los activa `npm run tarea` o `npm run instalar-hooks`).
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { absoluta, norm, worktrees } from '../../scripts/lib/carpetas.mjs';
+import { absoluta, norm, worktrees } from '../../scripts/lib/folders.mjs';
 
 const EDICION = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const TERMINAL = new Set(['Bash', 'PowerShell']);

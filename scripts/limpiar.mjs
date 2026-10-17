@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { git, gitOk, worktrees } from './lib/carpetas.mjs';
+import { git, gitOk, worktrees } from './lib/folders.mjs';
 import { quitarUnion } from './retirar.mjs';
 import { leerFicha } from './lib/repo-card.mjs';
 import { identidadDe } from './lib/identities.mjs';

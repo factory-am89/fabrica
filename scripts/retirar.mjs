@@ -5,7 +5,7 @@ import { lstatSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExitError, RETIRE_RESULT, runCommand, finish } from './lib/exit.mjs';
-import { git, gitOk, norm, principal, worktrees, carpetaDe, tieneOrigin } from './lib/carpetas.mjs';
+import { git, gitOk, norm, principal, worktrees, carpetaDe, tieneOrigin } from './lib/folders.mjs';
 import { motivoDeQuedarse, prFusionado } from './lib/can-delete.mjs';
 
 // Si node_modules es una unión o un enlace se quita ella sola: borrar en recursivo a través de
