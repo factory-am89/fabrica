@@ -335,7 +335,7 @@ CERRADA con la opción 1 (prohibir la ventana, sin excepción de emergencia): fi
 3. Aceptar el riesgo y apuntarlo
 
 ### B. ¿Das el OK a todo el plan, que toca caminos cerrados (`apps/**`, `.github/workflows/**`)?
-Un solo OK para el plan entero, apuntado en `intervenciones.md`.
+CERRADA con la opción 1 (OK al plan entero): fila del 2026-10-17 en `intervenciones.md` (PR #82). La respuesta es de Pablo mismo, no una delegación: el 17 oct 2026 la sesión coordinadora (fabrica-80) le preguntó en la terminal «¿Das el OK a los trozos 2 a 10 del plan de la App administradora?» y contestó «si». Los trozos 2 a 10 pueden tocar caminos cerrados (`apps/**`, `.github/workflows/**`) sin volver a preguntarle por cada uno, y el revisor sigue juzgando cada PR. Las opciones se conservan como registro de lo que se decidió.
 1. Sí, OK al plan entero (recommended)
 2. Sí, pero trozo a trozo
 3. No, plan aparcado
