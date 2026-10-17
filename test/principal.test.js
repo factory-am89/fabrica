@@ -1,5 +1,6 @@
 // La carpeta principal no se toca, se escriba como se escriba la orden: el hook de Claude
 // (.claude/hooks/carpeta-principal.mjs) y los hooks de git (.githooks/), que no miran el texto.
+// lesson: git-not-from-main-folder
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, realpathSync, cpSync, rmSync } from 'node:fs';

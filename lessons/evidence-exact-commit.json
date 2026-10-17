@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "class": "none",
+  "source": "#64",
+  "mechanism": "test/pr-body.test.js",
+  "origin": "constructor"
+}

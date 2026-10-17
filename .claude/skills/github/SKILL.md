@@ -32,7 +32,7 @@ comprobado: 2026-10-15
 (`scripts/lib/token-cache.mjs`) hasta el margen de `MARGEN_MS` antes de caducar: solo el token, nunca la clave. Si la
 caché falla, sigue como antes y avisa con una línea `cache: <motivo>` (motivos en `MOTIVO`). Necesita
 el client id (por defecto `CLIENT_ID_CONSTRUCTOR` de `scripts/lib/repo.mjs`; `FABRICA_CONSTRUCTOR_CLIENT_ID` solo lo sustituye) y una sesión de `op` abierta: la clave
-privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo.
+privada se lee de 1Password en memoria (skill `1password`). `FABRICA_REPO` cambia el repo. Subir y abrir un PR paso a paso: `referencias/subir.md`.
 
 ## Operaciones habituales
 
