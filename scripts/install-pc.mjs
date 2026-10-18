@@ -180,13 +180,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         origen: process.env.FABRICA_USUARIO,
         confirmar: process.argv.includes('--ampliar') ? confirmarEnTerminal() : undefined,
       });
-      if (!c.length) console.log('instalar-pc: sin cambios');
-      for (const { fichero, antes } of c) console.log(`instalar-pc: ${fichero} (${antes})`);
+      if (!c.length) console.log('install-pc: sin cambios');
+      for (const { fichero, antes } of c) console.log(`install-pc: ${fichero} (${antes})`);
     } else if (orden === 'comprobar') {
       const mal = comprobar({ origen: process.env.FABRICA_USUARIO });
-      for (const { fichero, estado: e } of mal) console.error(`comprobar-pc: ${fichero} ${e}`);
+      for (const { fichero, estado: e } of mal) console.error(`check-pc: ${fichero} ${e}`);
       if (mal.length) process.exit(1);
-      console.log('comprobar-pc: coincide');
+      console.log('check-pc: coincide');
     } else {
       throw new Error('Uso: install-pc.mjs instalar [--ampliar] | comprobar');
     }
