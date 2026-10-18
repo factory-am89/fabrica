@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { decidir, rutaEstandar, cargarPreguntas } from '../scripts/veredicto.mjs';
-import { preguntas, buenas, ctx, juzga } from './apoyo/fabrica.mjs';
+import { preguntas, buenas, ctx, juzga } from './support/factory.mjs';
 
 test('veredicto: sí solo si todo lo del revisor es sí o no aplica con prueba', () => {
   assert.equal(juzga(buenas()).ok, true);

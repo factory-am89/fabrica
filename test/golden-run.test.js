@@ -9,7 +9,7 @@ import yaml from 'js-yaml';
 
 const RAIZ = path.join(import.meta.dirname, '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'golden-run.mjs');
-const FALSO = path.join(import.meta.dirname, 'fixtures', 'claude-falso.mjs');
+const FALSO = path.join(import.meta.dirname, 'fixtures', 'claude-fake.mjs');
 const WORKFLOW = path.join(RAIZ, '.github', 'workflows', 'revisor.yml');
 const temporales = [];
 after(() => temporales.forEach((d) => rmSync(d, { recursive: true, force: true })));

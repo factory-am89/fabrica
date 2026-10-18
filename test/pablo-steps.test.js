@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, existsSync } from 'node:fs';
-import { leer } from './apoyo/fabrica.mjs';
+import { leer } from './support/factory.mjs';
 
 test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subida y ruleset en ese orden', () => {
   const pasos = leer('PASOS-PABLO.md');
@@ -35,7 +35,7 @@ test('PASOS-PABLO manda al script real; arranque ejecuta environment, apps, subi
   const ruleset = leer('apps/ruleset.ps1');
   assert.doesNotMatch(ruleset, /check-runs/, 'el check revisor no debe haber corrido antes: solo corre en PR');
   // El cuerpo del ruleset vive en Cuerpo-Ruleset (apps/lib-gh.ps1). Su comportamiento lo prueba
-  // test/lib-gh.prueba.ps1 (solo Windows); estas aserciones sobre el texto corren tambien en el CI de Linux.
+  // test/lib-gh.probe.ps1 (solo Windows); estas aserciones sobre el texto corren tambien en el CI de Linux.
   assert.match(ruleset, /Cuerpo-Ruleset \$NombreRuleset \$ContextoTests \$IdGitHubActions \$idRevisor/);
   assert.doesNotMatch(ruleset, /type = '/, 'el cuerpo del ruleset no se repite en ruleset.ps1');
   const lib = leer('apps/lib-gh.ps1');

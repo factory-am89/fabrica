@@ -12,7 +12,7 @@ One source for this rule; the skill `github`, `PASOS-PABLO.md`, C13 of `standard
 - The only ways out of a wrong «no» are Pablo's **Approve** on the PR (Files changed tab) or a fix PR that the current judge can pass; nothing else, and never a pause. A machine checks it, not a sentence: `anulacion.yml` (runs from `main`; `senal-review.yml` only wakes it) calls `aprobacionDePablo` in `scripts/veredicto.mjs`, which counts a review only if its author is `OWNER_LOGIN` (`scripts/lib/repo.mjs`), his latest decisive review (approved, changes requested, dismissed) is an approval, and its `commit_id` is the current head. A push after it, another author or a dismissed review do not override.
 - The result is the `revisor` check in green titled «override by Pablo», listing the findings it overrides. `node scripts/records.mjs` counts them as `overrides`.
 - `OWNER_LOGIN` is `pabloam89`, the owner account. Checked on 2026-10-16: `gh api repos/factory-am89/fabrica/collaborators/pabloam89/permission --jq .permission` printed `admin`.
-- Why the reviewer may accept this widening (C13): Pablo decided it (the rows of 2026-10-16 in `intervenciones.md`, PR #63: «Decidida, pendiente de implementar en el PR #61»), and the machine limits it to his login, the current head and his latest decisive review; `test/anulacion.test.js` goes red if any of the three is removed.
+- Why the reviewer may accept this widening (C13): Pablo decided it (the rows of 2026-10-16 in `intervenciones.md`, PR #63: «Decidida, pendiente de implementar en el PR #61»), and the machine limits it to his login, the current head and his latest decisive review; `test/override.test.js` goes red if any of the three is removed.
 
 ## Classes
 

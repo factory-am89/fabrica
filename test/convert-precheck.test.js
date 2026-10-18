@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cli, previos, REPO } from '../apps/convertir.mjs';
-import { leer } from './apoyo/fabrica.mjs';
+import { leer } from './support/factory.mjs';
 
 // Fake runner: `gh auth status` and `gh api repos/<REPO>` answer as told; everything else (powershell) works.
 const runner = ({ logged = true, admin = true, ps = true } = {}) => (programa, args) => {

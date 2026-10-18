@@ -56,8 +56,8 @@ Se pasa por tubería (stdin) entre dos procesos.
   the margin `MARGEN_MS` (same file) before it expires, with a lock so two sessions do not exchange at once. On "Too many requests"
   `token.mjs` does not retry nor try another vault: it prints `limite-de-1password`, uses the saved token if it is
   still alive and otherwise exits with the code of `MOTIVOS`. Count with
-  `node --test test/token-lecturas.test.js`: it runs a batch of calls and asserts the .pem was read once.
-  Two guards keep it from coming back: `test/presupuesto-lecturas.test.js` (the read budget `PRESUPUESTO_LECTURAS` in `token.mjs`, with its own
+  `node --test test/token-reads.test.js`: it runs a batch of calls and asserts the .pem was read once.
+  Two guards keep it from coming back: `test/read-budget.test.js` (the read budget `PRESUPUESTO_LECTURAS` in `token.mjs`, with its own
   reason in `MOTIVOS`) and `test/op-door.test.js` (only the files in `PUERTAS`, `scripts/lib/op-door.mjs`, may spawn `op` or open the vault).
 - **2026-10-11 · la `ssh` falla con «communication with agent failed».** Causa: nadie contestó la ventana de
   aprobar; no era el agente ni la llave. Arreglo: avisar a Pablo antes de conectar y esperar su sí, sin

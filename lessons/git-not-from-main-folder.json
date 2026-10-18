@@ -2,6 +2,6 @@
   "v": 1,
   "class": "none",
   "source": "#1",
-  "mechanism": "test/principal.test.js",
+  "mechanism": "test/main-folder.test.js",
   "origin": "constructor"
 }

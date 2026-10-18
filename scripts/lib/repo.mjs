@@ -5,7 +5,7 @@ export const REPO = 'factory-am89/fabrica';
 // Client id de la App fabrica-constructor. No es secreto (el secreto es la clave privada, en 1Password):
 // vive junto al repo para que ninguna sesión dependa de que alguien se lo pase.
 export const CLIENT_ID_CONSTRUCTOR = 'Iv23liur4l1hSrzmpd7h';
-// Slug de la App que publica el check `revisor` (apps/crear-apps.html la crea con este nombre; test/anulacion.test.js lo comprueba).
+// Slug de la App que publica el check `revisor` (apps/crear-apps.html la crea con este nombre; test/override.test.js lo comprueba).
 export const REVISOR_APP_SLUG = 'fabrica-revisor';
 // Slug de la App administradora (apps/crear-apps.html la crea con este nombre; test/apps.test.js lo comprueba).
 export const ADMIN_APP_SLUG = 'fabrica-administrador';

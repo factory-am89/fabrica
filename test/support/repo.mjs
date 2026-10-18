@@ -1,5 +1,5 @@
 // Shared test helpers for the tests that build throwaway git repos.
-// Lives in test/apoyo/ with the other test helpers; node --test also runs it as a file, harmlessly (no side effects).
+// Lives in test/support/ with the other test helpers; node --test also runs it as a file, harmlessly (no side effects).
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

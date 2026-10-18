@@ -6,7 +6,7 @@ import path from 'node:path';
 import { CORPUS, CLEAN as CLEAN_OF_SCORER, belowFloor } from '../scripts/golden.mjs';
 import { CLEAN, COMPARE_FILE_LIMIT, EXPECTED_FILE, FAULT, FLOOR_FILE, GOLDEN_DIR, checkGolden, goldenFaults, touchesCorpus } from '../scripts/lib/golden-guard.mjs';
 import { decidir } from '../scripts/veredicto.mjs';
-import { buenas, ctx, preguntas } from './apoyo/fabrica.mjs';
+import { buenas, ctx, preguntas } from './support/factory.mjs';
 
 // The real corpus is the base of every case: the same file a PR would change.
 const REAL = JSON.parse(readFileSync(path.join(CORPUS, EXPECTED_FILE), 'utf8'));

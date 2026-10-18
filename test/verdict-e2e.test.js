@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { extractRecord } from '../scripts/lib/record.mjs';
 import { decidir } from '../scripts/veredicto.mjs';
-import { preguntas, buenas, SHA, ctx } from './apoyo/fabrica.mjs';
+import { preguntas, buenas, SHA, ctx } from './support/factory.mjs';
 
 // Recorre el script entero como lo corre el workflow (variables de entorno y llamadas a la API),
 // con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
@@ -16,7 +16,7 @@ import { preguntas, buenas, SHA, ctx } from './apoyo/fabrica.mjs';
 const BASE_SHA = 'b'.repeat(40);
 const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
-  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
+  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-fake.mjs', import.meta.url))).href;
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
     env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
@@ -82,7 +82,7 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   mkdirSync(path.join(raiz, 'standards'));
   for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs', 'lib/golden-guard.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
   writeFileSync(path.join(raiz, 'standards', 'p.md'), '### P1 — First question\nQuién: revisor\n\n### P2 — Second question\nQuién: revisor\n');
-  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
+  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-fake.mjs', import.meta.url))).href;
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });
   const r = spawnSync(process.execPath, ['--import', precarga, path.join(raiz, 'scripts', 'veredicto.mjs')], {
     encoding: 'utf8',

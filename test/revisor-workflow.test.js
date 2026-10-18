@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import yaml from 'js-yaml';
 import { accionFijada } from '../scripts/lib/actions.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
-import { leer } from './apoyo/fabrica.mjs';
+import { leer } from './support/factory.mjs';
 
 // Los workflows se comprueban (permisos y SHA, C4) en test/workflows.test.js, que también sirve
 // para el repo que llama a tests.yml; aquí solo la regla de la excepción.

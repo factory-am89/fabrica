@@ -7,7 +7,7 @@ import { readdirSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { CORPUS } from '../scripts/golden.mjs';
 import { DEFAULT_TRIALS, MAX_CALLS } from '../scripts/golden-run.mjs';
-import { leer } from './apoyo/fabrica.mjs';
+import { leer } from './support/factory.mjs';
 
 const RUTA = '.github/workflows/golden.yml';
 const texto = leer(RUTA);
