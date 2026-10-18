@@ -121,9 +121,14 @@ function checkState(s) {
   if (!isObject(s)) fail('estado: tiene que ser un objeto');
   for (const k of Object.keys(s)) if (!STATE_KEYS.includes(k)) fail(`estado: clave desconocida '${k}'`);
   const isBoolMap = (r) => isObject(r) && ['private', 'allow_auto_merge', 'delete_branch_on_merge'].every((k) => typeof r[k] === 'boolean');
-  if (s.repo !== null && !isBoolMap(s.repo)) fail('estado.repo: null o un objeto con private, allow_auto_merge y delete_branch_on_merge (booleanos)');
+  // GitHub leaves allow_auto_merge and delete_branch_on_merge out of the repo for a caller without administration read:
+  // absent is not false, and reading it as false would ask for update-settings on every run.
+  if (s.repo !== null && !isBoolMap(s.repo)) fail('estado.repo: null o un objeto con private, allow_auto_merge y delete_branch_on_merge (booleanos; GitHub omite los dos ultimos sin permiso administration: read y no se dan por falsos)');
   for (const k of ['files', 'secretNames', 'rulesets']) if (!Array.isArray(s[k])) fail(`estado.${k}: tiene que ser una lista`);
   if (!s.rulesets.every((r) => isObject(r) && Number.isInteger(r.id))) fail('estado.rulesets: cada ruleset tiene que traer su id numerico');
+  // Same for bypass_actors of a ruleset. Absent is not empty: the guard never assumes it (and comparing against a hidden
+  // bypass would ask for update-ruleset on every run).
+  if (!s.rulesets.every((r) => Array.isArray(r.bypass_actors))) fail('estado.rulesets: un ruleset no trae bypass_actors (GitHub lo omite sin permiso administration: read); no se da por vacio');
   if (!Number.isInteger(s.revisorAppId) || s.revisorAppId <= 0) fail('estado.revisorAppId: tiene que ser el App ID numerico de la App revisora');
   if (s.environment !== null && !(isObject(s.environment) && typeof s.environment.customBranchPolicies === 'boolean' && Array.isArray(s.environment.branches))) {
     fail('estado.environment: null o { customBranchPolicies, branches }');
