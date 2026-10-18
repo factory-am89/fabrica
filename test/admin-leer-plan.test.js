@@ -97,3 +97,9 @@ test('the real proyectos/*.json obey the schema and are named after their repo',
   assert.ok(files.length >= 1);
   for (const f of files) parseProject(JSON.parse(readFileSync(path.join(dir, f), 'utf8')), { fileName: f });
 });
+
+test('a repo answer without allow_auto_merge / delete_branch_on_merge is not read as false: planning it fails loudly', async () => {
+  const { api } = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo': [200, { private: false }] });
+  const state = await readState(api, PROJECT);
+  assert.throws(() => planProject(PROJECT, state, TEMPLATES), /administration: read/);
+});

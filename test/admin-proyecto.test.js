@@ -264,3 +264,24 @@ test('the real state is validated too: malformed state, missing template and mis
   assert.throws(() => planProject(parseProject(PROJECT), { ...completo(), files: [] }, { ...TEMPLATES, 'tests.yml': undefined }), /tests\.yml/);
   assert.throws(() => plan({ ...completo(), surprise: 1 }), /surprise/);
 });
+
+// Real object: GET /repos/factory-am89/homenu-panel/rulesets/25340020 as the constructor App's token saw it, minutes after
+// aplicar.mjs created it (run 39120720719). It has no bypass_actors key at all: GitHub hides it from a caller without
+// administration read. Before this check, covers() read the absent key as "not empty" and aplicar.mjs asked for
+// update-ruleset forever (its second read threw «tras escribir aun faltan ... update-ruleset»).
+const RULESET_REAL = JSON.parse(leer(RAIZ, 'test', 'fixtures', 'admin', 'ruleset-real-sin-bypass.json'));
+const REVISOR_REAL = 5332150;
+const conRulesetReal = (extra = {}) => ({ ...completo(), revisorAppId: REVISOR_REAL, rulesets: [{ ...RULESET_REAL, ...extra }] });
+
+test('a ruleset whose bypass_actors GitHub hides fails loudly: absent is not empty and not drift', () => {
+  assert.throws(() => plan(conRulesetReal()), /bypass_actors.*administration: read/);
+});
+
+test('the real ruleset seen with its bypass_actors empty is complete (0 calls); with a bypass it is replaced', () => {
+  assert.deepEqual(plan(conRulesetReal({ bypass_actors: [] })), []);
+  assert.deepEqual(ops(plan(conRulesetReal({ bypass_actors: [{ actor_id: 5, actor_type: 'Team', bypass_mode: 'always' }] }))), ['update-ruleset']);
+});
+
+test('a repo state without the two settings (GitHub hides them) fails loudly, never read as false', () => {
+  assert.throws(() => plan({ ...completo(), repo: { private: false } }), /administration: read/);
+});
