@@ -1,8 +1,8 @@
 // Capa de usuario versionada: usuario/ (CLAUDE.md global y, si lo hay, settings.json; admite subcarpetas) <-> ~/.claude/.
-//   node scripts/instalar-pc.mjs instalar              copia lo que falta o difiere y apunta la huella
-//   node scripts/instalar-pc.mjs instalar --ampliar    igual, aunque settings.json amplíe permisos: SOLO desde una
+//   node scripts/install-pc.mjs instalar              copia lo que falta o difiere y apunta la huella
+//   node scripts/install-pc.mjs instalar --ampliar    igual, aunque settings.json amplíe permisos: SOLO desde una
 //                                                      terminal interactiva y tecleando AMPLIAR (solo Pablo)
-//   node scripts/instalar-pc.mjs comprobar             sale con 1 y nombra cada fichero que no coincide
+//   node scripts/install-pc.mjs comprobar             sale con 1 y nombra cada fichero que no coincide
 // Si el settings.json nuevo AMPLÍA permisos respecto al instalado (scripts/lib/settings-widening.mjs), instalar sale
 // con 1 sin escribir NADA. --ampliar no basta: sin terminal (las sesiones de Claude no la tienen) o sin la
 // confirmación, sale con 1 igual. Quitar permisos se aplica solo.
@@ -104,7 +104,7 @@ export class AmpliaPermisos extends Error {
     const lineas = motivos.map((m) => `  - ${m}`).join('\n');
     super(
       `settings.json amplía permisos y no se ha escrito nada (${causa}):\n${lineas}\n` +
-        `Lo lanza Pablo en su terminal: npm run instalar-pc -- --ampliar (y teclea ${CONFIRMACION}).`,
+        `Lo lanza Pablo en su terminal: npm run install-pc -- --ampliar (y teclea ${CONFIRMACION}).`,
     );
     this.motivos = motivos;
   }
@@ -180,15 +180,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         origen: process.env.FABRICA_USUARIO,
         confirmar: process.argv.includes('--ampliar') ? confirmarEnTerminal() : undefined,
       });
-      if (!c.length) console.log('instalar-pc: sin cambios');
-      for (const { fichero, antes } of c) console.log(`instalar-pc: ${fichero} (${antes})`);
+      if (!c.length) console.log('install-pc: sin cambios');
+      for (const { fichero, antes } of c) console.log(`install-pc: ${fichero} (${antes})`);
     } else if (orden === 'comprobar') {
       const mal = comprobar({ origen: process.env.FABRICA_USUARIO });
-      for (const { fichero, estado: e } of mal) console.error(`comprobar-pc: ${fichero} ${e}`);
+      for (const { fichero, estado: e } of mal) console.error(`check-pc: ${fichero} ${e}`);
       if (mal.length) process.exit(1);
-      console.log('comprobar-pc: coincide');
+      console.log('check-pc: coincide');
     } else {
-      throw new Error('Uso: instalar-pc.mjs instalar [--ampliar] | comprobar');
+      throw new Error('Uso: install-pc.mjs instalar [--ampliar] | comprobar');
     }
   } catch (e) {
     console.error(e.message);

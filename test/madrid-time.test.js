@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { horaDeMadrid, pasoHora } from '../scripts/hora.mjs';
+import { horaDeMadrid, pasoHora } from '../scripts/madrid-time.mjs';
 import { arrancar, PASOS } from '../scripts/al-arrancar.mjs';
 
-const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'hora.mjs');
+const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'madrid-time.mjs');
 
 test('hora: en verano (CEST, UTC+2) es dos horas más que UTC', () => {
   assert.equal(horaDeMadrid(new Date('2026-07-15T10:30:00Z')), '15/7/2026, 12:30:00');
@@ -27,7 +27,7 @@ test('hora: el paso del arranque imprime la hora de Madrid con el reloj inyectad
 test('hora: PASOS la incluye y package.json tiene `npm run hora`', () => {
   assert.ok(PASOS.some((p) => p.nombre === 'hora'));
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(pkg.scripts.hora, 'node scripts/hora.mjs');
+  assert.equal(pkg.scripts.hora, 'node scripts/madrid-time.mjs');
 });
 
 test('hora: lanzado de verdad imprime una sola línea con la hora de Madrid y sale 0', () => {

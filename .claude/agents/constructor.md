@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
 
-Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre en castellano), desde `origin/main`, en su propia carpeta (`npm run tarea -- <rama>`; al fusionar, `npm run retirar -- <nombre>`).
+Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre en castellano), desde `origin/main`, en su propia carpeta (`npm run tarea -- <rama>`; al fusionar, `npm run retire -- <nombre>`).
 
 1. Antes de escribir, mira lo que ya existe: reutiliza antes de crear.
 2. Un test nuevo se ve fallar antes de creerlo; el PR cuenta cómo (comando y salida).
@@ -18,7 +18,7 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 
 Run these without a human; they never ask anything.
 
-- Start a task: `npm run tarea -- --json feat/<name>`. Retire a folder once its PR is merged: `npm run retirar -- --json <name>`.
+- Start a task: `npm run tarea -- --json feat/<name>`. Retire a folder once its PR is merged: `npm run retire -- --json <name>`.
 - With `--json`, stdout is exactly one JSON object and human text goes to stderr. The shape and the codes are defined in `runCommand` and `EXIT` in `scripts/lib/exit.mjs`; the codes are also in `scripts/lib/exit-codes.json`, generated with `npm run contract` (run it whenever `EXIT` changes).
 - Read the exit code, not the text. Never copy the numbers or the field names into prose or into another file.
 - Before opening a PR, run `npm run done`: it runs lint and then the tests, exits 0 only if both pass, and its last stdout line is fixed (the words are `DONE_LINE` in `scripts/done.mjs`; never copy them). Its failure codes are in the same contract file.

@@ -1,5 +1,5 @@
 // What an agent needs to orchestrate the scripts without a human: one exit code per failure class,
-// a closed vocabulary for the result of `retirar`, and the shared --json / exit-code plumbing.
+// a closed vocabulary for the result of `retire`, and the shared --json / exit-code plumbing.
 // The map and the vocabulary live only here; scripts and tests import them.
 
 // scripts/token.mjs keeps its own exit codes in MOTIVOS; unifying them with EXIT is a separate piece.
@@ -11,19 +11,19 @@ export const EXIT = Object.freeze({
   FOLDER_EXISTS: 11, // tarea: the work folder already exists
   GIT_FAILED: 12, // a git command failed or git could not be started
   INSTALL_FAILED: 13, // tarea: npm ci failed (folder and branch exist)
-  NOT_FOUND: 20, // retirar: there is no such work folder
-  DETACHED_HEAD: 21, // retirar: the folder has no branch
-  INSIDE_FOLDER: 22, // retirar: launched from inside the folder it would delete
-  UNSAVED_CHANGES: 23, // retirar: the folder has uncommitted changes
-  NOT_MERGED: 24, // retirar: the branch is not merged into main
-  GH_FAILED: 25, // retirar: GitHub could not be asked about the merged PR
-  NODE_MODULES_SHARED: 26, // retirar: another folder's node_modules junction points into this one
+  NOT_FOUND: 20, // retire: there is no such work folder
+  DETACHED_HEAD: 21, // retire: the folder has no branch
+  INSIDE_FOLDER: 22, // retire: launched from inside the folder it would delete
+  UNSAVED_CHANGES: 23, // retire: the folder has uncommitted changes
+  NOT_MERGED: 24, // retire: the branch is not merged into main
+  GH_FAILED: 25, // retire: GitHub could not be asked about the merged PR
+  NODE_MODULES_SHARED: 26, // retire: another folder's node_modules junction points into this one
   DONE_LINT_FAILED: 30, // done: npm run lint failed
   DONE_TESTS_FAILED: 31, // done: npm test failed
   LESSON_FAULTS: 40, // lessons: the registry has at least one fault (the codes are in the output)
 });
 
-// Result of `retirar --json`: either the folder was removed or the command refused (see `error`).
+// Result of `retire --json`: either the folder was removed or the command refused (see `error`).
 export const RETIRE_RESULT = Object.freeze({ REMOVED: 'removed', REFUSED: 'refused' });
 
 // An error that carries its failure class; the message stays human text.

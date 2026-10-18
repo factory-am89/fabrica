@@ -115,7 +115,7 @@ test('una fecha con formato válido pero imposible se rechaza igual en comprobar
 test('skillsViejas lanza si no puede leer las skills, no dice que no hay ninguna', () => {
   const vacia = mkdtempSync(path.join(tmpdir(), 'forja-'));
   assert.throws(() => skillsViejas(vacia, '2027-02-01'), /no existe/);
-  const r = spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'skills-viejas.mjs'), vacia], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'stale-skills.mjs'), vacia], { encoding: 'utf8' });
   assert.notEqual(r.status, 0);
   assert.doesNotMatch(r.stdout, /ninguna/);
 });

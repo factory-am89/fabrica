@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXIT, RETIRE_RESULT, ExitError, runCommand } from '../scripts/lib/exit.mjs';
-import { cliRetirar } from '../scripts/retirar.mjs';
+import { cliRetirar } from '../scripts/retire.mjs';
 import { prFusionado } from '../scripts/lib/can-delete.mjs';
 import { git as gitRaw } from '../scripts/lib/folders.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
@@ -170,7 +170,7 @@ test('the real scripts exit with the class code; --json leaves only JSON on stdo
   const t = run('tarea.mjs', '--json', 'rama-rara');
   assert.equal(t.status, EXIT.INVALID_BRANCH);
   assert.equal(JSON.parse(t.stdout).error, 'INVALID_BRANCH');
-  const r = run('retirar.mjs', '--json', 'no-existe');
+  const r = run('retire.mjs', '--json', 'no-existe');
   assert.equal(r.status, EXIT.GIT_FAILED); // cwd is not a repository
   assert.equal(JSON.parse(r.stdout).error, 'GIT_FAILED');
 });

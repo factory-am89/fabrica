@@ -1,5 +1,5 @@
 // La capa de usuario: instalar copia usuario/ a ~/.claude/, la segunda vez no cambia nada y
-// un cambio a mano hace salir a comprobar-pc con 1 nombrando el fichero. Siempre con un HOME temporal.
+// un cambio a mano hace salir a check-pc con 1 nombrando el fichero. Siempre con un HOME temporal.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, statSync, readdirSync } from 'node:fs';
@@ -7,12 +7,12 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AmpliaPermisos, HUELLA, ORIGEN, comprobar, confirmarEnTerminal, instalar } from '../scripts/instalar-pc.mjs';
+import { AmpliaPermisos, HUELLA, ORIGEN, comprobar, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');
+const SCRIPT = path.join(RAIZ, 'scripts', 'install-pc.mjs');
 
-const nuevoHome = () => mkdtempSync(path.join(tmpdir(), 'instalar-pc-'));
+const nuevoHome = () => mkdtempSync(path.join(tmpdir(), 'install-pc-'));
 // Estos tests prueban la mecánica con un usuario/ que solo tiene el CLAUDE.md de verdad; el settings.json de verdad
 // (plantilla con huecos) se prueba en usuario-settings.test.js, con valores inventados.
 const SOLO_CLAUDE = mkdtempSync(path.join(tmpdir(), 'usuario-'));

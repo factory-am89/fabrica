@@ -1,5 +1,5 @@
 // La regla «¿se puede borrar esta carpeta de trabajo?» y la consulta a GitHub que la alimenta.
-// La usan retirar.mjs (una carpeta, por nombre) y limpiar.mjs (todas); ninguna la repite.
+// La usan retire.mjs (una carpeta, por nombre) y clean.mjs (todas); ninguna la repite.
 import { lstatSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

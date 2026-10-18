@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/instalar-pc.mjs';
+import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
 import { ampliaciones } from '../scripts/lib/settings-widening.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
 
@@ -59,7 +59,7 @@ test('toda clave de la plantilla rellena está en la lista cerrada o la miran la
 });
 
 test('instalar con valores de prueba escribe CLAUDE.md, settings.json relleno y la huella, y no los motivos', () => {
-  const home = mkdtempSync(path.join(tmpdir(), 'instalar-pc-'));
+  const home = mkdtempSync(path.join(tmpdir(), 'install-pc-'));
   const confirmar = confirmarEnTerminal({ tty: true, leerLinea: () => 'AMPLIAR', escribir: () => {} });
   instalar({ home, valores: VALORES_PRUEBA, confirmar });
   assert.deepEqual(readdirSync(path.join(home, '.claude')).sort(), ['CLAUDE.md', 'fabrica-huella.json', 'settings.json']);

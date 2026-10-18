@@ -5,9 +5,9 @@
 // y puede usar (https://code.claude.com/docs/en/hooks); con otra salida solo habría un aviso con la 1.ª línea de stderr.
 // Si un paso falla, la primera línea lo dice sin ambigüedad y luego va el detalle: la sesión debe enterarse.
 import { fileURLToPath } from 'node:url';
-import { limpiar, imprimir } from './limpiar.mjs';
-import { pasoAlDia } from './al-dia.mjs';
-import { pasoHora } from './hora.mjs';
+import { limpiar, imprimir } from './clean.mjs';
+import { pasoAlDia } from './pull-main.mjs';
+import { pasoHora } from './madrid-time.mjs';
 import { pasoSesiones } from './sesiones.mjs';
 
 export const pasoLimpiar = (limpiarFn = limpiar) => ({

@@ -87,7 +87,7 @@ export function comprobarSkill(carpeta, { raiz, hoy }) {
   return [...faltas, ...faltasDeCarpeta(carpeta, texto)];
 }
 
-// Skills que llevan más de REVISAR_DIAS días sin revisar. Informa, no falla: lo lee `npm run skills-viejas`.
+// Skills que llevan más de REVISAR_DIAS días sin revisar. Informa, no falla: lo lee `npm run stale-skills`.
 // `hoy` entra siempre por parámetro. Si no puede leer las skills, lanza (no devuelve [] como si todo estuviera al día).
 export function skillsViejas(raiz, hoy) {
   const dir = path.join(raiz, '.claude', 'skills');

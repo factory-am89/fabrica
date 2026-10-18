@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
-import { instalarHooks } from '../scripts/instalar-hooks.mjs';
+import { instalarHooks } from '../scripts/install-hooks.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(RAIZ, '.claude', 'hooks', 'carpeta-principal.mjs');

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
-import { retirar } from '../scripts/retirar.mjs';
+import { retirar } from '../scripts/retire.mjs';
 import { nombreDeRama, norm } from '../scripts/lib/folders.mjs';
 import { git, repo } from './apoyo/repo.mjs';
 import { decidir, enPrincipal, carpetaDeCommit } from '../.claude/hooks/carpeta-principal.mjs';

@@ -1,15 +1,15 @@
-// Borra las carpetas de trabajo cuyo PR ya está fusionado en GitHub: npm run limpiar [-- --ensayo]
+// Borra las carpetas de trabajo cuyo PR ya está fusionado en GitHub: npm run clean [-- --ensayo]
 // La ascendencia no sirve (squash y rebase dejan la rama fuera de main): se mira el PR fusionado.
 // Una sola consulta REST por pasada (los últimos 100 PR cerrados), por scripts/token.mjs. Si GitHub no
 // responde, falla en alto y no borra nada. Lo que no se pudo borrar se dice siempre.
 // Sirve para cualquier repo: lo que necesita saber (repo, rama base, identidad) está en su .fabrica.json
 // (scripts/lib/repo-card.mjs); sin ficha, error. Desde fuera de la carpeta del repo: --repo <carpeta>.
-//   npm run limpiar -- [--ensayo] [--repo <carpeta>] [--ficha <fichero>]
+//   npm run clean -- [--ensayo] [--repo <carpeta>] [--ficha <fichero>]
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git, gitOk, worktrees } from './lib/folders.mjs';
-import { quitarUnion } from './retirar.mjs';
+import { quitarUnion } from './retire.mjs';
 import { leerFicha } from './lib/repo-card.mjs';
 import { identidadDe } from './lib/identities.mjs';
 import { conToken, motivoDeQuedarse, prsFusionados } from './lib/can-delete.mjs';

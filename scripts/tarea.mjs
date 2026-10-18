@@ -5,7 +5,7 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { instalarHooks } from './instalar-hooks.mjs';
+import { instalarHooks } from './install-hooks.mjs';
 import { ExitError, runCommand, finish } from './lib/exit.mjs';
 import { gitOk, principal, nombreDeRama, carpetaDe, tieneOrigin } from './lib/folders.mjs';
 

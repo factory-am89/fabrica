@@ -5,7 +5,7 @@
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
 // scripts/lib/token-cache.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
 // Read budget: before each read it counts the last hour's reads (all scripts); at PRESUPUESTO_LECTURAS it does not read and exits with its code in MOTIVOS.
-// gh calls: every `gh` run leaves one line in the gh log (api and result, nothing else; path: rutaDeRegistroGh in scripts/lib/gh-log.mjs); count with `npm run llamadas-gh`.
+// gh calls: every `gh` run leaves one line in the gh log (api and result, nothing else; path: rutaDeRegistroGh in scripts/lib/gh-log.mjs); count with `npm run gh-calls`.
 // Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
 // scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
 import { createSign } from 'node:crypto';

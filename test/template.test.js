@@ -1,4 +1,4 @@
-// Plantilla con huecos {{nombre}} + fichero de valores: lo que rellena instalar-pc. Todo con valores INVENTADOS
+// Plantilla con huecos {{nombre}} + fichero de valores: lo que rellena install-pc. Todo con valores INVENTADOS
 // y un settings de prueba (test/fixtures/settings-base.json): ningún dato real.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,11 +7,11 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ORIGEN, instalar, confirmarEnTerminal } from '../scripts/instalar-pc.mjs';
+import { ORIGEN, instalar, confirmarEnTerminal } from '../scripts/install-pc.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SCRIPT = path.join(RAIZ, 'scripts', 'instalar-pc.mjs');
+const SCRIPT = path.join(RAIZ, 'scripts', 'install-pc.mjs');
 const base = () => JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'settings-base.json'), 'utf8'));
 
 // --- la mecánica ---
@@ -42,7 +42,7 @@ test('rellenar: un hueco sin valor y un valor sin hueco lanzan nombrándolos; lo
   assert.throws(() => rellenar({ a: '{{n}}' }, [1]), /objeto JSON/);
 });
 
-// --- con instalar-pc ---
+// --- con install-pc ---
 
 const VALORES_PRUEBA = {
   home: 'C:/Users/prueba',
@@ -72,7 +72,7 @@ const ficheroValores = (valores = VALORES_PRUEBA) => {
   return f;
 };
 const claude = (home, ...r) => path.join(home, '.claude', ...r);
-const nuevoHome = () => mkdtempSync(path.join(tmpdir(), 'instalar-pc-'));
+const nuevoHome = () => mkdtempSync(path.join(tmpdir(), 'install-pc-'));
 const cli = (home, origen, valores, orden = 'instalar', ...extra) =>
   spawnSync('node', [SCRIPT, orden, ...extra], {
     env: { ...process.env, FABRICA_HOME: home, FABRICA_USUARIO: origen, FABRICA_VALORES: valores },
