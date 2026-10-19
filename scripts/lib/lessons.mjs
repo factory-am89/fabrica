@@ -22,7 +22,7 @@ export const LESSON_FAULTS = Object.freeze(
   ].map((c) => [c, c])),
 );
 
-const FIELDS = ['v', 'class', 'source', 'mechanism', 'origin'];
+export const FIELDS = ['v', 'class', 'source', 'mechanism', 'origin'];
 const VERSION = 1;
 const NO_CLASS = 'none';
 const HUMAN_ORIGIN = 'pablo';

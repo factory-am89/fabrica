@@ -1,0 +1,21 @@
+{
+  "$comment": "Registro de campos de la Fábrica: cada campo que una entidad de entities.json tiene en código, declarado una vez. Las reglas de cada clave están en scripts/lib/fields.mjs (KEYS). Lo lee ese fichero y lo vigila test/fields.test.js: un campo que el código lista y este fichero no declara pone el test en rojo.",
+  "version": 1,
+  "fields": [
+    { "campo": "v", "tipo": "atributo_de", "de": "lesson", "dueño": "lesson", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "número", "cableado": ["scripts/lib/lessons.mjs", "test/lessons.test.js"] },
+    { "campo": "class", "tipo": "atributo_de", "de": "lesson", "dueño": "lesson", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "enum", "cableado": ["scripts/lib/lessons.mjs", "test/lessons.test.js"] },
+    { "campo": "source", "tipo": "atributo_de", "de": "lesson", "dueño": "lesson", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "id", "cableado": ["scripts/lib/lessons.mjs", "test/lessons.test.js"] },
+    { "campo": "mechanism", "tipo": "atributo_de", "de": "lesson", "dueño": "lesson", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "id", "cableado": ["scripts/lib/lessons.mjs", "test/lessons.test.js"] },
+    { "campo": "origin", "tipo": "atributo_de", "de": "lesson", "dueño": "lesson", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "enum", "cableado": ["scripts/lib/lessons.mjs", "test/lessons.test.js"] },
+    { "campo": "t", "tipo": "atributo_de", "de": "intervention", "dueño": "intervention", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "fecha", "cableado": ["scripts/lib/intervention-log.mjs", "test/intervenciones.test.js"] },
+    { "campo": "clase", "tipo": "atributo_de", "de": "intervention", "dueño": "intervention", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "enum", "cableado": ["scripts/lib/intervention-log.mjs", "test/intervenciones.test.js"] },
+    { "campo": "origen", "tipo": "atributo_de", "de": "intervention", "dueño": "intervention", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "enum", "cableado": ["scripts/lib/intervention-log.mjs", "test/intervenciones.test.js"] },
+    { "campo": "falta", "tipo": "atributo_de", "de": "intervention", "dueño": "intervention", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "enum", "cableado": ["scripts/lib/intervention-log.mjs", "test/intervenciones.test.js"] },
+    { "campo": "Files", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "id", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] },
+    { "campo": "Depends on", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "id", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] },
+    { "campo": "Blocked by", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "texto", "texto_motivo": "prosa-juzgada", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] },
+    { "campo": "Existing", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "texto", "texto_motivo": "prosa-juzgada", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] },
+    { "campo": "Not done", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "texto", "texto_motivo": "prosa-juzgada", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] },
+    { "campo": "Done", "tipo": "atributo_de", "de": "plan", "dueño": "plan", "existente": "nueva", "nueva_motivo": "sin-equivalente", "valores": "texto", "texto_motivo": "prosa-juzgada", "cableado": ["scripts/lib/plan.mjs", "test/check-plan.test.js"] }
+  ]
+}
