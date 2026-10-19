@@ -3,7 +3,7 @@
 // environment and its secrets are chunk 5 (secretos.mjs), the smoke PR and new repos are other chunks.
 // This file is a gate file (scripts/lib/gate.mjs, folder scripts/admin/); the machine guard of the key scans it.
 //
-// Order matters: protecting `main` with a ruleset that requires `revisor` BEFORE the `revisor` environment of that repo
+// Order matters (a third lock, about tests.yml, is further down): protecting `main` with a ruleset that requires `revisor` BEFORE the `revisor` environment of that repo
 // has its secrets would leave every PR of the repo blocked (plan, chunk 5). Two locks, both in code and both tested:
 //   1. The workflow runs this file only in a step AFTER the secrets step, with no `if` and no continue-on-error, so a
 //      failed secrets step skips it (test/admin-aplicar.test.js reads the real workflow).
@@ -16,6 +16,7 @@
 // A ruleset is only ever written `active`, with an empty bypass_actors, and is never paused nor removed.
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import yaml from 'js-yaml';
 import { ALLOWED_CALLS, REVISOR_ENV, parseProject, planProject } from './proyecto.mjs';
 import { loadTemplates, makeApi, readState } from './leer-plan.mjs';
 import { makeWriteApi, secretCalls } from './secretos.mjs';
@@ -37,14 +38,39 @@ export function assertAllowed(call) {
 // branch policy and the three secret names are there. The rule lives in planProject (environmentCalls); it is not rewritten here.
 export const missingBeforeProtecting = (calls) => secretCalls(calls).map((c) => `${c.op} ${c.path}`);
 
+// Lock 3: do not protect a repo whose required check `tests / tests` could never pass. The shared workflow (tests.yml of this repo, the
+// only source) runs `npm ci` / `cache: npm` (needs package-lock.json) and `npm test` (needs package.json). Read from the workflow itself, not
+// copied here, so a new requirement of the workflow is a new requirement of the lock.
+export const TESTS_WORKFLOW = path.join('.github', 'workflows', 'tests.yml');
+export function testsWorkflowNeeds(text) {
+  const steps = Object.values(yaml.load(text)?.jobs ?? {}).flatMap((j) => j.steps ?? []);
+  const needs = new Set();
+  for (const s of steps) {
+    const run = String(s.run ?? '').trim();
+    if (run === 'npm test') needs.add('package.json');
+    if (run === 'npm ci' || s.with?.cache === 'npm') needs.add('package-lock.json');
+  }
+  if (needs.size === 0) throw new Error(`${TESTS_WORKFLOW}: no encuentro que pide al repo (npm ci, npm test, cache: npm); no se puede comprobar si tests / tests podra pasar`);
+  return [...needs].sort();
+}
+
+// What the shared tests workflow needs that neither the repo (state.files) nor this run's own put-file on main will have. It only
+// matters when the plan writes a ruleset: that is the act of protecting. [] = nothing to say.
+export function missingForTests(plan, files, needs) {
+  if (!plan.some((c) => c.op === 'create-ruleset' || c.op === 'update-ruleset')) return [];
+  const will = new Set([...files, ...plan.filter((c) => c.op === 'put-file' && c.body?.branch === 'main').map((c) => c.path.split('/contents/')[1])]);
+  return needs.filter((n) => !will.has(n));
+}
+
 // readApi: GET with the lectura token (environments, secrets, trees, pulls). applyReadApi: GET with the aplicar token, for the two
 // reads the lectura token cannot see (merge settings, bypass_actors). Required: without it those fields would be «not visible»
 // (null), the settings and the bypass would be skipped and the second pass could prove nothing.
-export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), readApi, applyReadApi, writeApi, summaryFile } = {}) {
+export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), testsWorkflow = TESTS_WORKFLOW, readApi, applyReadApi, writeApi, summaryFile } = {}) {
   if (typeof applyReadApi !== 'function') throw new Error('aplicar.mjs: falta applyReadApi (lectura con el token de aplicar)');
   const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
   if (files.length === 0) throw new Error(`${dir}/: no hay ningun .json`);
   const templates = loadTemplates(templatesDir);
+  const needs = testsWorkflowNeeds(readFileSync(testsWorkflow, 'utf8'));
   const lines = [];
   const say = (s) => { lines.push(s); process.stdout.write(`${s}\n`); };
   const planned = [];
@@ -56,6 +82,10 @@ export async function main({ dir = 'proyectos', templatesDir = path.join('apps',
     const missing = missingBeforeProtecting(plan);
     if (missing.length > 0) {
       throw new Error(`${project.repo}: no se protege main todavia, falta en su environment ${REVISOR_ENV}: ${missing.join(', ')}. No se ha escrito nada en ningun repo.`);
+    }
+    const absent = missingForTests(plan, state.files, needs);
+    if (absent.length > 0) {
+      throw new Error(`${project.repo}: no se protege main todavia, falta en main lo que pide ${TESTS_WORKFLOW} para que tests / tests pueda pasar: ${absent.join(', ')}. Subelo por un PR (o a mano) y repite. No se ha escrito nada en ningun repo.`);
     }
     planned.push({ project, calls: applyCalls(plan) });
   }

@@ -10,7 +10,7 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { APPLY_OPS, applyCalls, assertAllowed, main, missingBeforeProtecting } from '../scripts/admin/aplicar.mjs';
+import { APPLY_OPS, applyCalls, assertAllowed, main, missingBeforeProtecting, missingForTests, testsWorkflowNeeds } from '../scripts/admin/aplicar.mjs';
 import { makeWriteApi } from '../scripts/admin/secretos.mjs';
 import { makeApi } from '../scripts/admin/leer-plan.mjs';
 import { rulesetBody } from '../scripts/admin/proyecto.mjs';
@@ -71,7 +71,7 @@ function fakeGitHub(repos) {
 
 const listo = (extra = {}) => ({
   settings: { allow_auto_merge: false, delete_branch_on_merge: false },
-  files: ['README.md'], env: { custom: true, branches: ['main'] }, secrets: [...SECRETS], rulesets: [], ...extra,
+  files: ['README.md', 'package.json', 'package-lock.json'], env: { custom: true, branches: ['main'] }, secrets: [...SECRETS], rulesets: [], ...extra,
 });
 
 async function correr(fake, dir, summaryFile) {
@@ -141,7 +141,7 @@ test('ready repo with nothing done: the three files on main, then settings, then
 
 test('a weaker ruleset (no revisor, an extra bypass) is replaced with PUT of the full body, never deleted or paused', async () => {
   const debil = { id: 5, name: 'main', target: 'branch', enforcement: 'active', bypass_actors: [{ actor_id: 1, actor_type: 'Integration', bypass_mode: 'always' }], conditions: { ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] } }, rules: [{ type: 'deletion' }] };
-  const fake = fakeGitHub({ demo: listo({ settings: { allow_auto_merge: true, delete_branch_on_merge: true }, files: ['README.md', '.github/workflows/tests.yml', '.github/workflows/revisor.yml', 'CLAUDE.md'], rulesets: [debil] }) });
+  const fake = fakeGitHub({ demo: listo({ settings: { allow_auto_merge: true, delete_branch_on_merge: true }, files: ['README.md', '.github/workflows/tests.yml', '.github/workflows/revisor.yml', 'CLAUDE.md', 'package.json', 'package-lock.json'], rulesets: [debil] }) });
   await correr(fake, proyectosDir(['demo']));
   assert.deepEqual(fake.gh.written.map((x) => `${x.method} ${x.path}`), ['PUT /repos/factory-am89/demo/rulesets/5']);
   assert.deepEqual(fake.gh.written[0].body, rulesetBody({ revisorAppId: APP_ID }));
@@ -164,6 +164,37 @@ test('an error of the writer carries method, path and status, never the body', a
   const fake = fakeGitHub({ demo: listo() });
   const f = async (url, init = {}) => ((init.method ?? 'GET') === 'GET' ? fake.fetchFn(url, init) : { ok: false, status: 403, text: async () => 'CUERPO-SECRETO' });
   await assert.rejects(() => main({ dir: proyectosDir(['demo']), templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('l', f), applyReadApi: makeApi('a', f), writeApi: makeWriteApi('a', f, assertAllowed) }), (e) => /403/.test(e.message) && !/CUERPO-SECRETO/.test(e.message));
+});
+
+// ---------- lock 3: never protect a repo whose `tests / tests` could not pass ----------
+// lesson: protect-before-check-can-pass
+// homenu-panel had package.json but no package-lock.json; the shared tests workflow runs `npm ci`, so the check the ruleset requires
+// failed on main and nothing could merge. The needs are read from the workflow itself.
+const TESTS_YML = readFileSync(path.join(RAIZ, '.github', 'workflows', 'tests.yml'), 'utf8');
+
+test('lock 3: what the repo must hold is read from the real tests.yml (lockfile for npm ci / cache: npm, package.json for npm test)', () => {
+  assert.deepEqual(testsWorkflowNeeds(TESTS_YML), ['package-lock.json', 'package.json']);
+  // single source: a requirement added to the workflow is a requirement of the lock, with no edit here
+  const conPaso = (run) => ['jobs:', '  t:', '    steps:', `      - run: ${run}`, ''].join('\n');
+  assert.deepEqual(testsWorkflowNeeds(conPaso('npm test')), ['package.json']);
+  assert.throws(() => testsWorkflowNeeds(conPaso('echo hi')), /no encuentro que pide/);
+});
+
+test('lock 3 (pure): it only speaks when a ruleset is about to be written, and this run own put-file on main counts as present', () => {
+  const needs = ['package-lock.json', 'package.json'];
+  const rs = { op: 'create-ruleset' };
+  const put = (f) => ({ op: 'put-file', path: `/repos/factory-am89/demo/contents/${f}`, body: { branch: 'main' } });
+  assert.deepEqual(missingForTests([rs], ['package.json'], needs), ['package-lock.json']);
+  assert.deepEqual(missingForTests([{ op: 'update-ruleset' }], [], needs), ['package-lock.json', 'package.json']);
+  assert.deepEqual(missingForTests([put('package.json'), put('package-lock.json'), rs], [], needs), [], 'an empty repo gets both files from the plan');
+  assert.deepEqual(missingForTests([{ op: 'put-file', path: '/repos/x/y/contents/package-lock.json', body: { branch: 'ops/fabrica-ficha' } }, rs], ['package.json'], needs), ['package-lock.json'], 'a file on another branch is not on main');
+  assert.deepEqual(missingForTests([], [], needs), [], 'no ruleset to write, nothing to say');
+});
+
+test('lock 3: package.json without a lockfile (the homenu-panel case) stops everything, names the file, and writes nothing, not even for the ready project', async () => {
+  const fake = fakeGitHub({ ok: listo(), demo: listo({ files: ['README.md', 'package.json'] }) });
+  await assert.rejects(() => correr(fake, proyectosDir(['ok', 'demo'])), (e) => e.message.includes('factory-am89/demo: no se protege main todavia') && e.message.includes('tests / tests pueda pasar: package-lock.json. Subelo') && e.message.includes('No se ha escrito nada'));
+  assert.deepEqual(fake.gh.written, []);
 });
 
 // ---------- the real workflow: aplicar only after the secrets step succeeded ----------
