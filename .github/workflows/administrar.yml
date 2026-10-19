@@ -58,6 +58,7 @@ jobs:
           # Sin owner la accion limita el token al repo actual: no veria los proyectos.
           owner: factory-am89
           permission-actions: read
+          permission-administration: read
           permission-contents: read
           permission-environments: read
           permission-pull-requests: read
