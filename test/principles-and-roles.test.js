@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readQuestions } from '../scripts/lib/questions.mjs';
-import { leer, preguntas } from './apoyo/fabrica.mjs';
+import { leer, preguntas } from './support/factory.mjs';
 
 test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
   const texto = leer('CLAUDE.md');

@@ -9,7 +9,7 @@
 // reviewer must not read the expectations), plus pr.diff and body.md of the case. At most MAX_CALLS calls per pass.
 // Outputs go to DIR/<case>/<trial>.json (default: a folder of its own under the OS temp, kept), then scripts/golden.mjs scores
 // them (no floor) and the report adds the variance: how many cases get an unstable verdict across the trials.
-// GOLDEN_CLAUDE_BIN replaces the claude binary (tests: test/fixtures/claude-falso.mjs).
+// GOLDEN_CLAUDE_BIN replaces the claude binary (tests: test/fixtures/claude-fake.mjs).
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

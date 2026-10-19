@@ -17,11 +17,11 @@ export const PUERTAS = {
   // A new test that needs the door is a conscious addition here, not an accident.
   pruebas: {
     'test/token-git.test.js': 'reads a vault entry that cannot exist, to see the failure path',
-    'test/lib-gh.prueba.ps1': 'reads a vault entry that cannot exist, to see the failure path of lib-gh.ps1',
-    'test/token-servicio.test.js': 'tokenServicio with an injected vault',
+    'test/lib-gh.probe.ps1': 'reads a vault entry that cannot exist, to see the failure path of lib-gh.ps1',
+    'test/token-service.test.js': 'tokenServicio with an injected vault',
     'test/token-cache.test.js': 'obtenerToken/clavePrivada with an injected op and a service-account token in the env',
     'test/op-log.test.js': 'clavePrivada with an injected op and read log',
-    'test/presupuesto-lecturas.test.js': 'clavePrivada with an injected op and read log; the real process runs under the fake op preload',
+    'test/read-budget.test.js': 'clavePrivada with an injected op and read log; the real process runs under the fake op preload',
     'scripts/lib/op-door.mjs': 'the guard itself: it spells out the names it looks for',
     'test/op-door.test.js': 'test of this guard: its fixtures are strings that spawn op on purpose',
   },

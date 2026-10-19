@@ -12,7 +12,7 @@ import { cliRetirar } from '../scripts/retire.mjs';
 import { prFusionado } from '../scripts/lib/can-delete.mjs';
 import { git as gitRaw } from '../scripts/lib/folders.mjs';
 import { cliTarea } from '../scripts/tarea.mjs';
-import { git, repo as baseRepo } from './apoyo/repo.mjs';
+import { git, repo as baseRepo } from './support/repo.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -24,7 +24,7 @@ const repo = (opts) => {
 
 const tarea = (main, branch, extra = {}) => cliTarea([...(extra.json ? ['--json'] : []), branch], { cwd: main, instalar: false });
 const retirar = (main, name, extra = {}) => cliRetirar([...(extra.json ? ['--json'] : []), name], { cwd: main, consultarPR: extra.consultarPR });
-const FALSO_TOKEN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'token-falso.mjs');
+const FALSO_TOKEN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'token-fake.mjs');
 const noRepoDir = () => realpathSync(mkdtempSync(path.join(tmpdir(), 'sin-repo-')));
 
 test('EXIT: one distinct code per failure class, frozen', () => {

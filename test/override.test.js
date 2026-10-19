@@ -8,7 +8,7 @@ import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
-import { buenas, SHA, leer } from './apoyo/fabrica.mjs';
+import { buenas, SHA, leer } from './support/factory.mjs';
 
 const VIEJA = 'b'.repeat(40);
 const review = (extra = {}) => ({ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA, ...extra });
@@ -36,7 +36,7 @@ test('aprobacionDePablo: un comentario posterior no borra su aprobación', () =>
 });
 
 const corre = (extra) => {
-  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
+  const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-fake.mjs', import.meta.url))).href;
   const ruta = fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',

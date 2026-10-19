@@ -13,13 +13,13 @@ if (i === -1) {
 } else if (cmd === 'gh') {
   if (process.env.FALSO_LOG) appendFileSync(process.env.FALSO_LOG, `${args.join(' ')}\n`);
   if (process.env.FALSO_FALLA) {
-    console.error('token-falso: sin respuesta');
+    console.error('token-fake: sin respuesta');
     process.exit(1);
   }
   process.stdout.write(readFileSync(process.env.FALSO_PRS, 'utf8'));
 } else if (cmd === 'git') {
   process.exit(spawnSync('git', args, { stdio: 'inherit' }).status ?? 1);
 } else {
-  console.error(`token-falso: orden no prevista: ${cmd}`);
+  console.error(`token-fake: orden no prevista: ${cmd}`);
   process.exit(2);
 }

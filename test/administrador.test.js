@@ -28,7 +28,7 @@ import yaml from 'js-yaml';
 import { ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
 import { checkPlan } from '../scripts/lib/plan.mjs';
 import { ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
-import { manifiestos } from './apoyo/fabrica.mjs';
+import { manifiestos } from './support/factory.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 // The names come from the gate list (one source): the workflow is the .yml entry, the code folder the entry ending in '/'.

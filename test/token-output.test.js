@@ -1,5 +1,5 @@
 // End to end: the exit code and the stderr line of a real `node scripts/token.mjs` run when 1Password
-// answers "Too many requests" (fake `op`, test/apoyo/precarga-falsa.mjs). No real `op`, `gh` or network.
+// answers "Too many requests" (fake `op`, test/support/fake-preload.mjs). No real `op`, `gh` or network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ test('token.mjs: 1Password "Too many requests" exits with the code of limite-de-
   };
   delete env.FABRICA_REPO;
   try {
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(raiz('./apoyo/precarga-falsa.mjs')).href, raiz('../scripts/token.mjs'), '--', process.execPath, '-e', 'process.exit(0)'], { env, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--import', pathToFileURL(raiz('./support/fake-preload.mjs')).href, raiz('../scripts/token.mjs'), '--', process.execPath, '-e', 'process.exit(0)'], { env, encoding: 'utf8' });
     assert.equal(r.status, MOTIVOS['limite-de-1password']);
     assert.match(r.stderr, /^limite-de-1password: /);
     assert.ok(!r.stderr.includes('SECRETO'), 'op output never reaches the message');

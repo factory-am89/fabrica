@@ -22,7 +22,7 @@ test('retirar y limpiar usan la misma regla y ninguno la repite', () => {
 });
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const FALSO = path.join(AQUI, 'fixtures', 'token-falso.mjs');
+const FALSO = path.join(AQUI, 'fixtures', 'token-fake.mjs');
 
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });

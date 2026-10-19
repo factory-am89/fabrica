@@ -87,7 +87,7 @@ test('real process: at the budget it prints one `presupuesto-de-lecturas: N read
     FALSO_CONTADOR: contador, FALSO_PEM: PEM, // the preload answers any `op` call: a real one can never happen here
   };
   delete env.FABRICA_REPO;
-  const r = spawnSync(process.execPath, ['--import', pathToFileURL(fileURLToPath(new URL('./apoyo/precarga-falsa.mjs', import.meta.url))).href, fileURLToPath(new URL('../scripts/token.mjs', import.meta.url)), '--', process.execPath, '-e', '0'], { env, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['--import', pathToFileURL(fileURLToPath(new URL('./support/fake-preload.mjs', import.meta.url))).href, fileURLToPath(new URL('../scripts/token.mjs', import.meta.url)), '--', process.execPath, '-e', '0'], { env, encoding: 'utf8' });
   assert.equal(r.status, MOTIVOS['presupuesto-de-lecturas'], r.stderr);
   assert.match(r.stderr.trim(), /^presupuesto-de-lecturas: 3 reads in the last hour \(budget 3\); per script: token\.mjs=3$/);
   assert.equal(readFileSync(contador, 'utf8'), '', 'op must not be reached');

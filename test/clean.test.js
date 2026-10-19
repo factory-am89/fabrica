@@ -14,7 +14,7 @@ import { consultar, rutaDe } from '../scripts/lib/gh-public.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const FALSO = path.join(AQUI, 'fixtures', 'token-falso.mjs');
+const FALSO = path.join(AQUI, 'fixtures', 'token-fake.mjs');
 
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });

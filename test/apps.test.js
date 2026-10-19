@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { destino, argsSecreto, argsEntornoPs, ENTORNO_ADMIN } from '../apps/convertir.mjs';
 import { jwt, orden } from '../scripts/token.mjs';
-import { leer, manifiestos } from './apoyo/fabrica.mjs';
+import { leer, manifiestos } from './support/factory.mjs';
 import { ADMIN_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 
 test('convertir.mjs guarda los secretos del revisor en su environment', () => {

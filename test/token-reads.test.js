@@ -1,5 +1,5 @@
 // End to end: N real runs of `node scripts/token.mjs -- <command>` with a fake `op` and a fake GitHub
-// (test/apoyo/precarga-falsa.mjs) count how many times the .pem is read. Before the cache: N. After: 1.
+// (test/support/fake-preload.mjs) count how many times the .pem is read. Before the cache: N. After: 1.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
@@ -26,7 +26,7 @@ test(`token.mjs: ${LLAMADAS} calls read the .pem once`, (t) => {
   delete env.FABRICA_REPO;
   try {
     for (let i = 0; i < LLAMADAS; i++) {
-      const r = spawnSync(process.execPath, ['--import', pathToFileURL(raiz('./apoyo/precarga-falsa.mjs')).href, raiz('../scripts/token.mjs'), '--', process.execPath, '-e', 'process.exit(process.env.GH_TOKEN ? 0 : 9)'], { env, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, ['--import', pathToFileURL(raiz('./support/fake-preload.mjs')).href, raiz('../scripts/token.mjs'), '--', process.execPath, '-e', 'process.exit(process.env.GH_TOKEN ? 0 : 9)'], { env, encoding: 'utf8' });
       assert.equal(r.status, 0, `call ${i + 1}: ${r.stderr}`);
     }
     const lecturas = readFileSync(contador, 'utf8').split('\n').filter(Boolean).length;
