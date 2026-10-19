@@ -16,7 +16,8 @@
     "NODE_MODULES_SHARED": 26,
     "DONE_LINT_FAILED": 30,
     "DONE_TESTS_FAILED": 31,
-    "LESSON_FAULTS": 40
+    "LESSON_FAULTS": 40,
+    "ADOPTED_FAULTS": 41
   },
   "RETIRE_RESULT": {
     "REMOVED": "removed",
@@ -95,6 +96,10 @@
     "LESSON_FAULTS": {
       "retry": "after-fix",
       "then": "fix each fault code printed in the output and run lessons again"
+    },
+    "ADOPTED_FAULTS": {
+      "retry": "no",
+      "then": "stop and write down the faults printed in the output; the fix belongs to the project, not to this command"
     }
   }
 }
