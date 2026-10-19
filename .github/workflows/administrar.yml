@@ -12,6 +12,8 @@ name: administrar
 # Trozo 5: secretos.mjs escribe el environment `revisor` y sus tres secretos (cifrados) y nada mas del plan.
 # Trozo 6: aplicar.mjs (paso `aplicar`: token con administration, contents y workflows en write) ajusta, sube los ficheros a main y
 #          crea o completa el ruleset; solo corre si el paso de secretos acabo bien.
+# Trozo 7: humo.mjs (paso `humo`: token con contents y pull_requests en write) abre el PR de la ficha .fabrica.json y arma su fusion
+#          automatica; va despues de aplicar, sin `if`, y solo ese paso usa su token.
 # Los tres valores viven en el environment `administrador` de esta repo; si falta alguno, el paso falla ANTES de escribir
 # y dice los NOMBRES que faltan (nunca valores). El ultimo paso falla el run si el log propio contiene una clave privada.
 on:
@@ -58,7 +60,6 @@ jobs:
           # Sin owner la accion limita el token al repo actual: no veria los proyectos.
           owner: factory-am89
           permission-actions: read
-          permission-administration: read
           permission-contents: read
           permission-environments: read
           permission-pull-requests: read
@@ -110,6 +111,24 @@ jobs:
         env:
           GH_TOKEN_LECTURA: ${{ steps.lectura.outputs.token }}
           GH_TOKEN_APLICAR: ${{ steps.aplicar.outputs.token }}
+
+      # Trozo 7. Va DESPUES de aplicar.mjs y SIN `if` ni continue-on-error: si aplicar falla, main no esta protegida ni tiene sus ficheros y no se abre ningun PR.
+      # Su token tiene lo minimo: contents (la rama y la ficha en ella) y pull_requests (abrir el PR y armar su fusion). test/admin-humo.test.js lo vigila.
+      - id: humo
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.ADMIN_CLIENT_ID }}
+          private-key: ${{ secrets.ADMIN_APP_KEY }}
+          owner: factory-am89
+          permission-contents: write
+          permission-pull-requests: write
+          permission-metadata: read
+
+      # La rama ops/fabrica-ficha con .fabrica.json, el PR y la fusion automatica; GitHub fusiona cuando tests y revisor estan en verde.
+      - run: node scripts/admin/humo.mjs 2>&1 | tee -a "$RUNNER_TEMP/administrar.log"
+        env:
+          GH_TOKEN_LECTURA: ${{ steps.lectura.outputs.token }}
+          GH_TOKEN_HUMO: ${{ steps.humo.outputs.token }}
 
       # Falla el run si lo que imprimieron los pasos de arriba contiene una clave privada. Solo mira lo que imprimen nuestros
       # scripts (el log de GitHub enmascara los secretos por su cuenta); corre siempre, tambien si el paso de secretos fallo.
