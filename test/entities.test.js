@@ -47,6 +47,7 @@ test('good case is green; each fault code has a bad case that turns it red', () 
   assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: 'porque-si' }]), [ENTITY_FAULTS.BAD_HOLE]);
   assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: OTHER }]), [ENTITY_FAULTS.BAD_HOLE]);
   assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: NO_FORGE }]), []);
+  assert.deepEqual(codes([{ ...good(), forge: 'scripts/lib/plan.mjs' }]), [ENTITY_FAULTS.BASE_DOES_NOT_NAME_FORGE]);
 });
 
 test('the CLI (cliEntities and a spawned process) prints the whole registry: one JSON object, ok', () => {

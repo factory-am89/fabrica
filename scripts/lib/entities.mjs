@@ -16,6 +16,7 @@ export const ENTITY_FAULTS = Object.freeze(
     'MISSING_PATH',
     'HORIZONTAL_WITHOUT_BASE',
     'BAD_HOLE',
+    'BASE_DOES_NOT_NAME_FORGE',
   ].map((c) => [c, c])),
 );
 
@@ -52,6 +53,13 @@ function pathFaults(e, root) {
     .map((p) => fault(ENTITY_FAULTS.MISSING_PATH, e.id, `${p} does not exist`));
 }
 
+// A base file that exists must name the forge path of the entity: it links the forge instead of copying its rules.
+function baseNamesForge(e, root) {
+  const file = isText(e.base) && e.base !== BASE_HOLE && isText(e.forge) ? path.join(root, e.base) : null;
+  if (file === null || !existsSync(file) || readFileSync(file, 'utf8').includes(e.forge)) return [];
+  return [fault(ENTITY_FAULTS.BASE_DOES_NOT_NAME_FORGE, e.id, `${e.base} does not name ${e.forge}`)];
+}
+
 function holeFaults(e) {
   if (!HOLE_REASONS.includes(e.base_reason)) {
     return [fault(ENTITY_FAULTS.BAD_HOLE, e.id, `base_reason must be one of ${HOLE_REASONS.join(', ')}`)];
@@ -79,7 +87,7 @@ function oneFaults(e, root) {
   if (!SCOPES.includes(e.scope)) bad.push(fault(ENTITY_FAULTS.BAD_VALUE, e.id, `scope must be one of ${SCOPES.join(', ')}`));
   if (!Array.isArray(e.readers)) bad.push(fault(ENTITY_FAULTS.BAD_VALUE, e.id, 'readers must be a list'));
   if (bad.length > 0) return bad;
-  return [...horizontalFaults(e), ...pathFaults(e, root)];
+  return [...horizontalFaults(e), ...pathFaults(e, root), ...baseNamesForge(e, root)];
 }
 
 export function entityFaults(registry, root) {
