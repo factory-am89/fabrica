@@ -13,6 +13,7 @@ import { REPO } from './lib/repo.mjs';
 
 const PER_PAGE = 100;
 const MAX_PAGES = 50;
+const FILES_CAP = 3000; // GitHub stops listing a PR's files here without saying so
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TOKEN_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'token.mjs');
 
@@ -55,6 +56,7 @@ export async function collect({ get, repo = REPO, since = null }) {
   for (const p of await listPulls(get, repo, since)) {
     if (typeof p.head?.ref !== 'string') throw new Error(`PR #${p.number}: no head.ref in the answer`);
     const files = (await pages(get, `repos/${repo}/pulls/${p.number}/files`)).map((f) => f.filename);
+    if (files.length >= FILES_CAP) throw new Error(`PR #${p.number}: ${files.length} files reaches GitHub's listing cap (${FILES_CAP}); the list may be cut`);
     const commits = (await pages(get, `repos/${repo}/pulls/${p.number}/commits`)).map((c) => c.sha);
     for (const sha of commits) {
       const res = await get(`repos/${repo}/commits/${sha}/check-runs?check_name=revisor&per_page=${PER_PAGE}`);

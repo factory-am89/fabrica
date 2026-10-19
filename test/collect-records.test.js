@@ -62,6 +62,16 @@ test('a PR without head.ref throws instead of being recorded without a branch', 
   await assert.rejects(collect({ get, repo: REPO }), /head\.ref/);
 });
 
+test('a PR whose files list reaches the GitHub cap throws instead of passing a cut list', async () => {
+  const get = async (route) => {
+    if (route.includes('/pulls?')) return [pull(1, '2026-10-15T10:00:00Z')];
+    if (!route.includes('/files?')) return [];
+    const page = Number(route.match(/&page=(\d+)/)[1]);
+    return page <= 30 ? Array.from({ length: 100 }, (_, i) => ({ filename: `f${page}-${i}` })) : [];
+  };
+  await assert.rejects(collect({ get, repo: REPO }), /cap/);
+});
+
 test('--since leaves out the PRs created before it', async () => {
   const { pulls } = await collect({ get: fakeGet(), repo: REPO, since: '2026-10-15' });
   assert.deepEqual(pulls.map((p) => p.number), [2, 1]);
