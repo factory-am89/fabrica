@@ -47,8 +47,8 @@ export async function readState(api, project) {
   const repoRes = await api(`/repos/${r}`, [404]);
   const repo = repoRes.status === 404 ? null : {
     private: repoRes.body.private === true,
-    // Raw on purpose: GitHub leaves these two out for a token without administration read, and planProject (checkState) refuses
-    // an absent one instead of reading it as false.
+    // Raw on purpose: the token `lectura` has administration: read, without which GitHub leaves these two out; planProject
+    // (checkState) refuses an absent one instead of reading it as false.
     allow_auto_merge: repoRes.body.allow_auto_merge,
     delete_branch_on_merge: repoRes.body.delete_branch_on_merge,
   };

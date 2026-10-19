@@ -197,6 +197,10 @@ test('workflow: the reading token is read-only and the writing token has exactly
   assert.deepEqual(permisosDe('escritura'), { 'permission-administration': 'write', 'permission-environments': 'write', 'permission-metadata': 'read' });
 });
 
+test('workflow: the reading token has administration: read, without it GitHub omits bypass_actors and the repo settings', () => {
+  assert.equal(permisosDe('lectura')['permission-administration'], 'read');
+});
+
 test('workflow: the secrets step gets both tokens and the three values, and a later step fails the run if the log shows PRIVATE KEY', () => {
   const paso = pasos.find((p) => String(p.run ?? '').includes('scripts/admin/secretos.mjs'));
   assert.ok(paso, 'no step runs secretos.mjs');
