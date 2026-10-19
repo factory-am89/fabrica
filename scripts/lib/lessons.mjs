@@ -54,7 +54,7 @@ export const NO_QUESTION_REASONS = [REASON_PENDING, REASON_NO_QUESTION];
 export const NO_SIGNAL_REASONS = [...NO_QUESTION_REASONS, OTHER];
 const HUMAN_ORIGIN = 'pablo';
 const ID_RE = /^[a-z0-9-]+$/;
-const PR_SOURCE = /^#[1-9]\d*$/;
+export const PR_SOURCE = /^#[1-9]\d*$/;
 // A line number points at the wrong row as soon as main adds rows (merge=union hides the shift): refused.
 const LINE_SOURCE = /:[1-9]\d*$/;
 const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
@@ -169,6 +169,78 @@ export function lessonFaults(lessons, ctx) {
   ctx.intervenciones.split('\n').forEach((line, i) => {
     if (DATED_ROW.test(line) && line.split(' | ').at(-1).startsWith(REPEATED) && !ids.some((id) => line.includes(`lessons/${id}.json`))) {
       faults.push({ code: LESSON_FAULTS.REPEATED_WITHOUT_LESSON, where: `intervenciones.md:${i + 1}`, message: `a row marked «${REPEATED}» cites no lessons/<id>.json of a lesson present` });
+    }
+  });
+  return faults;
+}
+
+// no-lesson.json (chunk 7 of plans/trabajar-solos.md): the reviewer's «no» that was triaged and got no lesson, each with a closed
+// reason. It sits at the root and not in lessons/, which readLessons reads whole as lessons. Entries: {source, question, reason}
+// and, only when the reason asks for it, reason_ref (ya-cubierta: the id of the lesson that covers it) or reason_note (otro).
+export const NO_LESSON_FILE = 'no-lesson.json';
+export const NO_LESSON_VERSION = 1;
+export const NO_LESSON_FIELDS = ['source', 'question', 'reason', 'reason_ref', 'reason_note'];
+export const NO_LESSON_OPTIONAL_FIELDS = ['reason_ref', 'reason_note'];
+export const REASON_NOISE = 'ruido-del-juez';
+export const REASON_COVERED = 'ya-cubierta';
+// `caso-unico` and `otro` are the lesson reasons themselves, not copies.
+export const NO_LESSON_REASONS = [REASON_NOISE, REASON_COVERED, REASON_SINGLE, OTHER];
+
+export const NO_LESSON_FAULTS = Object.freeze(
+  Object.fromEntries([
+    'NO_LESSON_NOT_JSON',
+    'NO_LESSON_BAD_FILE',
+    'NO_LESSON_BAD_FIELDS',
+    'NO_LESSON_BAD_SOURCE',
+    'NO_LESSON_UNKNOWN_QUESTION',
+    'NO_LESSON_BAD_REASON',
+    'NO_LESSON_REF_MISMATCH',
+    'NO_LESSON_UNKNOWN_LESSON',
+    'NO_LESSON_NOTE_MISMATCH',
+  ].map((c) => [c, c])),
+);
+
+export function readNoLesson(root) {
+  const file = path.join(root, NO_LESSON_FILE);
+  if (!existsSync(file)) throw new Error(`${NO_LESSON_FILE} not found in ${root}`);
+  return readFileSync(file, 'utf8');
+}
+
+// text: the content of no-lesson.json; ctx: see lessonContext; lessonIds: ids of the lessons present. Returns [{code, where, message}].
+const NO_LESSON_FILE_KEYS = ['$comment', 'version', 'entries'];
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isNote = (v) => typeof v === 'string' && v.trim() !== '';
+
+export function noLessonFaults(text, ctx, lessonIds) {
+  const faults = [];
+  const add = (where, code, message) => faults.push({ code, where, message });
+  let d;
+  try { d = JSON.parse(text); } catch (e) { add(NO_LESSON_FILE, NO_LESSON_FAULTS.NO_LESSON_NOT_JSON, e.message); return faults; }
+  if (!isPlainObject(d) || !Object.keys(d).every((k) => NO_LESSON_FILE_KEYS.includes(k)) || d.version !== NO_LESSON_VERSION || !Array.isArray(d.entries)) {
+    add(NO_LESSON_FILE, NO_LESSON_FAULTS.NO_LESSON_BAD_FILE, `the file must be an object with version ${NO_LESSON_VERSION}, a list «entries» and, at most, a «$comment»`);
+    return faults;
+  }
+  const required = NO_LESSON_FIELDS.filter((f) => !NO_LESSON_OPTIONAL_FIELDS.includes(f));
+  const [SOURCE, QUESTION, REASON, REF, NOTE] = NO_LESSON_FIELDS;
+  d.entries.forEach((e, i) => {
+    const where = `${NO_LESSON_FILE}#${i + 1}`;
+    if (!isPlainObject(e) || !required.every((f) => Object.hasOwn(e, f)) || !Object.keys(e).every((k) => NO_LESSON_FIELDS.includes(k))) {
+      add(where, NO_LESSON_FAULTS.NO_LESSON_BAD_FIELDS, `an entry must have ${required.join(', ')} and, when the reason asks, ${NO_LESSON_OPTIONAL_FIELDS.join(', ')}`);
+      return;
+    }
+    if (typeof e[SOURCE] !== 'string' || !PR_SOURCE.test(e[SOURCE])) add(where, NO_LESSON_FAULTS.NO_LESSON_BAD_SOURCE, `${SOURCE} ${JSON.stringify(e[SOURCE])} must be #<n>`);
+    if (e[QUESTION] === NO_QUESTION || !ctx.questions.includes(e[QUESTION])) {
+      add(where, NO_LESSON_FAULTS.NO_LESSON_UNKNOWN_QUESTION, `${QUESTION} ${JSON.stringify(e[QUESTION])} is not a question id of the standards`);
+    }
+    if (!NO_LESSON_REASONS.includes(e[REASON])) add(where, NO_LESSON_FAULTS.NO_LESSON_BAD_REASON, `${REASON} must be one of ${NO_LESSON_REASONS.join(', ')}`);
+    const covered = e[REASON] === REASON_COVERED;
+    if (Object.hasOwn(e, REF) !== covered || (covered && !isNote(e[REF]))) {
+      add(where, NO_LESSON_FAULTS.NO_LESSON_REF_MISMATCH, `${REF} must be a lesson id exactly when ${REASON} is ${REASON_COVERED}`);
+    } else if (covered && !lessonIds.includes(e[REF])) {
+      add(where, NO_LESSON_FAULTS.NO_LESSON_UNKNOWN_LESSON, `${REF} ${JSON.stringify(e[REF])} is not the id of a lesson of lessons/`);
+    }
+    if (Object.hasOwn(e, NOTE) !== (e[REASON] === OTHER) || (Object.hasOwn(e, NOTE) && !isNote(e[NOTE]))) {
+      add(where, NO_LESSON_FAULTS.NO_LESSON_NOTE_MISMATCH, `${NOTE} must be a non-empty text exactly when ${REASON} is ${OTHER}`);
     }
   });
   return faults;
