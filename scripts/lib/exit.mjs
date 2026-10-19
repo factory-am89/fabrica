@@ -23,6 +23,31 @@ export const EXIT = Object.freeze({
   LESSON_FAULTS: 40, // lessons: the registry has at least one fault (the codes are in the output)
 });
 
+// What to do after each code. retry: YES = the same command may work if repeated as is; AFTER_FIX = only
+// after doing `then`; NO = repeating cannot help (done, or a different command/decision is needed).
+// The agent reads this table; running the recovery by itself is not part of it.
+export const RETRY = Object.freeze({ YES: 'yes', AFTER_FIX: 'after-fix', NO: 'no' });
+const row = (retry, then) => Object.freeze({ retry, then });
+export const RECOVERY = Object.freeze({
+  OK: row(RETRY.NO, 'nothing: it worked'),
+  UNEXPECTED: row(RETRY.NO, 'read stderr; it is a bug in the script: report it, do not loop'),
+  USAGE: row(RETRY.AFTER_FIX, 'pass the missing argument and run it again'),
+  INVALID_BRANCH: row(RETRY.AFTER_FIX, 'rename the branch to feat/, fix/ or ops/ + a kebab-case name'),
+  FOLDER_EXISTS: row(RETRY.NO, 'work in the existing folder, or retire it first if its PR is merged'),
+  GIT_FAILED: row(RETRY.AFTER_FIX, 'read stderr, fix the git problem (network, auth, state) and run it again'),
+  INSTALL_FAILED: row(RETRY.AFTER_FIX, 'folder and branch exist: run npm ci inside the folder, do not run tarea again'),
+  NOT_FOUND: row(RETRY.NO, 'there is nothing to retire: check the name'),
+  DETACHED_HEAD: row(RETRY.NO, 'put the folder on its branch by hand; retire refuses a folder with no branch'),
+  INSIDE_FOLDER: row(RETRY.AFTER_FIX, 'run it again from another folder (the main one)'),
+  UNSAVED_CHANGES: row(RETRY.AFTER_FIX, 'commit and push the changes, or discard them on purpose, then run it again'),
+  NOT_MERGED: row(RETRY.AFTER_FIX, 'wait for GitHub to merge the PR (tests and revisor green), then run it again'),
+  GH_FAILED: row(RETRY.YES, 'GitHub did not answer: run it again; if it keeps failing, check the App token'),
+  NODE_MODULES_SHARED: row(RETRY.AFTER_FIX, 'retire the other folder first, or remove its node_modules junction'),
+  DONE_LINT_FAILED: row(RETRY.AFTER_FIX, 'fix what lint reports and run done again'),
+  DONE_TESTS_FAILED: row(RETRY.AFTER_FIX, 'fix the failing test or the code it checks and run done again'),
+  LESSON_FAULTS: row(RETRY.AFTER_FIX, 'fix each fault code printed in the output and run lessons again'),
+});
+
 // Result of `retire --json`: either the folder was removed or the command refused (see `error`).
 export const RETIRE_RESULT = Object.freeze({ REMOVED: 'removed', REFUSED: 'refused' });
 

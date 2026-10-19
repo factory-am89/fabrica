@@ -21,5 +21,80 @@
   "RETIRE_RESULT": {
     "REMOVED": "removed",
     "REFUSED": "refused"
+  },
+  "RETRY": {
+    "YES": "yes",
+    "AFTER_FIX": "after-fix",
+    "NO": "no"
+  },
+  "RECOVERY": {
+    "OK": {
+      "retry": "no",
+      "then": "nothing: it worked"
+    },
+    "UNEXPECTED": {
+      "retry": "no",
+      "then": "read stderr; it is a bug in the script: report it, do not loop"
+    },
+    "USAGE": {
+      "retry": "after-fix",
+      "then": "pass the missing argument and run it again"
+    },
+    "INVALID_BRANCH": {
+      "retry": "after-fix",
+      "then": "rename the branch to feat/, fix/ or ops/ + a kebab-case name"
+    },
+    "FOLDER_EXISTS": {
+      "retry": "no",
+      "then": "work in the existing folder, or retire it first if its PR is merged"
+    },
+    "GIT_FAILED": {
+      "retry": "after-fix",
+      "then": "read stderr, fix the git problem (network, auth, state) and run it again"
+    },
+    "INSTALL_FAILED": {
+      "retry": "after-fix",
+      "then": "folder and branch exist: run npm ci inside the folder, do not run tarea again"
+    },
+    "NOT_FOUND": {
+      "retry": "no",
+      "then": "there is nothing to retire: check the name"
+    },
+    "DETACHED_HEAD": {
+      "retry": "no",
+      "then": "put the folder on its branch by hand; retire refuses a folder with no branch"
+    },
+    "INSIDE_FOLDER": {
+      "retry": "after-fix",
+      "then": "run it again from another folder (the main one)"
+    },
+    "UNSAVED_CHANGES": {
+      "retry": "after-fix",
+      "then": "commit and push the changes, or discard them on purpose, then run it again"
+    },
+    "NOT_MERGED": {
+      "retry": "after-fix",
+      "then": "wait for GitHub to merge the PR (tests and revisor green), then run it again"
+    },
+    "GH_FAILED": {
+      "retry": "yes",
+      "then": "GitHub did not answer: run it again; if it keeps failing, check the App token"
+    },
+    "NODE_MODULES_SHARED": {
+      "retry": "after-fix",
+      "then": "retire the other folder first, or remove its node_modules junction"
+    },
+    "DONE_LINT_FAILED": {
+      "retry": "after-fix",
+      "then": "fix what lint reports and run done again"
+    },
+    "DONE_TESTS_FAILED": {
+      "retry": "after-fix",
+      "then": "fix the failing test or the code it checks and run done again"
+    },
+    "LESSON_FAULTS": {
+      "retry": "after-fix",
+      "then": "fix each fault code printed in the output and run lessons again"
+    }
   }
 }
