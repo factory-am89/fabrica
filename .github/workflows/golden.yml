@@ -6,8 +6,8 @@ name: golden
 # falla si una salida falta, es ilegible o claude da error, nunca por detección baja. El suelo se añade
 # cuando la varianza esté medida.
 #
-# Cuándo corre: cada lunes, al fusionar a main un cambio del rol del revisor, de un estándar o del
-# juez, y a mano (workflow_dispatch). Siempre en main: el environment `revisor` solo admite esa rama.
+# Cuándo corre: solo a mano (workflow_dispatch), cuando Pablo la lanza; sin schedule ni push (decisión A
+# de plans/trabajar-solos.md). Siempre en main: el environment `revisor` solo admite esa rama.
 #
 # Mismo secreto que el revisor (CLAUDE_CODE_OAUTH_TOKEN del environment `revisor`); no hay secretos
 # nuevos ni permisos más allá de contents: read. El prompt, el modelo y el schema salen de revisor.yml
@@ -17,15 +17,6 @@ name: golden
 # informe. El juez que ve Claude se extrae de git SIN test/fixtures/golden, y la comprobación del
 # esperado se baja después de que Claude haya terminado.
 on:
-  schedule:
-    - cron: '17 5 * * 1'
-  push:
-    branches: [main]
-    paths:
-      - '.claude/agents/revisor.md'
-      - 'standards/**'
-      - '.github/workflows/revisor.yml'
-      - 'scripts/veredicto.mjs'
   workflow_dispatch:
 
 concurrency:
