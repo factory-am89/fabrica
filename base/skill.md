@@ -25,6 +25,10 @@ comprobado: AAAA-MM-DD
   no hay nada más que `SKILL.md` y `referencias/`.
 - **Una sección `## Lo que falló`**, con una viñeta por lección: `- **AAAA-MM-DD · síntoma.** Causa: …
   Arreglo: …`. Es el know-how acumulado: cada fallo real vuelve aquí si no cabe en un test o un hook.
+- **Sin lector no hay regla.** Una viñeta que no enlaza una lección es una regla sin lector, y
+  `rules-without-reader.json` (raíz) dice cuántas puede tener cada skill: el número solo baja, y subirlo es rebajar un
+  check. Lo normal es que la viñeta enlace `lessons/<id>.json`; si esa lección tiene `signal: machine`, el test ya es la
+  memoria y la viñeta se borra (fallo `PROSE_DUPLICATES_TEST`). Lo comprueba `faltasDeReglasSinLector` en `scripts/lib/skills.mjs`.
 - **Nada sensible**: ni valores de claves, ni direcciones IP, ni ids de instalación; solo el nombre
   de la variable o de la ficha y dónde vive.
 

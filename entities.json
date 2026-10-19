@@ -76,7 +76,13 @@
     {
       "id": "rule", "name": "Regla", "scope": "horizontal", "term": "regla",
       "source_of_truth": "CLAUDE.md",
-      "readers": ["test/principles-and-roles.test.js"],
+      "readers": ["scripts/lib/lessons.mjs", "scripts/lib/questions.mjs", "scripts/lib/skills.mjs", "test/principles-and-roles.test.js"],
+      "rule_sources": [
+        { "kind": "lección", "where": "lessons", "reader": "mechanism", "reader_path": "scripts/lib/lessons.mjs" },
+        { "kind": "pregunta", "where": "standards", "reader": "Quién", "reader_path": "scripts/lib/questions.mjs" },
+        { "kind": "viñeta", "where": ".claude/skills", "reader": "lessons/<id>.json", "reader_path": "scripts/lib/skills.mjs" },
+        { "kind": "principio", "where": "CLAUDE.md", "reader": "test/principles-and-roles.test.js", "reader_path": "test/principles-and-roles.test.js", "reader_note": "solo mira palabras clave, no juzga la regla" }
+      ],
       "base": "hueco", "base_reason": "sin-forja"
     }
   ]

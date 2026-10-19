@@ -1,12 +1,14 @@
 // La forja mínima de skills (base/skill.md): una sola, la misma para cualquier skill.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, REVISAR_DIAS, leerFrontmatter, skillsViejas } from '../scripts/lib/skills.mjs';
+import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, REVISAR_DIAS, leerFrontmatter, skillsViejas, faltasDeReglasSinLector, RULES_BUDGET_FILE, SKILL_FAULTS } from '../scripts/lib/skills.mjs';
+import { SIGNAL_MACHINE } from '../scripts/lib/lessons.mjs';
+import { readEntities } from '../scripts/lib/entities.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOY = '2026-10-15';
@@ -127,4 +129,76 @@ test('una referencia que SKILL.md no cita es huérfana, y una carpeta ajena sobr
 
 test('skillsViejas lanza si una skill tiene comprobado en el futuro', () => {
   assert.throws(() => skillsViejas(raizConSkills(['2027-03-01']), '2027-02-01'), /en el futuro/);
+});
+
+// Trinquete de viñetas sin lección (rules-without-reader.json).
+const VINETA = (extra = '') => `- **2026-10-01 · algo.** Causa: x. Arreglo: y.${extra}\n`;
+const LECCION = (signal) => JSON.stringify({ v: 2, signal });
+
+// Una raíz temporal con la skill `prueba` (viñetas dadas), lecciones {id: signal} y el presupuesto dado.
+function raizDeReglas({ vinetas, lecciones = {}, presupuesto = { prueba: 1 }, fichero = true }) {
+  const raiz = mkdtempSync(path.join(tmpdir(), 'trinquete-'));
+  const carpeta = path.join(raiz, '.claude', 'skills', 'prueba');
+  mkdirSync(carpeta, { recursive: true });
+  writeFileSync(path.join(carpeta, 'SKILL.md'), BIEN.replace(/- \*\*2026.*\n/, vinetas.join('')));
+  mkdirSync(path.join(raiz, 'lessons'));
+  for (const [id, signal] of Object.entries(lecciones)) writeFileSync(path.join(raiz, 'lessons', `${id}.json`), LECCION(signal));
+  if (fichero) writeFileSync(path.join(raiz, RULES_BUDGET_FILE), JSON.stringify({ version: 1, budget: presupuesto }));
+  return raiz;
+}
+const codigos = (raiz) => faltasDeReglasSinLector(raiz).map((f) => f.code);
+
+test('las skills reales cumplen el trinquete: las viñetas sin lección son justo las del presupuesto', () => {
+  assert.deepEqual(faltasDeReglasSinLector(RAIZ), []);
+});
+
+test('el trinquete en verde, y cada fallo nuevo tiene su caso malo', () => {
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA()] })), []);
+  // Una viñeta que enlaza una lección con signal none sigue siendo la memoria: no cuenta ni sobra.
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA(' Ver `lessons/uno.json`.'), VINETA()], lecciones: { uno: 'none' } })), []);
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA(), VINETA()], presupuesto: { prueba: 1 } })), [SKILL_FAULTS.BUDGET_EXCEEDED]);
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA()], presupuesto: { prueba: 2 } })), [SKILL_FAULTS.BUDGET_NOT_LOWERED]);
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA()], presupuesto: {} })), [SKILL_FAULTS.BUDGET_MISSING]);
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA()], presupuesto: { prueba: 1, fantasma: 3 } })), [SKILL_FAULTS.BUDGET_UNKNOWN_SKILL]);
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [VINETA(' Ver `lessons/nada.json`.'), VINETA()] })), [SKILL_FAULTS.UNKNOWN_LESSON_LINK]);
+  const duplica = raizDeReglas({ vinetas: [VINETA(' Ver `lessons/uno.json`.')], lecciones: { uno: SIGNAL_MACHINE }, presupuesto: { prueba: 0 } });
+  assert.deepEqual(codigos(duplica), [SKILL_FAULTS.PROSE_DUPLICATES_TEST]);
+});
+
+test('una viñeta de varias líneas cuenta una vez y su enlace puede estar en cualquiera', () => {
+  const larga = '- **2026-10-01 · algo.** Causa: x.\n  Arreglo: y. Ver `lessons/uno.json`.\n';
+  assert.deepEqual(codigos(raizDeReglas({ vinetas: [larga], lecciones: { uno: 'none' }, presupuesto: { prueba: 0 } })), []);
+});
+
+test('el presupuesto que no se puede leer lanza: no se toma como «sin presupuesto»', () => {
+  assert.throws(() => faltasDeReglasSinLector(raizDeReglas({ vinetas: [VINETA()], fichero: false })), /no existe/);
+  const rota = raizDeReglas({ vinetas: [VINETA()] });
+  writeFileSync(path.join(rota, RULES_BUDGET_FILE), '{no');
+  assert.throws(() => faltasDeReglasSinLector(rota), /JSON legible/);
+  writeFileSync(path.join(rota, RULES_BUDGET_FILE), '{}');
+  assert.throws(() => faltasDeReglasSinLector(rota), /«budget»/);
+});
+
+test('el trinquete vive en la raíz y no dentro de lessons/, que se lee entera como lecciones', () => {
+  assert.equal(RULES_BUDGET_FILE.includes('/'), false);
+  assert.equal(existsSync(path.join(RAIZ, RULES_BUDGET_FILE)), true);
+  assert.equal(existsSync(path.join(RAIZ, 'lessons', RULES_BUDGET_FILE)), false);
+});
+
+test('base/skill.md explica el trinquete y enlaza el fichero, sin copiar sus números', () => {
+  const base = readFileSync(path.join(RAIZ, 'base', 'skill.md'), 'utf8');
+  assert.ok(base.includes(RULES_BUDGET_FILE));
+  assert.ok(base.includes('lessons/<id>.json'));
+});
+
+test('la entidad «regla» nombra cada fuente de reglas con su lector, y los lectores existen', () => {
+  const regla = readEntities(RAIZ).entities.find((e) => e.id === 'rule');
+  assert.deepEqual(regla.rule_sources.map((s) => s.kind), ['lección', 'pregunta', 'viñeta', 'principio']);
+  for (const s of regla.rule_sources) {
+    assert.ok(s.reader && s.reader_path, s.kind);
+    assert.ok(existsSync(path.join(RAIZ, s.reader_path)), `${s.kind}: ${s.reader_path} no existe`);
+    assert.ok(regla.readers.includes(s.reader_path), `${s.kind}: ${s.reader_path} no está en readers`);
+  }
+  const principio = regla.rule_sources.find((s) => s.kind === 'principio');
+  assert.match(principio.reader_note, /palabras clave/);
 });
