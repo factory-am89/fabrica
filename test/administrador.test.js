@@ -43,7 +43,9 @@ const PERMISOS_MANIFIESTO = Object.fromEntries(Object.entries(
 const NIVEL = { read: 1, write: 2, admin: 3 };
 const PASO_DE_LECTURA = 'lectura'; // id of the token step that only reads (it feeds the plan)
 
-const NOMBRA_LA_CLAVE = /\bADMIN_(?:APP_KEY|CLIENT_ID)\b|\badministrador\b/i;
+// `fabrica-administrador` (the public slug of the App, the bot name revisor.yml lists in allowed_bots) is not the environment: only the
+// bare word `administrador` is. The secret names stay forbidden everywhere.
+const NOMBRA_LA_CLAVE = /\bADMIN_(?:APP_KEY|CLIENT_ID)\b|(?<!fabrica-)\badministrador\b/i;
 const PUSH_PATHS = ['proyectos/**', `${CODIGO}/**`];
 
 function ficheros(dir, out = []) {
@@ -208,6 +210,13 @@ test('rule 1 (red): another workflow naming the key, the environment or the secr
     assert.match(m[0], /only-administrar-names-the-key/, nombre);
   }
   assert.match(motivos({ 'scripts/admin/x.mjs': "const k = process.env.ADMIN_APP_KEY;\n" }).join('\n'), /only-administrar-names-the-key/);
+});
+
+test('rule 1: the public slug of the App (a bot name in allowed_bots) is not the key; the bare environment name and the secret names still are', () => {
+  const otro = (linea) => ({ '.github/workflows/otro.yml': `name: otro\non: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo\n        with:\n          ${linea}\n` });
+  assert.deepEqual(motivos(otro('allowed_bots: fabrica-constructor,fabrica-administrador')), []);
+  assert.equal(motivos(otro('allowed_bots: fabrica-administrador, administrador')).length, 1);
+  assert.equal(motivos(otro('x: fabrica-administrador ${{ secrets.ADMIN_APP_KEY }}')).length, 1);
 });
 
 test('rule 2 (red): each forbidden trigger, and a push that is not main + the plan paths', () => {
