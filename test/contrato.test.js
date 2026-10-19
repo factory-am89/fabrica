@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { EXIT, RETIRE_RESULT } from '../scripts/lib/exit.mjs';
+import { EXIT, RETIRE_RESULT, RECOVERY, RETRY } from '../scripts/lib/exit.mjs';
 import { CONTRACT_FILE, contractText } from '../scripts/contract.mjs';
 import { DONE_LINE } from '../scripts/done.mjs';
 
@@ -13,8 +13,31 @@ test('contract: the committed file equals the EXIT and RETIRE_RESULT constants (
   const file = contract();
   assert.deepEqual(file.EXIT, { ...EXIT });
   assert.deepEqual(file.RETIRE_RESULT, { ...RETIRE_RESULT });
-  assert.deepEqual(Object.keys(file).sort(), ['EXIT', 'RETIRE_RESULT']);
+  assert.deepEqual(file.RECOVERY, JSON.parse(JSON.stringify(RECOVERY)));
+  assert.deepEqual(file.RETRY, { ...RETRY });
+  assert.deepEqual(Object.keys(file).sort(), ['EXIT', 'RECOVERY', 'RETIRE_RESULT', 'RETRY']);
   assert.equal(readFileSync(CONTRACT_FILE, 'utf8'), contractText(), 'file is not what the generator writes');
+});
+
+// Recovery table: the class is "every EXIT code has a row and every row names a real code", not a list of cases.
+const recoveryFaults = (exit, recovery, retry) => {
+  const faults = [];
+  for (const key of Object.keys(exit)) if (!Object.hasOwn(recovery, key)) faults.push(`no row for ${key}`);
+  for (const [key, row] of Object.entries(recovery)) {
+    if (!Object.hasOwn(exit, key)) faults.push(`row for unknown code ${key}`);
+    if (!Object.values(retry).includes(row.retry)) faults.push(`${key}: retry «${row.retry}» is not in RETRY`);
+    if (typeof row.then !== 'string' || row.then.trim() === '') faults.push(`${key}: empty then`);
+  }
+  return faults;
+};
+
+test('recovery: every EXIT code has a {retry, then} row and every row names a real code (good and bad case)', () => {
+  assert.deepEqual(recoveryFaults(EXIT, RECOVERY, RETRY), []);
+  const fewer = Object.fromEntries(Object.entries(RECOVERY).filter(([k]) => k !== 'LESSON_FAULTS'));
+  assert.deepEqual(recoveryFaults(EXIT, fewer, RETRY), ['no row for LESSON_FAULTS']);
+  assert.deepEqual(recoveryFaults(EXIT, { ...RECOVERY, GHOST: { retry: RETRY.NO, then: 'x' } }, RETRY), ['row for unknown code GHOST']);
+  assert.deepEqual(recoveryFaults(EXIT, { ...RECOVERY, USAGE: { retry: 'maybe', then: 'x' } }, RETRY), ['USAGE: retry «maybe» is not in RETRY']);
+  assert.deepEqual(recoveryFaults(EXIT, { ...RECOVERY, USAGE: { retry: RETRY.NO, then: ' ' } }, RETRY), ['USAGE: empty then']);
 });
 
 // The agent role file must keep naming the commands and the contract file: it is the reader of --json and of exit-codes.json.
