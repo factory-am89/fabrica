@@ -1,0 +1,83 @@
+{
+  "$comment": "Registro de entidades de la Fábrica: clases de cosa con esquema en código. Los campos siguen ops/entidades.json de MenuPlan. Un horizontal lleva base (cómo se escribe uno, en base/) y forge (el código que lo comprueba), o base: hueco con base_reason (sin-forja, u otro + base_note). Lo lee scripts/entities.mjs y lo vigila test/entities.test.js. Meta e invariante los añade el trozo 22 del plan.",
+  "version": 1,
+  "entities": [
+    {
+      "id": "project", "name": "Proyecto", "scope": "horizontal", "term": "proyecto",
+      "source_of_truth": "proyectos/README.md",
+      "readers": ["scripts/admin/proyecto.mjs", "scripts/admin/leer-plan.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forma de proyectos/<repo>.json está en proyectos/README.md; sin base ni forja propias"
+    },
+    {
+      "id": "lesson", "name": "Lección", "scope": "horizontal", "term": "lección",
+      "source_of_truth": "lessons",
+      "readers": ["scripts/lessons.mjs", "scripts/lib/lessons.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (lessonFaults) y falta escribir su base",
+      "forge": "scripts/lib/lessons.mjs"
+    },
+    {
+      "id": "review-record", "name": "Registro del revisor", "scope": "horizontal", "term": "registro del revisor",
+      "source_of_truth": "none",
+      "readers": ["scripts/lib/record.mjs", "scripts/records.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (record.mjs) y falta escribir su base",
+      "forge": "scripts/lib/record.mjs"
+    },
+    {
+      "id": "intervention", "name": "Intervención", "scope": "horizontal", "term": "intervención",
+      "source_of_truth": "intervenciones.md",
+      "readers": ["scripts/lib/intervention-log.mjs", "scripts/hitl.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (vocabulario cerrado en intervention-log.mjs) y falta escribir su base",
+      "forge": "scripts/lib/intervention-log.mjs"
+    },
+    {
+      "id": "message", "name": "Mensaje", "scope": "horizontal", "term": "mensaje",
+      "source_of_truth": "none",
+      "readers": ["scripts/lib/message-log.mjs"],
+      "base": "hueco", "base_reason": "sin-forja"
+    },
+    {
+      "id": "session", "name": "Sesión", "scope": "horizontal", "term": "sesión",
+      "source_of_truth": "none",
+      "readers": ["scripts/sesiones.mjs", "scripts/lib/session-log.mjs"],
+      "base": "hueco", "base_reason": "sin-forja"
+    },
+    {
+      "id": "question", "name": "Pregunta", "scope": "horizontal", "term": "pregunta",
+      "source_of_truth": "standards/code.md",
+      "readers": ["scripts/lib/questions.mjs", "scripts/veredicto.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (readQuestions); su forma se explica en base/standard.md",
+      "forge": "scripts/lib/questions.mjs"
+    },
+    {
+      "id": "plan", "name": "Plan", "scope": "horizontal", "term": "plan",
+      "source_of_truth": "standards/plan.md",
+      "readers": ["scripts/lib/plan.mjs", "scripts/check-plan.mjs"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (PLAN_FIELDS) y su forma está en standards/plan.md",
+      "forge": "scripts/lib/plan.mjs"
+    },
+    {
+      "id": "skill", "name": "Skill", "scope": "horizontal", "term": "skill",
+      "source_of_truth": ".claude/skills",
+      "readers": ["scripts/lib/skills.mjs", "scripts/stale-skills.mjs"],
+      "base": "base/skill.md", "forge": "scripts/lib/skills.mjs"
+    },
+    {
+      "id": "role", "name": "Rol", "scope": "horizontal", "term": "rol",
+      "source_of_truth": ".claude/agents",
+      "readers": ["test/contrato.test.js"],
+      "base": "hueco", "base_reason": "otro", "base_note": "ningún mecanismo del plan necesita una base de rol; audit cuenta el hueco"
+    },
+    {
+      "id": "standard", "name": "Estándar", "scope": "horizontal", "term": "estándar",
+      "source_of_truth": "standards",
+      "readers": ["scripts/lib/questions.mjs", "scripts/veredicto.mjs"],
+      "base": "base/standard.md", "forge": "scripts/lib/questions.mjs"
+    },
+    {
+      "id": "rule", "name": "Regla", "scope": "horizontal", "term": "regla",
+      "source_of_truth": "CLAUDE.md",
+      "readers": ["test/principles-and-roles.test.js"],
+      "base": "hueco", "base_reason": "sin-forja"
+    }
+  ]
+}
