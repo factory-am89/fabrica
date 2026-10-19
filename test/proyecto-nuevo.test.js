@@ -17,7 +17,7 @@ const hayPs = process.platform === 'win32';
 
 test('proyecto-nuevo.ps1 contra un gh falso: privado, sin admin, Apps, secretos, PR, ruleset e idempotencia', { skip: !hayPs }, () => {
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-    path.join(FABRICA, 'test', 'proyecto-nuevo.prueba.ps1'), '-Script', path.join(FABRICA, 'apps', 'proyecto-nuevo.ps1')], { encoding: 'utf8' });
+    path.join(FABRICA, 'test', 'new-project.probe.ps1'), '-Script', path.join(FABRICA, 'apps', 'proyecto-nuevo.ps1')], { encoding: 'utf8' });
   const lineas = r.stdout.split(/\r?\n/).filter((l) => /^(OK|FALLO):/.test(l));
   assert.ok(lineas.length >= 29, `salida inesperada: ${r.stdout}${r.stderr}`);
   assert.deepEqual(lineas.filter((l) => l.startsWith('FALLO')), []);
