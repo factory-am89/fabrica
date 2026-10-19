@@ -19,12 +19,13 @@ export const ENTITY_FAULTS = Object.freeze(
   ].map((c) => [c, c])),
 );
 
-export const SCOPES = ['horizontal', 'vertical'];
+export const HORIZONTAL = 'horizontal';
+export const SCOPES = [HORIZONTAL, 'vertical'];
 export const BASE_HOLE = 'hueco';
 export const OTHER = 'otro';
 export const NO_FORGE = 'sin-forja';
 export const HOLE_REASONS = [NO_FORGE, OTHER];
-const REQUIRED = ['id', 'name', 'scope', 'term', 'source_of_truth', 'readers'];
+export const REQUIRED_FIELDS = ['id', 'name', 'scope', 'term', 'source_of_truth', 'readers'];
 // A source_of_truth that is not a path (the entity has no file of its own).
 export const NO_PATH = 'none';
 
@@ -62,7 +63,7 @@ function holeFaults(e) {
 }
 
 function horizontalFaults(e) {
-  if (e.scope !== 'horizontal') return [];
+  if (e.scope !== HORIZONTAL) return [];
   if (e.base === BASE_HOLE) return holeFaults(e);
   if (!isText(e.base) || !isText(e.forge)) {
     return [fault(ENTITY_FAULTS.HORIZONTAL_WITHOUT_BASE, e.id, `a horizontal entity needs base and forge, or base: ${BASE_HOLE} with a reason`)];
@@ -72,7 +73,7 @@ function horizontalFaults(e) {
 
 function oneFaults(e, root) {
   const where = e?.id ?? '?';
-  const missing = REQUIRED.filter((k) => e?.[k] === undefined).map((k) => fault(ENTITY_FAULTS.MISSING_FIELD, where, `missing «${k}»`));
+  const missing = REQUIRED_FIELDS.filter((k) => e?.[k] === undefined).map((k) => fault(ENTITY_FAULTS.MISSING_FIELD, where, `missing «${k}»`));
   if (missing.length > 0) return missing;
   const bad = [];
   if (!SCOPES.includes(e.scope)) bad.push(fault(ENTITY_FAULTS.BAD_VALUE, e.id, `scope must be one of ${SCOPES.join(', ')}`));

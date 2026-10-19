@@ -3,26 +3,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BASE_HOLE, ENTITY_FAULTS, HOLE_REASONS, NO_FORGE, OTHER, SCOPES, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
+import { BASE_HOLE, ENTITY_FAULTS, HOLE_REASONS, NO_FORGE, OTHER, SCOPES, HORIZONTAL, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
 import { cliEntities } from '../scripts/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const real = () => readEntities(RAIZ);
-const good = () => ({ id: 'x', name: 'X', scope: SCOPES[0], term: 'x', source_of_truth: 'CLAUDE.md', readers: ['CLAUDE.md'], base: 'base/skill.md', forge: 'scripts/lib/skills.mjs' });
+const good = () => ({ id: 'x', name: 'X', scope: HORIZONTAL, term: 'x', source_of_truth: 'CLAUDE.md', readers: ['CLAUDE.md'], base: 'base/skill.md', forge: 'scripts/lib/skills.mjs' });
 const codes = (entities) => entityFaults({ entities }, RAIZ).map((f) => f.code);
 
-test('the real registry has no fault, and every path of source_of_truth, base, forge and readers exists', () => {
+test('the real registry has no fault, and every path of source_of_truth, base, forge and readers exists (entityFaults checks it)', () => {
   const registry = real();
   assert.deepEqual(entityFaults(registry, RAIZ), []);
-  for (const e of registry.entities) {
-    const paths = [e.source_of_truth, ...e.readers, e.forge, e.base !== BASE_HOLE ? e.base : undefined];
-    for (const p of paths.filter((x) => x && x !== 'none')) assert.ok(existsSync(path.join(RAIZ, p)), `${e.id}: ${p}`);
-  }
 });
 
 test('the role is a base hole and skill and standard have the base files of base/', () => {
@@ -34,7 +30,7 @@ test('the role is a base hole and skill and standard have the base files of base
 });
 
 test('every horizontal entity has base and forge, or a hole with a closed reason', () => {
-  for (const e of real().entities.filter((x) => x.scope === SCOPES[0])) {
+  for (const e of real().entities.filter((x) => x.scope === HORIZONTAL)) {
     if (e.base === BASE_HOLE) assert.ok(HOLE_REASONS.includes(e.base_reason), e.id);
     else assert.ok(e.base && e.forge, e.id);
   }

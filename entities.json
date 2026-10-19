@@ -45,7 +45,7 @@
       "id": "question", "name": "Pregunta", "scope": "horizontal", "term": "pregunta",
       "source_of_truth": "standards/code.md",
       "readers": ["scripts/lib/questions.mjs", "scripts/veredicto.mjs"],
-      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (readQuestions); su forma se explica en base/standard.md",
+      "base": "base/standard.md",
       "forge": "scripts/lib/questions.mjs"
     },
     {

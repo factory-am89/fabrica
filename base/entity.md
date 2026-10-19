@@ -6,11 +6,10 @@ las reglas están en esa forja (`ENTITY_FAULTS`) y no se repiten aquí.
 
 ## Cómo se añade una
 
-- Una fila en `entities.json` con los campos de MenuPlan (`ops/entidades.json`): `id`, `name`, `scope`,
-  `term`, `source_of_truth`, `readers`.
+- Una fila en `entities.json` con los campos obligatorios de `REQUIRED_FIELDS` (`scripts/lib/entities.mjs`), que siguen los de MenuPlan.
 - Un horizontal dice su `base` (esta carpeta, `base/`) y su `forge` (el código que lo comprueba), o es un hueco
   con su motivo. Los valores válidos están en `scripts/lib/entities.mjs` (`BASE_HOLE`, `HOLE_REASONS`); el hueco se cuenta, no se esconde.
-- Toda ruta que nombre debe existir; `none` en `source_of_truth` significa que no tiene fichero propio.
+- Toda ruta que nombre debe existir; `NO_PATH` en `source_of_truth` significa que no tiene fichero propio.
 
 ## Verlo entero
 

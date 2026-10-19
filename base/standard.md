@@ -1,13 +1,12 @@
 # Cómo se escribe un estándar
 
-Un estándar (`standards/*.md`) es una lista de preguntas de sí o no que alguien comprueba. Su forja es
-`readQuestions` en `scripts/lib/questions.mjs`: es el único lector de las preguntas y la forma que exige
-(cabecera `### <letra><n> — texto`, línea `Quién:`, `Bien:` y `Mal:`) está allí, no se repite aquí.
+Un estándar () es una lista de preguntas de sí o no que alguien comprueba. Su forja es
+ en : es el único lector de las preguntas y todo lo que exige
+(, , , una letra por fichero) está allí, no se repite aquí.
 
 ## Cómo se añade una pregunta
 
-- Una letra por fichero (`C` en `standards/code.md`, `P` en `standards/plan.md`) y número correlativo.
-- `Quién: máquina` solo si un check la falla de verdad; si no, `Quién: revisor`.
-- Si cambia el estándar de código, el juez lo lee desde `main` tras fusionar.
+- Con la forma que dicen esos nombres; quién la comprueba lo dice .
+- Si cambia el estándar de código, el juez lo lee desde  tras fusionar.
 
-Registrado como entidad `standard` en `entities.json`.
+Registrado como entidad  en ; la entidad  usa esta misma base.
