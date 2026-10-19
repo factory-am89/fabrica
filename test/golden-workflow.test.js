@@ -1,4 +1,4 @@
-// .github/workflows/golden.yml: la pasada programada del revisor sobre el corpus. Lo que no se puede probar sin GitHub
+// .github/workflows/golden.yml: la pasada del revisor sobre el corpus, solo a mano sobre el corpus. Lo que no se puede probar sin GitHub
 // (que arranque de verdad) se deja a workflow_dispatch; aquí, las reglas que una máquina sí comprueba: cuándo corre,
 // con qué permisos y secretos, en qué orden baja los esperados y que no falla por detección baja.
 import { test } from 'node:test';
@@ -23,12 +23,8 @@ const recoger = () => indice((p) => /--phase collect/.test(p.run ?? ''));
 const bajarEsperados = () => indice((p) => /git sparse-checkout disable/.test(p.run ?? ''));
 const subida = () => pasos.find((p) => /^actions\/upload-artifact@/.test(p.uses ?? ''));
 
-test('corre cada semana, al cambiar el juez en main y a mano; en ningún otro caso', () => {
-  assert.deepEqual(Object.keys(wf.on).sort(), ['push', 'schedule', 'workflow_dispatch']);
-  assert.equal(wf.on.schedule.length, 1);
-  assert.match(wf.on.schedule[0].cron, /^\d+ \d+ \* \* \d$/, 'una vez por semana: minuto, hora y día de la semana fijos');
-  assert.deepEqual(wf.on.push.branches, ['main']);
-  assert.deepEqual(wf.on.push.paths, ['.claude/agents/revisor.md', 'standards/**', '.github/workflows/revisor.yml', 'scripts/veredicto.mjs']);
+test('solo corre a mano: workflow_dispatch, sin schedule ni push (decisión A de plans/trabajar-solos.md)', () => {
+  assert.deepEqual(Object.keys(wf.on), ['workflow_dispatch']);
 });
 
 test('permisos mínimos, el environment del revisor y concurrencia con cancelación', () => {
