@@ -1,0 +1,10 @@
+{
+  "$comment": "Trinquete de las viñetas de «Lo que falló» sin lección en lessons/: el número por skill solo puede bajar. Lo comprueba faltasDeReglasSinLector (scripts/lib/skills.mjs) desde test/skills.test.js. Una viñeta que enlaza lessons/<id>.json deja de contar; subir un número es rebajar un check. Está en la raíz y no en lessons/, que se lee entera como lecciones.",
+  "version": 1,
+  "budget": {
+    "1password": 11,
+    "github": 13,
+    "hetzner": 8,
+    "tailscale": 2
+  }
+}
