@@ -79,7 +79,7 @@ async function correr(fake, dir, summaryFile) {
   const real = process.stdout.write;
   process.stdout.write = (s) => { out.push(String(s)); return true; };
   try {
-    await main({ dir, templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('lectura', fake.fetchFn), writeApi: makeWriteApi('aplicar', fake.fetchFn, assertAllowed), summaryFile });
+    await main({ dir, templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('lectura', fake.fetchFn), applyReadApi: makeApi('aplicar', fake.fetchFn), writeApi: makeWriteApi('aplicar', fake.fetchFn, assertAllowed), summaryFile });
   } finally {
     process.stdout.write = real;
   }
@@ -163,7 +163,7 @@ test('only the four operations of the chunk can leave aplicar.mjs; the smoke fic
 test('an error of the writer carries method, path and status, never the body', async () => {
   const fake = fakeGitHub({ demo: listo() });
   const f = async (url, init = {}) => ((init.method ?? 'GET') === 'GET' ? fake.fetchFn(url, init) : { ok: false, status: 403, text: async () => 'CUERPO-SECRETO' });
-  await assert.rejects(() => main({ dir: proyectosDir(['demo']), templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('l', f), writeApi: makeWriteApi('a', f, assertAllowed) }), (e) => /403/.test(e.message) && !/CUERPO-SECRETO/.test(e.message));
+  await assert.rejects(() => main({ dir: proyectosDir(['demo']), templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('l', f), applyReadApi: makeApi('a', f), writeApi: makeWriteApi('a', f, assertAllowed) }), (e) => /403/.test(e.message) && !/CUERPO-SECRETO/.test(e.message));
 });
 
 // ---------- the real workflow: aplicar only after the secrets step succeeded ----------
@@ -213,4 +213,10 @@ test('red by mutation: if, continue-on-error or a changed order on the workflow 
   const bloque = real.match(/ {6}# Trozo 6\.[\s\S]*?(?= {6}# Falla el run)/)[0];
   const m4 = quita(real, bloque).replace('      # Escribe el environment `revisor`', bloque + '      # Escribe el environment `revisor`');
   assert.match(ordenDeAplicar(m4).join('\n'), /order must be/);
+});
+
+test('main refuses to run without the aplicar-token read: the settings and the bypass would be «not visible» and nothing could be proven', async () => {
+  const fake = fakeGitHub({ demo: listo() });
+  await assert.rejects(() => main({ dir: proyectosDir(['demo']), templatesDir: path.join(RAIZ, 'apps', 'proyecto-nuevo'), readApi: makeApi('l', fake.fetchFn), writeApi: makeWriteApi('a', fake.fetchFn, assertAllowed) }), /falta applyReadApi/);
+  assert.deepEqual(fake.gh.written, []);
 });

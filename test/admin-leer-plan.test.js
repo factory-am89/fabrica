@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadTemplates, makeApi, readState, renderPlan } from '../scripts/admin/leer-plan.mjs';
-import { parseProject, planProject } from '../scripts/admin/proyecto.mjs';
+import { hiddenFields, parseProject, planProject } from '../scripts/admin/proyecto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const PROJECT = parseProject({ repo: 'factory-am89/demo', visibilidad: 'publico', descripcion: 'demo' });
@@ -98,9 +98,52 @@ test('the real proyectos/*.json obey the schema and are named after their repo',
   for (const f of files) parseProject(JSON.parse(readFileSync(path.join(dir, f), 'utf8')), { fileName: f });
 });
 
+const FIX = (n) => JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'admin', n), 'utf8'));
+
 // lesson: absent-field-read-as-default
-test('a repo answer without allow_auto_merge / delete_branch_on_merge is not read as false: planning it fails loudly', async () => {
+test('read-only run: a repo answer without allow_auto_merge / delete_branch_on_merge is «no visible» (null), not false, and the summary says so', async () => {
   const { api } = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo': [200, { private: false }] });
   const state = await readState(api, PROJECT);
-  assert.throws(() => planProject(PROJECT, state, TEMPLATES), /administration: read/);
+  assert.equal(state.repo.allow_auto_merge, null);
+  assert.equal(state.repo.delete_branch_on_merge, null);
+  const calls = planProject(PROJECT, state, TEMPLATES);
+  assert.ok(!calls.some((c) => c.op === 'update-settings'), 'a hidden setting is not asked for');
+  assert.match(renderPlan(PROJECT, calls, hiddenFields(state)), /No visible con el token de lectura.*allow_auto_merge/);
+  assert.match(renderPlan(PROJECT, [], hiddenFields(state)), /0 cambios visibles/);
+  assert.doesNotMatch(renderPlan(PROJECT, [], hiddenFields(state)), /ya esta como dice/);
+});
+
+test('read-only run: the real ruleset shape without bypass_actors is flagged bypassHidden (bypass_actors is not made up as [])', async () => {
+  const real = FIX('ruleset-real-sin-bypass.json');
+  assert.equal('bypass_actors' in real, false);
+  const { api } = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo/rulesets': [200, [{ id: real.id }]], [`/repos/factory-am89/demo/rulesets/${real.id}`]: [200, real] });
+  const state = await readState(api, PROJECT);
+  assert.equal(state.rulesets[0].bypassHidden, true);
+  assert.equal('bypass_actors' in state.rulesets[0], false);
+  assert.deepEqual(hiddenFields(state), [`bypass_actors del ruleset ${real.id}`]);
+});
+
+test('with the aplicar token (settingsApi) both reads go through it, and a field it does not return either fails loudly', async () => {
+  const real = FIX('ruleset-real-sin-bypass.json');
+  const rsRoute = `/repos/factory-am89/demo/rulesets/${real.id}`;
+  const lectura = fakeApi({ ...UNPROTECTED, '/repos/factory-am89/demo': [200, { private: false }], '/repos/factory-am89/demo/rulesets': [200, [{ id: real.id }]] });
+  const repoReal = FIX('repo-real-con-ajustes.json');
+  const ok = fakeApi({ '/repos/factory-am89/demo': [200, repoReal], [rsRoute]: [200, { ...real, bypass_actors: [] }] });
+  const state = await readState(lectura.api, PROJECT, { settingsApi: ok.api });
+  assert.equal(state.repo.allow_auto_merge, true);
+  assert.deepEqual(state.rulesets[0].bypass_actors, []);
+  assert.ok(!lectura.seen.includes(rsRoute), 'the ruleset body is not read with the lectura token');
+  const noSettings = fakeApi({ '/repos/factory-am89/demo': [200, { private: false }] });
+  await assert.rejects(readState(lectura.api, PROJECT, { settingsApi: noSettings.api }), /no trae allow_auto_merge ni con el token de aplicar/);
+  const noBypass = fakeApi({ '/repos/factory-am89/demo': [200, repoReal], [rsRoute]: [200, real] });
+  await assert.rejects(readState(lectura.api, PROJECT, { settingsApi: noBypass.api }), /no trae bypass_actors ni con el token de aplicar/);
+});
+
+// lesson: permission-change-asked-on-unproven-diagnosis
+test('no message in scripts/admin names a permission as the cause of a missing field (#96 did, #97 asked Pablo for it, it did not fix it)', () => {
+  const dir = path.join(RAIZ, 'scripts', 'admin');
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.mjs'))) {
+    const text = readFileSync(path.join(dir, f), 'utf8');
+    assert.doesNotMatch(text, /sin permiso administration|(omite|oculta|esconde)[^\n]*sin permiso/, `${f}: a message asserts a permission as the cause`);
+  }
 });

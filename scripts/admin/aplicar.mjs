@@ -37,7 +37,11 @@ export function assertAllowed(call) {
 // branch policy and the three secret names are there. The rule lives in planProject (environmentCalls); it is not rewritten here.
 export const missingBeforeProtecting = (calls) => secretCalls(calls).map((c) => `${c.op} ${c.path}`);
 
-export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), readApi, writeApi, summaryFile } = {}) {
+// readApi: GET with the lectura token (environments, secrets, trees, pulls). applyReadApi: GET with the aplicar token, for the two
+// reads the lectura token cannot see (merge settings, bypass_actors). Required: without it those fields would be «not visible»
+// (null), the settings and the bypass would be skipped and the second pass could prove nothing.
+export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), readApi, applyReadApi, writeApi, summaryFile } = {}) {
+  if (typeof applyReadApi !== 'function') throw new Error('aplicar.mjs: falta applyReadApi (lectura con el token de aplicar)');
   const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
   if (files.length === 0) throw new Error(`${dir}/: no hay ningun .json`);
   const templates = loadTemplates(templatesDir);
@@ -46,7 +50,7 @@ export async function main({ dir = 'proyectos', templatesDir = path.join('apps',
   const planned = [];
   for (const f of files) {
     const project = parseProject(JSON.parse(readFileSync(path.join(dir, f), 'utf8')), { fileName: f });
-    const state = await readState(readApi, project);
+    const state = await readState(readApi, project, { settingsApi: applyReadApi });
     if (!state.repo) throw new Error(`${project.repo} no existe: este run solo ajusta y protege repos que ya existen, crear repos es otro trozo`);
     const plan = planProject(project, state, templates);
     const missing = missingBeforeProtecting(plan);
@@ -65,7 +69,7 @@ export async function main({ dir = 'proyectos', templatesDir = path.join('apps',
   }
   // Second pass over the real state: nothing of this chunk may be left to do.
   for (const { project } of planned) {
-    const left = applyCalls(planProject(project, await readState(readApi, project), templates));
+    const left = applyCalls(planProject(project, await readState(readApi, project, { settingsApi: applyReadApi }), templates));
     if (left.length > 0) throw new Error(`${project.repo}: tras escribir aun faltan ${left.map((c) => `${c.op} ${c.path}`).join('; ')}`);
   }
   say('Comprobado: una segunda lectura del estado real no deja nada por escribir en ajustes, ficheros ni ruleset.');
@@ -76,6 +80,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
   const need = (n) => process.env[n] || (() => { throw new Error(`falta ${n}`); })();
   await main({
     readApi: makeApi(need('GH_TOKEN_LECTURA')),
+    applyReadApi: makeApi(need('GH_TOKEN_APLICAR')),
     writeApi: makeWriteApi(need('GH_TOKEN_APLICAR'), fetch, assertAllowed),
     summaryFile: process.env.GITHUB_STEP_SUMMARY,
   });

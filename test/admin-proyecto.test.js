@@ -10,7 +10,7 @@ import yaml from 'js-yaml';
 import { REPO } from '../scripts/lib/repo.mjs';
 import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import {
-  ACTIONS_APP_ID, ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, parseProject, planProject, rulesetBody,
+  ACTIONS_APP_ID, ALLOWED_CALLS, FICHA, PROJECT_FILES, REVISOR_SECRETS, ORG, hiddenFields, parseProject, planProject, rulesetBody,
 } from '../scripts/admin/proyecto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
@@ -266,15 +266,25 @@ test('the real state is validated too: malformed state, missing template and mis
 });
 
 // Real object: GET /repos/factory-am89/homenu-panel/rulesets/25340020 as the constructor App's token saw it, minutes after
-// aplicar.mjs created it (run 39120720719). It has no bypass_actors key at all: GitHub hides it from a caller without
-// administration read. Before this check, covers() read the absent key as "not empty" and aplicar.mjs asked for
+// aplicar.mjs created it (run 39120720719). It has no bypass_actors key at all: GitHub only returns it to a caller with write access
+// to the ruleset. Before this check, covers() read the absent key as "not empty" and aplicar.mjs asked for
 // update-ruleset forever (its second read threw «tras escribir aun faltan ... update-ruleset»).
 const RULESET_REAL = JSON.parse(leer(RAIZ, 'test', 'fixtures', 'admin', 'ruleset-real-sin-bypass.json'));
 const REVISOR_REAL = 5332150;
 const conRulesetReal = (extra = {}) => ({ ...completo(), revisorAppId: REVISOR_REAL, rulesets: [{ ...RULESET_REAL, ...extra }] });
 
-test('a ruleset whose bypass_actors GitHub hides fails loudly: absent is not empty and not drift', () => {
-  assert.throws(() => plan(conRulesetReal()), /bypass_actors.*administration: read/);
+test('a ruleset whose bypass_actors is absent (not classified as null) fails loudly: absent is not empty and not drift', () => {
+  assert.throws(() => plan(conRulesetReal()), /sin bypass_actors.*ausente no se da por vacio/);
+});
+
+test('a ruleset with bypassHidden (bypass_actors not visible to the token) is compared without it, listed as hidden, and never called complete', () => {
+  const hidden = conRulesetReal({ bypassHidden: true });
+  assert.deepEqual(plan(hidden), []);
+  assert.deepEqual(hiddenFields(hidden), [`bypass_actors del ruleset ${RULESET_REAL.id}`]);
+  // The rest still counts: a weaker ruleset with hidden bypass is replaced.
+  assert.deepEqual(ops(plan(conRulesetReal({ bypassHidden: true, rules: [] }))), ['update-ruleset']);
+  // A visible non-empty bypass is never accepted.
+  assert.deepEqual(ops(plan(conRulesetReal({ bypass_actors: [{ actor_id: 5, actor_type: 'Team', bypass_mode: 'always' }] }))), ['update-ruleset']);
 });
 
 test('the real ruleset seen with its bypass_actors empty is complete (0 calls); with a bypass it is replaced', () => {
@@ -282,6 +292,20 @@ test('the real ruleset seen with its bypass_actors empty is complete (0 calls); 
   assert.deepEqual(ops(plan(conRulesetReal({ bypass_actors: [{ actor_id: 5, actor_type: 'Team', bypass_mode: 'always' }] }))), ['update-ruleset']);
 });
 
-test('a repo state without the two settings (GitHub hides them) fails loudly, never read as false', () => {
-  assert.throws(() => plan({ ...completo(), repo: { private: false } }), /administration: read/);
+test('a repo state without the two settings fails loudly, never read as false', () => {
+  assert.throws(() => plan({ ...completo(), repo: { private: false } }), /ausente no se da por falso/);
+});
+
+// Real shape: GET /repos/factory-am89/homenu-panel with the constructor App token (contents write, no administration), 2026-10-19:
+// the merge settings ARE there (true) although permissions.push is false. See repo-real-con-ajustes.json.
+const REPO_REAL = JSON.parse(leer(RAIZ, 'test', 'fixtures', 'admin', 'repo-real-con-ajustes.json'));
+
+test('settings: null (not visible) asks for no PATCH and is listed as hidden; a visible false asks for it; the real shape is complete', () => {
+  const base = { ...completo(), repo: { private: false, allow_auto_merge: null, delete_branch_on_merge: null } };
+  assert.deepEqual(plan(base), []);
+  assert.deepEqual(hiddenFields(base), ['ajustes allow_auto_merge y delete_branch_on_merge']);
+  assert.deepEqual(ops(plan({ ...base, repo: { private: false, allow_auto_merge: null, delete_branch_on_merge: false } })), ['update-settings']);
+  const real = { ...completo(), repo: { private: REPO_REAL.private, allow_auto_merge: REPO_REAL.allow_auto_merge, delete_branch_on_merge: REPO_REAL.delete_branch_on_merge } };
+  assert.deepEqual(plan(real), []);
+  assert.deepEqual(hiddenFields(real), []);
 });
