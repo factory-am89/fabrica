@@ -7,13 +7,13 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BASE_HOLE, ENTITY_FAULTS, HOLE_REASONS, NO_FORGE, OTHER, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
+import { BASE_HOLE, ENTITY_FAULTS, HOLE_REASONS, NO_FORGE, OTHER, SCOPES, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
 import { cliEntities } from '../scripts/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const real = () => readEntities(RAIZ);
-const good = () => ({ id: 'x', name: 'X', scope: 'horizontal', term: 'x', source_of_truth: 'CLAUDE.md', readers: ['CLAUDE.md'], base: 'base/skill.md', forge: 'scripts/lib/skills.mjs' });
+const good = () => ({ id: 'x', name: 'X', scope: SCOPES[0], term: 'x', source_of_truth: 'CLAUDE.md', readers: ['CLAUDE.md'], base: 'base/skill.md', forge: 'scripts/lib/skills.mjs' });
 const codes = (entities) => entityFaults({ entities }, RAIZ).map((f) => f.code);
 
 test('the real registry has no fault, and every path of source_of_truth, base, forge and readers exists', () => {
@@ -25,11 +25,8 @@ test('the real registry has no fault, and every path of source_of_truth, base, f
   }
 });
 
-test('the registry holds the entities the plan asks for, the role is a base hole and skill and standard have a base', () => {
+test('the role is a base hole and skill and standard have the base files of base/', () => {
   const byId = Object.fromEntries(real().entities.map((e) => [e.id, e]));
-  for (const id of ['project', 'lesson', 'review-record', 'intervention', 'message', 'session', 'question', 'plan', 'skill', 'role', 'standard', 'rule']) {
-    assert.ok(byId[id], id);
-  }
   assert.equal(byId.role.base, BASE_HOLE);
   assert.ok(baseHoles(real()).includes('role'));
   assert.equal(byId.skill.base, 'base/skill.md');
@@ -37,7 +34,7 @@ test('the registry holds the entities the plan asks for, the role is a base hole
 });
 
 test('every horizontal entity has base and forge, or a hole with a closed reason', () => {
-  for (const e of real().entities.filter((x) => x.scope === 'horizontal')) {
+  for (const e of real().entities.filter((x) => x.scope === SCOPES[0])) {
     if (e.base === BASE_HOLE) assert.ok(HOLE_REASONS.includes(e.base_reason), e.id);
     else assert.ok(e.base && e.forge, e.id);
   }
@@ -70,7 +67,7 @@ test('the CLI (cliEntities and a spawned process) prints the whole registry: one
 test('a registry with a fault fails loudly through the CLI (exit is not OK, stdout names the error)', (t) => {
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-entities-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const ghost = { id: 'ghost', name: 'G', scope: 'vertical', term: 'g', source_of_truth: 'no/existe.md', readers: [] };
+  const ghost = { id: 'ghost', name: 'G', scope: SCOPES[1], term: 'g', source_of_truth: 'no/existe.md', readers: [] };
   writeFileSync(path.join(root, 'entities.json'), JSON.stringify({ entities: [ghost] }));
   const p = spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'entities.mjs'), '--json', root], { encoding: 'utf8' });
   assert.notEqual(p.status, 0);

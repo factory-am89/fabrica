@@ -8,8 +8,8 @@ las reglas están en esa forja (`ENTITY_FAULTS`) y no se repiten aquí.
 
 - Una fila en `entities.json` con los campos de MenuPlan (`ops/entidades.json`): `id`, `name`, `scope`,
   `term`, `source_of_truth`, `readers`.
-- Un horizontal dice su `base` (esta carpeta, `base/`) y su `forge` (el código que lo comprueba), o
-  `base: hueco` con `base_reason`: `sin-forja`, u `otro` con `base_note`. El hueco se cuenta, no se esconde.
+- Un horizontal dice su `base` (esta carpeta, `base/`) y su `forge` (el código que lo comprueba), o es un hueco
+  con su motivo. Los valores válidos están en `scripts/lib/entities.mjs` (`BASE_HOLE`, `HOLE_REASONS`); el hueco se cuenta, no se esconde.
 - Toda ruta que nombre debe existir; `none` en `source_of_truth` significa que no tiene fichero propio.
 
 ## Verlo entero

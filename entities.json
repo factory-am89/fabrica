@@ -1,5 +1,5 @@
 {
-  "$comment": "Registro de entidades de la Fábrica: clases de cosa con esquema en código. Los campos siguen ops/entidades.json de MenuPlan. Un horizontal lleva base (cómo se escribe uno, en base/) y forge (el código que lo comprueba), o base: hueco con base_reason (sin-forja, u otro + base_note). Lo lee scripts/entities.mjs y lo vigila test/entities.test.js. Meta e invariante los añade el trozo 22 del plan.",
+  "$comment": "Registro de entidades de la Fábrica: clases de cosa con esquema en código. Los campos siguen ops/entidades.json de MenuPlan. Las reglas de cada campo están en scripts/lib/entities.mjs. Lo lee scripts/entities.mjs y lo vigila test/entities.test.js. Meta e invariante los añade el trozo 22 del plan.",
   "version": 1,
   "entities": [
     {
