@@ -22,7 +22,23 @@ export function parseClosedPaths(text) {
   return lines;
 }
 
-const escapeChar = (s) => s.replace(/[.+^${}()|[\]\\]/g, (c) => `\\${c}`);
+// The four classes of the closed list are bold bullets under "## Classes"; this is their only reader.
+// Anything but exactly CLASS_COUNT of them fails loudly: a change to the list is a change to the closed list.
+export const CLASS_COUNT = 4;
+const CLASSES_SECTION = /^## Classes[ \t]*\r?\n([\s\S]*?)(?=^## |(?![\s\S]))/m;
+const CLASS_BULLET = /^- \*\*([^*]+)\*\*:/;
+
+export function parseClasses(text) {
+  const section = CLASSES_SECTION.exec(text);
+  if (!section) throw new Error('intervention: no "## Classes" section');
+  const names = section[1].split(/\r?\n/).map((l) => CLASS_BULLET.exec(l)?.[1].trim()).filter(Boolean);
+  if (names.length !== CLASS_COUNT) throw new Error(`intervention: expected ${CLASS_COUNT} classes under "## Classes", found ${names.length}`);
+  const repeated = names.find((n, i) => names.indexOf(n) !== i);
+  if (repeated) throw new Error(`intervention: repeated class: ${repeated}`);
+  return names;
+}
+
+const escapeChar =(s) => s.replace(/[.+^${}()|[\]\\]/g, (c) => `\\${c}`);
 const toRegExp = (glob) => new RegExp(`^${glob.split('**').map((part) => part.split('*').map(escapeChar).join('[^/]*')).join('.*')}$`);
 
 export function touchesClosedList(file, globs) {
@@ -30,6 +46,10 @@ export function touchesClosedList(file, globs) {
 }
 
 // The root is built from a path, not from a URL relative to this file: test/gate-files.test.js reads that as an import.
+export function loadClasses(root = path.resolve(import.meta.dirname, '..', '..')) {
+  return parseClasses(readFileSync(path.join(root, INTERVENTION_FILE), 'utf8'));
+}
+
 export function loadClosedPaths(root = path.resolve(import.meta.dirname, '..', '..')) {
   return parseClosedPaths(readFileSync(path.join(root, INTERVENTION_FILE), 'utf8'));
 }

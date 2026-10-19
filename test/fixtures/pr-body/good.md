@@ -18,6 +18,10 @@ $ node --test test/pr-body.test.js
 # fail 15
 ```
 
+## Decisions
+
+- principio 5 | eligió: una comprobación de máquina | descartó: una frase en la plantilla | motivo: decidido
+
 ## Not verified
 
 Nothing.

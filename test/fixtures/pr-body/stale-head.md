@@ -19,6 +19,10 @@ $ node --test test/pr-body.test.js
 # fail 15
 ```
 
+## Decisions
+
+None
+
 ## Not verified
 
 Nothing.
