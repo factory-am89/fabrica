@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER } from '../scripts/lib/entities.mjs';
 import {
-  FIELDS, KINDS, LESSON_FAULTS, MACHINE_KINDS, NO_LESSON_FAULTS, NO_LESSON_FIELDS, NO_LESSON_FILE, NO_LESSON_OPTIONAL_FIELDS, NO_LESSON_REASONS, NO_LESSON_VERSION, NO_QUESTION,
+  FIELDS, KINDS, LESSON_FAULTS, MACHINE_KINDS, NO_LESSON_FAULTS, NO_LESSON_FIELDS, NO_LESSON_FILE, NO_LESSON_KEYS, NO_LESSON_OPTIONAL_FIELDS, NO_LESSON_REASONS, NO_LESSON_VERSION, NO_QUESTION,
   NO_QUESTION_REASONS, NO_SIGNAL_REASONS, REASON_COVERED, REASON_NO_QUESTION, REASON_NOISE, REASON_PENDING, REASON_SINGLE, REASONS, SIGNAL_MACHINE,
   SIGNAL_NONE, SIGNALS, VERSION, lessonContext, lessonFaults, mechanismKind, noLessonFaults, readLessons, readNoLesson,
 } from '../scripts/lib/lessons.mjs';
@@ -196,9 +196,10 @@ test('every field of FIELDS is used by some valid shape', () => {
 });
 
 // no-lesson.json: the triaged «no» that got no lesson. The entry keys come from NO_LESSON_FIELDS, never typed again.
-const [SOURCE, QUESTION, REASON, REF, NOTE] = NO_LESSON_FIELDS;
+const { source: SOURCE, question: QUESTION, reason: REASON, ref: REF, note: NOTE } = NO_LESSON_KEYS;
+const GOOD_ID = good().id;
 const entry = () => ({ [SOURCE]: '#9', [QUESTION]: REAL.questions[0], [REASON]: REASON_NOISE });
-const goodNoLesson = () => ({ data: { version: NO_LESSON_VERSION, entries: [entry()] }, lessonIds: ['good-one'] });
+const goodNoLesson = () => ({ data: { version: NO_LESSON_VERSION, entries: [entry()] }, lessonIds: [GOOD_ID] });
 const noLessonOf = (fx) => noLessonFaults(fx.text ?? JSON.stringify(fx.data), REAL, fx.lessonIds);
 const setEntry = (key, value) => (fx) => { fx.data.entries[0][key] = value; return fx; };
 const unsetEntry = (key) => (fx) => { delete fx.data.entries[0][key]; return fx; };
@@ -232,7 +233,7 @@ const NO_LESSON_MUTATIONS = {
   NO_LESSON_BAD_REASON: [['outside the closed list', setEntry(REASON, 'porque-si')], ['a list instead of one value', setEntry(REASON, [REASON_NOISE])]],
   NO_LESSON_REF_MISMATCH: [
     ['ya-cubierta without a reason_ref', setEntry(REASON, REASON_COVERED)],
-    ['a reason_ref without ya-cubierta', setEntry(REF, 'good-one')],
+    ['a reason_ref without ya-cubierta', setEntry(REF, GOOD_ID)],
     ['ya-cubierta with a blank reason_ref', (fx) => setEntry(REF, '  ')(setEntry(REASON, REASON_COVERED)(fx))],
   ],
   NO_LESSON_UNKNOWN_LESSON: [['ya-cubierta citing a lesson that is not there', (fx) => setEntry(REF, 'no-such-lesson')(setEntry(REASON, REASON_COVERED)(fx))]],
@@ -268,7 +269,7 @@ for (const [code, rows] of Object.entries(NO_LESSON_MUTATIONS)) {
 const NO_LESSON_VALID_SHAPES = [
   ['ruido-del-juez', {}],
   ['caso-unico', { [REASON]: REASON_SINGLE }],
-  ['ya-cubierta with the id of a lesson present', { [REASON]: REASON_COVERED, [REF]: 'good-one' }],
+  ['ya-cubierta with the id of a lesson present', { [REASON]: REASON_COVERED, [REF]: GOOD_ID }],
   ['otro with its note', { [REASON]: OTHER, [NOTE]: 'se juzga a ojo' }],
 ];
 for (const [name, change] of NO_LESSON_VALID_SHAPES) {
@@ -286,6 +287,26 @@ test('an empty list of entries is valid, and every closed reason has a valid sha
   const keys = new Set(NO_LESSON_VALID_SHAPES.flatMap(([, change]) => Object.keys({ ...entry(), ...change })));
   assert.deepEqual([...keys].sort(), [...NO_LESSON_FIELDS].sort());
   assert.ok(NO_LESSON_OPTIONAL_FIELDS.every((f) => NO_LESSON_FIELDS.includes(f)));
+});
+
+test('NO_LESSON_FIELDS is the list of the values of NO_LESSON_KEYS, and each key names itself or its field once', () => {
+  assert.deepEqual(NO_LESSON_FIELDS, Object.values(NO_LESSON_KEYS));
+  assert.equal(new Set(NO_LESSON_FIELDS).size, Object.keys(NO_LESSON_KEYS).length);
+  assert.deepEqual(NO_LESSON_OPTIONAL_FIELDS, [REF, NOTE]);
+});
+
+// The on-disk format, written out by hand on purpose: the one place that pins the key names a file must use, so renaming,
+// reordering or swapping the names of NO_LESSON_KEYS cannot stay green while a good file is rejected.
+test('a no-lesson.json written by hand in the on-disk format is accepted', () => {
+  const text = JSON.stringify({
+    version: 1,
+    entries: [
+      { source: '#9', question: REAL.questions[0], reason: 'ruido-del-juez' },
+      { source: '#10', question: REAL.questions[0], reason: 'ya-cubierta', reason_ref: GOOD_ID },
+      { source: '#11', question: REAL.questions[0], reason: 'otro', reason_note: 'x' },
+    ],
+  });
+  assert.deepEqual(noLessonFaults(text, REAL, [GOOD_ID]), []);
 });
 
 test('the faults of two entries are told apart by where', () => {

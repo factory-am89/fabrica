@@ -1,5 +1,5 @@
 {
-  "$comment": "«No» del revisor ya triados que no dieron lección, cada uno con un motivo cerrado. Entrada: source (#n del PR), question (id de pregunta) y reason (ruido-del-juez, ya-cubierta + reason_ref con el id de una lección, caso-unico, otro + reason_note). ruido-del-juez es la fuente de la tasa de «no» falsos por pregunta. Las reglas están en scripts/lib/lessons.mjs (noLessonFaults) y las vigila test/lessons.test.js. Está en la raíz y no en lessons/, que se lee entera como lecciones. Vacío hasta que se triae el primer «no».",
+  "$comment": "«No» del revisor triados sin lección. Esquema y motivos: NO_LESSON_FIELDS y NO_LESSON_REASONS en scripts/lib/lessons.mjs. Está en la raíz y no en lessons/, que se lee entera como lecciones.",
   "version": 1,
   "entries": []
 }
