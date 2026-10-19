@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENTITY_FAULTS, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
+import { BASE_HOLE, ENTITY_FAULTS, HOLE_REASONS, NO_FORGE, OTHER, baseHoles, entityFaults, readEntities } from '../scripts/lib/entities.mjs';
 import { cliEntities } from '../scripts/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 
@@ -20,7 +20,7 @@ test('the real registry has no fault, and every path of source_of_truth, base, f
   const registry = real();
   assert.deepEqual(entityFaults(registry, RAIZ), []);
   for (const e of registry.entities) {
-    const paths = [e.source_of_truth, ...e.readers, e.forge, e.base !== 'hueco' ? e.base : undefined];
+    const paths = [e.source_of_truth, ...e.readers, e.forge, e.base !== BASE_HOLE ? e.base : undefined];
     for (const p of paths.filter((x) => x && x !== 'none')) assert.ok(existsSync(path.join(RAIZ, p)), `${e.id}: ${p}`);
   }
 });
@@ -30,7 +30,7 @@ test('the registry holds the entities the plan asks for, the role is a base hole
   for (const id of ['project', 'lesson', 'review-record', 'intervention', 'message', 'session', 'question', 'plan', 'skill', 'role', 'standard', 'rule']) {
     assert.ok(byId[id], id);
   }
-  assert.equal(byId.role.base, 'hueco');
+  assert.equal(byId.role.base, BASE_HOLE);
   assert.ok(baseHoles(real()).includes('role'));
   assert.equal(byId.skill.base, 'base/skill.md');
   assert.equal(byId.standard.base, 'base/standard.md');
@@ -38,7 +38,7 @@ test('the registry holds the entities the plan asks for, the role is a base hole
 
 test('every horizontal entity has base and forge, or a hole with a closed reason', () => {
   for (const e of real().entities.filter((x) => x.scope === 'horizontal')) {
-    if (e.base === 'hueco') assert.ok(['sin-forja', 'otro'].includes(e.base_reason), e.id);
+    if (e.base === BASE_HOLE) assert.ok(HOLE_REASONS.includes(e.base_reason), e.id);
     else assert.ok(e.base && e.forge, e.id);
   }
 });
@@ -51,9 +51,9 @@ test('good case is green; each fault code has a bad case that turns it red', () 
   assert.deepEqual(codes([{ ...good(), scope: 'lateral' }]), [ENTITY_FAULTS.BAD_VALUE]);
   assert.deepEqual(codes([{ ...good(), readers: ['no/existe.mjs'] }]), [ENTITY_FAULTS.MISSING_PATH]);
   assert.deepEqual(codes([{ ...good(), forge: undefined }]), [ENTITY_FAULTS.HORIZONTAL_WITHOUT_BASE]);
-  assert.deepEqual(codes([{ ...good(), base: 'hueco', base_reason: 'porque-si' }]), [ENTITY_FAULTS.BAD_HOLE]);
-  assert.deepEqual(codes([{ ...good(), base: 'hueco', base_reason: 'otro' }]), [ENTITY_FAULTS.BAD_HOLE]);
-  assert.deepEqual(codes([{ ...good(), base: 'hueco', base_reason: 'sin-forja' }]), []);
+  assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: 'porque-si' }]), [ENTITY_FAULTS.BAD_HOLE]);
+  assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: OTHER }]), [ENTITY_FAULTS.BAD_HOLE]);
+  assert.deepEqual(codes([{ ...good(), base: BASE_HOLE, base_reason: NO_FORGE }]), []);
 });
 
 test('the CLI (cliEntities and a spawned process) prints the whole registry: one JSON object, ok', () => {

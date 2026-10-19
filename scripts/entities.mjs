@@ -17,7 +17,7 @@ export function readRegistry(root) {
 
 export const humanText = (r) => [
   `entities: ${r.entities.length} (base holes: ${r.baseHoles.length})`,
-  ...r.entities.map((e) => `  ${e.id} [${e.scope}] base=${e.base ?? '-'} forge=${e.forge ?? '-'}`),
+  ...r.entities.map((e) => `  ${e.id} [${e.scope}] base=${e.base === undefined ? 'none' : e.base} forge=${e.forge === undefined ? 'none' : e.forge}`),
 ].join('\n');
 
 export const cliEntities = (argv) => runCommand(argv, { run: ([root = REPO]) => readRegistry(path.resolve(root)), human: humanText });

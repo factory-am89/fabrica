@@ -21,8 +21,9 @@ export const ENTITY_FAULTS = Object.freeze(
 
 export const SCOPES = ['horizontal', 'vertical'];
 export const BASE_HOLE = 'hueco';
-export const HOLE_REASONS = ['sin-forja', 'otro'];
 export const OTHER = 'otro';
+export const NO_FORGE = 'sin-forja';
+export const HOLE_REASONS = [NO_FORGE, OTHER];
 const REQUIRED = ['id', 'name', 'scope', 'term', 'source_of_truth', 'readers'];
 // A source_of_truth that is not a path (the entity has no file of its own).
 export const NO_PATH = 'none';
@@ -32,7 +33,11 @@ const isText = (v) => typeof v === 'string' && v.trim() !== '';
 export function readEntities(root) {
   const file = path.join(root, ENTITIES_FILE);
   if (!existsSync(file)) throw new Error(`${ENTITIES_FILE} not found in ${root}`);
-  return JSON.parse(readFileSync(file, 'utf8'));
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new Error(`${ENTITIES_FILE} in ${root} is not readable JSON`, { cause: e });
+  }
 }
 
 const fault = (code, where, message) => ({ code, where, message });
