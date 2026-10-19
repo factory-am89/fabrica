@@ -1,7 +1,14 @@
 {
-  "v": 1,
-  "class": "C5",
-  "source": "#96",
+  "v": 2,
+  "question": "C5",
+  "sources": [
+    "#96"
+  ],
   "mechanism": "test/admin-leer-plan.test.js",
-  "origin": "constructor"
+  "origin": "constructor",
+  "signal": "machine",
+  "reason": [
+    "caso-unico"
+  ],
+  "escaped": false
 }

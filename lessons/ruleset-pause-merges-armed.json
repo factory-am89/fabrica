@@ -1,7 +1,16 @@
 {
-  "v": 1,
-  "class": "none",
-  "source": "#77",
+  "v": 2,
+  "question": "none",
+  "sources": [
+    "#77",
+    "#20",
+    "#52"
+  ],
   "mechanism": "test/ruleset-never-paused.test.js",
-  "origin": "pablo"
+  "origin": "pablo",
+  "signal": "machine",
+  "reason": [
+    "pregunta-pendiente"
+  ],
+  "escaped": true
 }

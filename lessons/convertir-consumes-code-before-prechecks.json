@@ -1,7 +1,15 @@
 {
-  "v": 1,
-  "class": "none",
-  "source": "#80",
+  "v": 2,
+  "question": "none",
+  "sources": [
+    "#80"
+  ],
   "mechanism": "test/convertir-precheck.test.js",
-  "origin": "constructor"
+  "origin": "constructor",
+  "signal": "machine",
+  "reason": [
+    "pregunta-pendiente",
+    "caso-unico"
+  ],
+  "escaped": false
 }

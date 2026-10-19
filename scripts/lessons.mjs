@@ -1,4 +1,4 @@
-// Reader of the lesson registry (lessons/*.json): counts per class, per mechanism kind and per origin,
+// Reader of the lesson registry (lessons/*.json): counts per question, per signal, per mechanism kind and per origin, and how many escaped to main,
 // and the faults found by the validator in scripts/lib/lessons.mjs. Keys come from the data, not from a list.
 //   node scripts/lessons.mjs [--json] [root]   (root defaults to this repo; output rule and exit codes: scripts/lib/exit.mjs)
 import path from 'node:path';
@@ -23,9 +23,11 @@ export function summarize(root) {
   const good = lessons.filter((l) => !bad.has(`lessons/${l.file}`)).map((l) => JSON.parse(l.text));
   return {
     total: lessons.length,
-    byClass: tally(good.map((d) => d.class)),
+    byQuestion: tally(good.map((d) => d.question)),
+    bySignal: tally(good.map((d) => d.signal)),
     byMechanism: tally(good.map((d) => mechanismKind(d.mechanism))),
     byOrigin: tally(good.map((d) => d.origin)),
+    escaped: good.filter((d) => d.escaped).length,
     faults,
   };
 }
@@ -35,9 +37,11 @@ const lines = (title, counts) => [`${title}:`, ...Object.entries(counts).map(([k
 export function humanText(s) {
   return [
     `lessons: ${s.total}`,
-    ...lines('per class', s.byClass),
+    ...lines('per question', s.byQuestion),
+    ...lines('per signal', s.bySignal),
     ...lines('per mechanism', s.byMechanism),
     ...lines('per origin', s.byOrigin),
+    `escaped to main: ${s.escaped}`,
     ...s.faults.map((f) => `fault ${f.code} ${f.where}: ${f.message}`),
   ].join('\n');
 }
