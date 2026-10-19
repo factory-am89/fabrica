@@ -11,7 +11,8 @@ const REPO = 'o/r';
 const sha = (n) => String(n).repeat(40).slice(0, 40);
 const record = (pr, n, ok) => buildRecord({ repo: REPO, pr, sha: sha(n), standard: 'standards/code.md', veredicto: { ok }, respuestas: { answers: { C5: ok ? 'sí' : 'no' }, invalid: 0 }, run: null });
 const run = (id, pr, n, ok) => ({ id, output: { title: `Veredicto: ${ok ? 'sí' : 'no'}`, text: formatBlock(record(pr, n, ok)) } });
-const pull = (number, created) => ({ number, state: 'open', created_at: created, merged_at: null });
+const pull = (number, created) => ({ number, state: 'open', created_at: created, merged_at: null, head: { ref: `fix/pr-${number}` } });
+const FILES = { 1: ['a.js', 'b.js'], 2: ['c.js'], 3: [] };
 
 // A fake GitHub: PR 1 has two commits (round 1 "no", round 2 "sí"), PR 2 has one, PR 3 is old and has no check-run.
 function fakeGet(calls = []) {
@@ -20,6 +21,8 @@ function fakeGet(calls = []) {
   return async (route) => {
     calls.push(route);
     if (route.startsWith(`repos/${REPO}/pulls?`)) return [pull(2, '2026-10-16T10:00:00Z'), pull(1, '2026-10-15T10:00:00Z'), pull(3, '2026-10-01T10:00:00Z')];
+    const f = route.match(/pulls\/(\d)\/files/);
+    if (f) return FILES[f[1]].map((filename) => ({ filename }));
     const m = route.match(/pulls\/(\d)\/commits/);
     if (m) return commits[m[1]].map((s) => ({ sha: s }));
     const c = route.match(/commits\/([0-9a-f]{40})\/check-runs\?check_name=revisor/);
@@ -47,6 +50,18 @@ test('collect asks for one check-runs page per commit and only the revisor', asy
   assert.ok(checks.every((c) => c.includes('check_name=revisor')));
 });
 
+test('collect keeps the branch (head.ref) and the files of each PR, and does not touch the check-runs', async () => {
+  const { pulls, checkRuns } = await collect({ get: fakeGet(), repo: REPO });
+  assert.deepEqual(pulls.map((p) => [p.number, p.head_ref, p.files]), [[2, 'fix/pr-2', ['c.js']], [1, 'fix/pr-1', ['a.js', 'b.js']], [3, 'fix/pr-3', []]]);
+  assert.equal(checkRuns.length, 3);
+  assert.ok(checkRuns.every((c) => !('files' in c) && !('head_ref' in c)));
+});
+
+test('a PR without head.ref throws instead of being recorded without a branch', async () => {
+  const get = async (route) => (route.includes('/pulls?') ? [{ number: 1, state: 'open', created_at: '2026-10-15T10:00:00Z', merged_at: null }] : []);
+  await assert.rejects(collect({ get, repo: REPO }), /head\.ref/);
+});
+
 test('--since leaves out the PRs created before it', async () => {
   const { pulls } = await collect({ get: fakeGet(), repo: REPO, since: '2026-10-15' });
   assert.deepEqual(pulls.map((p) => p.number), [2, 1]);
@@ -56,6 +71,7 @@ test('--since leaves out the PRs created before it', async () => {
 test('a check-run seen twice is kept once', async () => {
   const get = async (route) => {
     if (route.includes('/pulls?')) return [pull(1, '2026-10-15T10:00:00Z')];
+    if (route.includes('/files?')) return [];
     if (route.includes('/commits?')) return [{ sha: sha(1) }, { sha: sha(2) }];
     return { total_count: 1, check_runs: [run(11, 1, 1, true)] };
   };
@@ -65,6 +81,7 @@ test('a check-run seen twice is kept once', async () => {
 test('a cut check-runs answer throws instead of passing for the whole', async () => {
   const get = async (route) => {
     if (route.includes('/pulls?')) return [pull(1, '2026-10-15T10:00:00Z')];
+    if (route.includes('/files?')) return [];
     if (route.includes('/commits?')) return [{ sha: sha(1) }];
     return { total_count: 150, check_runs: [run(11, 1, 1, true)] };
   };
