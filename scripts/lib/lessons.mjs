@@ -44,7 +44,6 @@ export const NO_QUESTION = 'none';
 export const SIGNAL_MACHINE = 'machine';
 export const SIGNAL_NONE = 'none';
 export const SIGNALS = [SIGNAL_MACHINE, SIGNAL_NONE];
-export const MACHINE_KINDS = ['test', 'hook', 'script'];
 // `reason` is a list of closed values; the valve `otro` needs `reason_note`, and only it does.
 export const REASON_PENDING = 'pregunta-pendiente';
 export const REASON_NO_QUESTION = 'conducta-sin-pregunta';
@@ -52,7 +51,7 @@ export const REASON_SINGLE = 'caso-unico';
 export const REASONS = [REASON_PENDING, REASON_NO_QUESTION, REASON_SINGLE, OTHER];
 // Why a lesson may have no question, and why it may have no machine signal.
 export const NO_QUESTION_REASONS = [REASON_PENDING, REASON_NO_QUESTION];
-export const NO_SIGNAL_REASONS = [REASON_PENDING, REASON_NO_QUESTION, OTHER];
+export const NO_SIGNAL_REASONS = [...NO_QUESTION_REASONS, OTHER];
 const HUMAN_ORIGIN = 'pablo';
 const ID_RE = /^[a-z0-9-]+$/;
 const PR_SOURCE = /^#[1-9]\d*$/;
@@ -63,13 +62,16 @@ const REPEATED = 'repetida: sí';
 const STANDARDS = ['standards/code.md', 'standards/plan.md'];
 
 // What kind of mechanism a repo path is; null when the path is none of the known kinds (then it is a fault).
-const KINDS = [
-  ['test', /^test\/[^/].*$/],
-  ['hook', /^(\.claude\/hooks|\.githooks)\/[^/]+$/],
-  ['skill', /^\.claude\/skills\/[^/]+\/(SKILL\.md|referencias\/[^/]+\.md)$/],
-  ['standard', /^standards\/[^/]+\.md$/],
-  ['script', /^scripts\/[^/].*$/],
+// [kind, path pattern, whether a machine runs it]: the third column is the only place that says which kinds are machines.
+export const KINDS = [
+  ['test', /^test\/[^/].*$/, true],
+  ['hook', /^(\.claude\/hooks|\.githooks)\/[^/]+$/, true],
+  ['skill', /^\.claude\/skills\/[^/]+\/(SKILL\.md|referencias\/[^/]+\.md)$/, false],
+  ['standard', /^standards\/[^/]+\.md$/, false],
+  ['script', /^scripts\/[^/].*$/, true],
 ];
+// Derived from KINDS, never listed again.
+export const MACHINE_KINDS = KINDS.filter(([, , machine]) => machine).map(([kind]) => kind);
 export function mechanismKind(mechanism) {
   if (typeof mechanism !== 'string' || mechanism.split('/').includes('..')) return null;
   return KINDS.find(([, re]) => re.test(mechanism))?.[0] ?? null;

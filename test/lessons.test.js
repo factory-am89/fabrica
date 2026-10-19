@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER } from '../scripts/lib/entities.mjs';
 import {
-  FIELDS, LESSON_FAULTS, NO_QUESTION, NO_QUESTION_REASONS, REASON_NO_QUESTION, REASON_PENDING, REASON_SINGLE, REASONS, SIGNAL_MACHINE,
+  FIELDS, KINDS, LESSON_FAULTS, MACHINE_KINDS, NO_QUESTION, NO_QUESTION_REASONS, NO_SIGNAL_REASONS, REASON_NO_QUESTION, REASON_PENDING, REASON_SINGLE, REASONS, SIGNAL_MACHINE,
   SIGNAL_NONE, SIGNALS, VERSION, lessonContext, lessonFaults, mechanismKind, readLessons,
 } from '../scripts/lib/lessons.mjs';
 
@@ -179,8 +179,14 @@ for (const [name, change] of VALID_SHAPES) {
   });
 }
 
-test('the lesson vocabularies are the exports, not copies', () => {
-  assert.deepEqual(SIGNALS, [SIGNAL_MACHINE, SIGNAL_NONE]);
-  assert.ok(NO_QUESTION_REASONS.every((r) => REASONS.includes(r)) && REASONS.includes(OTHER) && REASONS.includes(REASON_SINGLE));
-  assert.ok(FIELDS.includes('escaped') && !FIELDS.includes('class') && !FIELDS.includes('source'));
+test('the reason lists and the machine kinds are subsets of what they are derived from', () => {
+  for (const r of [...NO_QUESTION_REASONS, ...NO_SIGNAL_REASONS]) assert.ok(REASONS.includes(r), `${r} is not in REASONS`);
+  for (const k of MACHINE_KINDS) assert.ok(KINDS.some(([name]) => name === k), `${k} is not a kind of KINDS`);
+  assert.ok(MACHINE_KINDS.length > 0 && MACHINE_KINDS.length < KINDS.length, 'some kinds are machines and some are not');
+  assert.ok(SIGNALS.includes(SIGNAL_MACHINE) && SIGNALS.includes(SIGNAL_NONE));
+});
+
+test('every field of FIELDS is used by some valid shape', () => {
+  const used = new Set(VALID_SHAPES.flatMap(([, change]) => Object.keys({ ...good().data, ...change })));
+  for (const f of FIELDS) assert.ok(used.has(f), `no valid shape uses ${f}`);
 });

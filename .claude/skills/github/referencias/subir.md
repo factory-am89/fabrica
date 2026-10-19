@@ -27,7 +27,7 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    The constructor App cannot rerun runs: to get a new run, push a new commit (then redo step 2 and the body).
 7. **Revisor says no with no reason.** Ask an independent revisor agent for the reason; do not argue with the verdict.
    Do not rebase without a real conflict: check with `git merge-tree --write-tree HEAD origin/main` (exit 0 = none).
-   A rebase changes the SHAs your body cites, so the body must be redone from step 2. A lesson `source` follows
+   A rebase changes the SHAs your body cites, so the body must be redone from step 2. Each entry of a lesson's `sources` follows
    `PR_SOURCE` in `scripts/lib/lessons.mjs`; do not restate it here.
    A stuck `mergeable_state=dirty` with a clean merge-tree is the one justified rebase.
 8. **Arm the merge** only when `revisor` and `tests` are green: `node scripts/token.mjs -- gh pr merge <n> --auto --squash`.

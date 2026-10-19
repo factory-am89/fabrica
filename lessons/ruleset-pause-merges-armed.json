@@ -2,14 +2,15 @@
   "v": 2,
   "question": "none",
   "sources": [
-    "#77"
+    "#77",
+    "#20",
+    "#52"
   ],
   "mechanism": "test/ruleset-never-paused.test.js",
   "origin": "pablo",
   "signal": "machine",
   "reason": [
-    "pregunta-pendiente",
-    "caso-unico"
+    "pregunta-pendiente"
   ],
   "escaped": true
 }

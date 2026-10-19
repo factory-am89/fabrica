@@ -17,7 +17,7 @@ const entities = () => readEntities(RAIZ);
 const real = () => readFields(RAIZ);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const codes = (fields, discovered) => fieldFaults({ fields }, entities(), RAIZ, discovered).map((f) => f.code);
-// One declared field of the real registry (lesson.class), to build bad cases from.
+// One declared field of the real registry (the second lesson field), to build bad cases from.
 const base = () => clone(real().fields.find((f) => fieldId(f) === `lesson.${LESSON_FIELDS[1]}`));
 const others = () => real().fields.filter((f) => fieldId(f) !== fieldId(base()));
 const withBase = (...mutated) => [...others(), ...mutated];
