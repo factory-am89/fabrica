@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER, readEntities } from '../scripts/lib/entities.mjs';
 import { CAMPOS } from '../scripts/lib/intervention-log.mjs';
-import { FIELDS as LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
+import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FIELDS } from '../scripts/lib/plan.mjs';
 import {
   ATTRIBUTE_KIND, FIELD_FAULTS, FIELD_SOURCES, KEYS, NEW, TEXT, discoveredFields, fieldFaults, fieldId, normalizeName, readFields,
@@ -17,8 +17,10 @@ const entities = () => readEntities(RAIZ);
 const real = () => readFields(RAIZ);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const codes = (fields, discovered) => fieldFaults({ fields }, entities(), RAIZ, discovered).map((f) => f.code);
-// One declared field of the real registry (the second lesson field), to build bad cases from.
-const base = () => clone(real().fields.find((f) => fieldId(f) === `lesson.${LESSON_FIELDS[1]}`));
+// One declared field of the real registry, to build bad cases from: the first lesson field that no other field reuses (`existente`),
+// so changing it breaks nothing else.
+const BASE_NAME = LESSON_FIELDS.find((n) => !real().fields.some((f) => f[KEYS.existing] === `lesson.${n}`));
+const base = () => clone(real().fields.find((f) => fieldId(f) === `lesson.${BASE_NAME}`));
 const others = () => real().fields.filter((f) => fieldId(f) !== fieldId(base()));
 const withBase = (...mutated) => [...others(), ...mutated];
 
@@ -26,15 +28,16 @@ test('the real registry has no fault: every field the sources list is declared, 
   assert.deepEqual(fieldFaults(real(), entities(), RAIZ), []);
 });
 
-test('the sources are the real exports: lesson, intervention and plan names are all discovered', () => {
+test('the sources are the real exports: lesson, no-lesson, intervention and plan names are all discovered', () => {
   const found = discoveredFields(entities()).map((d) => `${d.owner}.${d.name}`);
   const expected = [
     ...LESSON_FIELDS.map((n) => `lesson.${n}`),
+    ...NO_LESSON_FIELDS.map((n) => `no-lesson.${n}`),
     ...CAMPOS.map((n) => `intervention.${n}`),
     ...Object.values(PLAN_FIELDS).map((n) => `plan.${n}`),
   ];
   assert.deepEqual([...found].sort(), expected.sort());
-  assert.deepEqual(Object.keys(FIELD_SOURCES).sort(), ['intervention', 'lesson', 'plan']);
+  assert.deepEqual(Object.keys(FIELD_SOURCES).sort(), ['intervention', 'lesson', 'no-lesson', 'plan']);
 });
 
 test('a source that returns no list or an empty one throws, never «no fields»', () => {
@@ -74,9 +77,9 @@ test('a source naming an id that is not an entity is a fault', () => {
 });
 
 test('a repeated name (lowercase, no accents) is a fault in the same owner, and across owners unless it reuses the other field', () => {
-  const sameOwner = { ...base(), [KEYS.name]: LESSON_FIELDS[1].toUpperCase() };
+  const sameOwner = { ...base(), [KEYS.name]: BASE_NAME.toUpperCase() };
   assert.ok(codes(withBase(base(), sameOwner)).includes(FIELD_FAULTS.DUPLICATE_NAME));
-  const other = { ...base(), [KEYS.owner]: 'plan', [KEYS.kind]: ATTRIBUTE_KIND, [KEYS.parent]: 'plan', [KEYS.name]: LESSON_FIELDS[1].replace(/^./, (c) => c.toUpperCase()) };
+  const other = { ...base(), [KEYS.owner]: 'plan', [KEYS.kind]: ATTRIBUTE_KIND, [KEYS.parent]: 'plan', [KEYS.name]: BASE_NAME.replace(/^./, (c) => c.toUpperCase()) };
   const found = [...discoveredFields(entities()), { owner: 'plan', name: other[KEYS.name] }];
   assert.ok(codes(withBase(base(), { ...other, [KEYS.existing]: NEW, [KEYS.newReason]: 'sin-equivalente' }), found).includes(FIELD_FAULTS.DUPLICATE_NAME));
   assert.deepEqual(codes(withBase(base(), { ...other, [KEYS.existing]: fieldId(base()) }), found).filter((c) => c === FIELD_FAULTS.DUPLICATE_NAME), []);

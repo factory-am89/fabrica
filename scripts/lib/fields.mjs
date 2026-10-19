@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CAMPOS } from './intervention-log.mjs';
-import { FIELDS as LESSON_FIELDS } from './lessons.mjs';
+import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from './lessons.mjs';
 import { PLAN_FIELDS } from './plan.mjs';
 import { NO_PATH, OTHER } from './entities.mjs';
 
@@ -63,6 +63,7 @@ export const TEXT_REASONS = ['prosa-juzgada', OTHER];
 // Where each entity's fields are listed in code. Keys are entity ids of entities.json; values return the field names.
 export const FIELD_SOURCES = Object.freeze({
   lesson: () => LESSON_FIELDS,
+  'no-lesson': () => NO_LESSON_FIELDS,
   intervention: () => CAMPOS,
   plan: () => Object.values(PLAN_FIELDS),
 });

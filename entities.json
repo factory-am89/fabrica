@@ -16,6 +16,12 @@
       "forge": "scripts/lib/lessons.mjs"
     },
     {
+      "id": "no-lesson", "name": "«No» sin lección", "scope": "horizontal", "term": "«no» sin lección",
+      "source_of_truth": "no-lesson.json",
+      "readers": ["scripts/lib/lessons.mjs", "test/lessons.test.js"],
+      "base": "hueco", "base_reason": "otro", "base_note": "su forja es noLessonFaults, en scripts/lib/lessons.mjs, que ya es la forja de la entidad lesson; no se repite aquí porque scripts/adopted.mjs cuenta cada ruta de forja y daría dos fallos por un mismo fichero. Falta escribir su base"
+    },
+    {
       "id": "review-record", "name": "Registro del revisor", "scope": "horizontal", "term": "registro del revisor",
       "source_of_truth": "none",
       "readers": ["scripts/lib/record.mjs", "scripts/records.mjs"],

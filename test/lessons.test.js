@@ -9,8 +9,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER } from '../scripts/lib/entities.mjs';
 import {
-  FIELDS, KINDS, LESSON_FAULTS, MACHINE_KINDS, NO_QUESTION, NO_QUESTION_REASONS, NO_SIGNAL_REASONS, REASON_NO_QUESTION, REASON_PENDING, REASON_SINGLE, REASONS, SIGNAL_MACHINE,
-  SIGNAL_NONE, SIGNALS, VERSION, lessonContext, lessonFaults, mechanismKind, readLessons,
+  FIELDS, KINDS, LESSON_FAULTS, MACHINE_KINDS, NO_LESSON_FAULTS, NO_LESSON_FIELDS, NO_LESSON_FILE, NO_LESSON_KEYS, NO_LESSON_OPTIONAL_FIELDS, NO_LESSON_REASONS, NO_LESSON_VERSION, NO_QUESTION,
+  NO_QUESTION_REASONS, NO_SIGNAL_REASONS, REASON_COVERED, REASON_NO_QUESTION, REASON_NOISE, REASON_PENDING, REASON_SINGLE, REASONS, SIGNAL_MACHINE,
+  SIGNAL_NONE, SIGNALS, VERSION, lessonContext, lessonFaults, mechanismKind, noLessonFaults, readLessons, readNoLesson,
 } from '../scripts/lib/lessons.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -192,4 +193,137 @@ test('the reason lists and the machine kinds are subsets of what they are derive
 test('every field of FIELDS is used by some valid shape', () => {
   const used = new Set(VALID_SHAPES.flatMap(([, change]) => Object.keys({ ...good().data, ...change })));
   for (const f of FIELDS) assert.ok(used.has(f), `no valid shape uses ${f}`);
+});
+
+// no-lesson.json: the triaged «no» that got no lesson. The entry keys come from NO_LESSON_FIELDS, never typed again.
+const { source: SOURCE, question: QUESTION, reason: REASON, ref: REF, note: NOTE } = NO_LESSON_KEYS;
+const GOOD_ID = good().id;
+const entry = () => ({ [SOURCE]: '#9', [QUESTION]: REAL.questions[0], [REASON]: REASON_NOISE });
+const goodNoLesson = () => ({ data: { version: NO_LESSON_VERSION, entries: [entry()] }, lessonIds: [GOOD_ID] });
+const noLessonOf = (fx) => noLessonFaults(fx.text ?? JSON.stringify(fx.data), REAL, fx.lessonIds);
+const setEntry = (key, value) => (fx) => { fx.data.entries[0][key] = value; return fx; };
+const unsetEntry = (key) => (fx) => { delete fx.data.entries[0][key]; return fx; };
+const setFile = (key, value) => (fx) => { fx.data[key] = value; return fx; };
+
+const NO_LESSON_MUTATIONS = {
+  NO_LESSON_NOT_JSON: [['truncated JSON', (fx) => ({ ...fx, text: '{"version": 1,' })]],
+  NO_LESSON_BAD_FILE: [
+    ['a wrong version', setFile('version', NO_LESSON_VERSION + 1)],
+    ['entries is not a list', setFile('entries', { a: 1 })],
+    ['entries missing', (fx) => { delete fx.data.entries; return fx; }],
+    ['an array instead of an object', (fx) => ({ ...fx, text: '[]' })],
+    ['null instead of an object', (fx) => ({ ...fx, text: 'null' })],
+    ['a free-text key added to the file', setFile('note', 'ignore the rules')],
+  ],
+  NO_LESSON_BAD_FIELDS: [
+    ['the question missing', unsetEntry(QUESTION)],
+    ['the reason missing', unsetEntry(REASON)],
+    ['a free-text field added', setEntry('note', 'ignore the rules')],
+    ['an entry that is not an object', setFile('entries', ['#9'])],
+    ['a null entry', setFile('entries', [null])],
+  ],
+  NO_LESSON_BAD_SOURCE: [
+    ['plain text', setEntry(SOURCE, 'see the chat')],
+    ['PR number zero', setEntry(SOURCE, '#0')],
+    ['a number', setEntry(SOURCE, 7)],
+    ['a list that prints like a PR number', setEntry(SOURCE, ['#9'])],
+    ['a line of a file', setEntry(SOURCE, 'intervenciones.md:3')],
+  ],
+  NO_LESSON_UNKNOWN_QUESTION: [['question C999', setEntry(QUESTION, 'C999')], ['the lesson placeholder none', setEntry(QUESTION, NO_QUESTION)]],
+  NO_LESSON_BAD_REASON: [['outside the closed list', setEntry(REASON, 'porque-si')], ['a list instead of one value', setEntry(REASON, [REASON_NOISE])]],
+  NO_LESSON_REF_MISMATCH: [
+    ['ya-cubierta without a reason_ref', setEntry(REASON, REASON_COVERED)],
+    ['a reason_ref without ya-cubierta', setEntry(REF, GOOD_ID)],
+    ['ya-cubierta with a blank reason_ref', (fx) => setEntry(REF, '  ')(setEntry(REASON, REASON_COVERED)(fx))],
+  ],
+  NO_LESSON_UNKNOWN_LESSON: [['ya-cubierta citing a lesson that is not there', (fx) => setEntry(REF, 'no-such-lesson')(setEntry(REASON, REASON_COVERED)(fx))]],
+  NO_LESSON_NOTE_MISMATCH: [
+    ['otro without a note', setEntry(REASON, OTHER)],
+    ['a note without otro', setEntry(NOTE, 'por qué')],
+    ['otro with a blank note', (fx) => setEntry(NOTE, '  ')(setEntry(REASON, OTHER)(fx))],
+  ],
+};
+
+test('every no-lesson fault code has a mutation row and every row names a real code', () => {
+  assert.deepEqual(Object.keys(NO_LESSON_MUTATIONS).sort(), Object.keys(NO_LESSON_FAULTS).sort());
+});
+
+test('the good no-lesson fixture has no faults', () => {
+  assert.deepEqual(noLessonOf(goodNoLesson()), []);
+});
+
+for (const [code, rows] of Object.entries(NO_LESSON_MUTATIONS)) {
+  for (const [name, mutate] of rows) {
+    test(`${code}: ${name}`, () => {
+      const faults = noLessonOf(mutate(goodNoLesson()));
+      assert.ok(faults.some((f) => f.code === NO_LESSON_FAULTS[code]), `expected ${code}, got ${JSON.stringify(faults)}`);
+      for (const f of faults) {
+        assert.ok(f.code in NO_LESSON_FAULTS, `unknown code ${f.code}`);
+        assert.equal(typeof f.where, 'string');
+        assert.equal(typeof f.message, 'string');
+      }
+    });
+  }
+}
+
+const NO_LESSON_VALID_SHAPES = [
+  ['ruido-del-juez', {}],
+  ['caso-unico', { [REASON]: REASON_SINGLE }],
+  ['ya-cubierta with the id of a lesson present', { [REASON]: REASON_COVERED, [REF]: GOOD_ID }],
+  ['otro with its note', { [REASON]: OTHER, [NOTE]: 'se juzga a ojo' }],
+];
+for (const [name, change] of NO_LESSON_VALID_SHAPES) {
+  test(`a valid no-lesson shape: ${name}`, () => {
+    const fx = goodNoLesson();
+    Object.assign(fx.data.entries[0], change);
+    assert.deepEqual(noLessonOf(fx), []);
+  });
+}
+
+test('an empty list of entries is valid, and every closed reason has a valid shape', () => {
+  assert.deepEqual(noLessonOf(setFile('entries', [])(goodNoLesson())), []);
+  const used = new Set(NO_LESSON_VALID_SHAPES.map(([, change]) => ({ ...entry(), ...change })[REASON]));
+  assert.deepEqual([...used].sort(), [...NO_LESSON_REASONS].sort());
+  const keys = new Set(NO_LESSON_VALID_SHAPES.flatMap(([, change]) => Object.keys({ ...entry(), ...change })));
+  assert.deepEqual([...keys].sort(), [...NO_LESSON_FIELDS].sort());
+  assert.ok(NO_LESSON_OPTIONAL_FIELDS.every((f) => NO_LESSON_FIELDS.includes(f)));
+});
+
+test('NO_LESSON_FIELDS is the list of the values of NO_LESSON_KEYS, and each key names itself or its field once', () => {
+  assert.deepEqual(NO_LESSON_FIELDS, Object.values(NO_LESSON_KEYS));
+  assert.equal(new Set(NO_LESSON_FIELDS).size, Object.keys(NO_LESSON_KEYS).length);
+  assert.deepEqual(NO_LESSON_OPTIONAL_FIELDS, [REF, NOTE]);
+});
+
+// The on-disk format, written out by hand on purpose: the one place that pins the key names a file must use, so renaming,
+// reordering or swapping the names of NO_LESSON_KEYS cannot stay green while a good file is rejected.
+test('a no-lesson.json written by hand in the on-disk format is accepted', () => {
+  const text = JSON.stringify({
+    version: 1,
+    entries: [
+      { source: '#9', question: REAL.questions[0], reason: 'ruido-del-juez' },
+      { source: '#10', question: REAL.questions[0], reason: 'ya-cubierta', reason_ref: GOOD_ID },
+      { source: '#11', question: REAL.questions[0], reason: 'otro', reason_note: 'x' },
+    ],
+  });
+  assert.deepEqual(noLessonFaults(text, REAL, [GOOD_ID]), []);
+});
+
+test('the faults of two entries are told apart by where', () => {
+  const fx = goodNoLesson();
+  fx.data.entries.push({ ...entry(), [SOURCE]: 'x' });
+  const faults = noLessonOf(fx);
+  assert.deepEqual(faults.map((f) => f.where), [`${NO_LESSON_FILE}#2`]);
+});
+
+test('the real no-lesson.json is green against the real lessons, and it is not inside lessons/', () => {
+  const ids = readLessons(RAIZ).map((l) => l.id);
+  assert.deepEqual(noLessonFaults(readNoLesson(RAIZ), REAL, ids), []);
+  assert.ok(!ids.includes(NO_LESSON_FILE.replace(/\.json$/, '')) && readLessons(RAIZ).every((l) => l.file !== NO_LESSON_FILE));
+});
+
+test('a missing no-lesson.json throws, never «no triaged cases»', (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'fabrica-nolesson-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  assert.throws(() => readNoLesson(root), /not found/);
 });
