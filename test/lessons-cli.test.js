@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXIT } from '../scripts/lib/exit.mjs';
-import { lessonContext, mechanismKind } from '../scripts/lib/lessons.mjs';
+import { NO_QUESTION, REASON_PENDING, REASON_SINGLE, SIGNAL_MACHINE, VERSION, lessonContext, mechanismKind } from '../scripts/lib/lessons.mjs';
 import { cliLessons } from '../scripts/lessons.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,19 +28,22 @@ function fixtureRoot(t, lessons) {
   }
   return root;
 }
-const lesson = (over) => ({ v: 1, class: REAL.classes[0], source: '#2', mechanism: 'test/a.test.js', origin: REAL.origins[0], ...over });
+const lesson = (over) => ({
+  v: VERSION, question: REAL.questions[0], sources: ['#2', '#3'], mechanism: 'test/a.test.js', origin: REAL.origins[0], signal: SIGNAL_MACHINE, escaped: false, ...over,
+});
 
 const THREE = () => ({
   one: lesson({ mechanism: 'test/a.test.js' }),
   two: lesson({ mechanism: 'test/b.test.js', origin: REAL.origins[1] }),
-  three: lesson({ mechanism: 'test/c.test.js', class: 'none' }),
+  three: lesson({ mechanism: 'test/c.test.js', question: NO_QUESTION, reason: [REASON_PENDING], escaped: true }),
 });
 
 test('good case: exit OK, human text names the counts', (t) => {
   const r = cliLessons([fixtureRoot(t, THREE())]);
   assert.equal(r.code, EXIT.OK);
   assert.match(r.stdout, /lessons: 3/);
-  assert.match(r.stdout, new RegExp(`${REAL.classes[0]}: 2`));
+  assert.match(r.stdout, new RegExp(`${REAL.questions[0]}: 2`));
+  assert.match(r.stdout, /escaped to main: 1/);
   assert.match(r.stdout, /test: 3/);
 });
 
@@ -55,10 +58,20 @@ test('--json: stdout is exactly one parseable object and its counts match the fi
   const d = JSON.parse(r.stdout);
   assert.equal(d.ok, true);
   assert.equal(d.total, 3);
-  assert.deepEqual(d.byClass, { [REAL.classes[0]]: 2, none: 1 });
+  assert.deepEqual(d.byQuestion, { [REAL.questions[0]]: 2, [NO_QUESTION]: 1 });
+  assert.deepEqual(d.bySignal, { [SIGNAL_MACHINE]: 3 });
+  assert.equal(d.escaped, 1);
   assert.deepEqual(d.byMechanism, { [mechanismKind('test/a.test.js')]: 3 });
   assert.deepEqual(d.byOrigin, { [REAL.origins[0]]: 2, [REAL.origins[1]]: 1 });
   assert.deepEqual(d.faults, []);
+});
+
+test('a one-case lesson without caso-unico is refused by the CLI and accepted with it', (t) => {
+  const bad = cliLessons(['--json', fixtureRoot(t, { ...THREE(), solo: lesson({ mechanism: 'test/d.test.js', sources: ['#2'] }) })]);
+  assert.equal(bad.code, EXIT.LESSON_FAULTS);
+  assert.deepEqual(JSON.parse(bad.stdout).faults.map((f) => f.code), ['SINGLE_CASE_WITHOUT_REASON']);
+  const ok = cliLessons(['--json', fixtureRoot(t, { ...THREE(), solo: lesson({ mechanism: 'test/d.test.js', sources: ['#2'], reason: [REASON_SINGLE] }) })]);
+  assert.equal(ok.code, EXIT.OK);
 });
 
 test('a bad lesson: the lessons exit code, the fault code listed, human and json', (t) => {
@@ -73,5 +86,5 @@ test('a bad lesson: the lessons exit code, the fault code listed, human and json
   assert.equal(d.exit, EXIT.LESSON_FAULTS);
   assert.deepEqual(d.faults.map((f) => f.code), ['NOT_JSON']);
   assert.equal(d.total, 4);
-  assert.equal(Object.values(d.byClass).reduce((a, b) => a + b, 0), 3, 'the faulty lesson is not counted');
+  assert.equal(Object.values(d.byQuestion).reduce((a, b) => a + b, 0), 3, 'the faulty lesson is not counted');
 });

@@ -74,10 +74,10 @@ test('a source naming an id that is not an entity is a fault', () => {
 });
 
 test('a repeated name (lowercase, no accents) is a fault in the same owner, and across owners unless it reuses the other field', () => {
-  const sameOwner = { ...base(), [KEYS.name]: 'CLASS' };
+  const sameOwner = { ...base(), [KEYS.name]: LESSON_FIELDS[1].toUpperCase() };
   assert.ok(codes(withBase(base(), sameOwner)).includes(FIELD_FAULTS.DUPLICATE_NAME));
-  const other = { ...base(), [KEYS.owner]: 'plan', [KEYS.kind]: ATTRIBUTE_KIND, [KEYS.parent]: 'plan', [KEYS.name]: 'Class' };
-  const found = [...discoveredFields(entities()), { owner: 'plan', name: 'Class' }];
+  const other = { ...base(), [KEYS.owner]: 'plan', [KEYS.kind]: ATTRIBUTE_KIND, [KEYS.parent]: 'plan', [KEYS.name]: LESSON_FIELDS[1].replace(/^./, (c) => c.toUpperCase()) };
+  const found = [...discoveredFields(entities()), { owner: 'plan', name: other[KEYS.name] }];
   assert.ok(codes(withBase(base(), { ...other, [KEYS.existing]: NEW, [KEYS.newReason]: 'sin-equivalente' }), found).includes(FIELD_FAULTS.DUPLICATE_NAME));
   assert.deepEqual(codes(withBase(base(), { ...other, [KEYS.existing]: fieldId(base()) }), found).filter((c) => c === FIELD_FAULTS.DUPLICATE_NAME), []);
 });
