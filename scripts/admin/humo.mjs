@@ -12,7 +12,8 @@
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ALLOWED_CALLS, parseProject, planProject } from './proyecto.mjs';
-import { API, loadTemplates, makeApi, readState } from './leer-plan.mjs';
+import { loadTemplates, makeApi, readState } from './leer-plan.mjs';
+import { makeWriteApi } from './secretos.mjs';
 
 export const SMOKE_OPS = ['create-ref', 'put-file', 'open-pr', 'arm-auto-merge'];
 const MAX_ROUNDS = 4; // create-ref + file + PR, then arm, then nothing: three rounds at most in practice
@@ -30,28 +31,13 @@ export function assertAllowed(call) {
 
 const AUTO_MERGE = 'mutation($id: ID!, $method: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) { pullRequest { number } } }';
 
-// The only door that writes. REST calls go as planned; the GraphQL one is built from the plan's description of it. GitHub answers a
-// failed GraphQL mutation with status 200 and an `errors` list, so that list is read. An error carries method, path, status
-// and, for GraphQL, the first message GitHub gave; never a request body.
+// The only door that writes is makeWriteApi (secretos.mjs), with this file's own list of allowed calls. The plan describes the auto-merge in
+// words; here it becomes the GraphQL request. makeWriteApi reads the `errors` of a GraphQL answer.
 export function makeHumoApi(token, fetchFn = fetch, check = assertAllowed) {
-  return async function writeApi(call) {
-    check(call);
-    const graphql = call.op === 'arm-auto-merge';
-    const body = graphql ? { query: AUTO_MERGE, variables: { id: call.body.pullRequestId, method: call.body.mergeMethod } } : call.body;
-    const res = await fetchFn(`${API}${call.path}`, {
-      method: call.method,
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`${call.method} ${call.path} -> ${res.status}`);
-    if (!graphql) return res.status;
-    const answer = await res.json().catch(() => null);
-    if (!answer) throw new Error(`${call.method} ${call.path} -> ${res.status}, la respuesta no es JSON`);
-    if (Array.isArray(answer.errors) && answer.errors.length > 0) {
-      throw new Error(`${call.method} ${call.path} -> ${res.status} con errors: ${String(answer.errors[0]?.message).slice(0, 200)}`);
-    }
-    return res.status;
-  };
+  const write = makeWriteApi(token, fetchFn, check);
+  return (call) => write(call, call.op === 'arm-auto-merge'
+    ? { query: AUTO_MERGE, variables: { id: call.body.pullRequestId, method: call.body.mergeMethod } }
+    : call.body);
 }
 
 const describe = (c) => `${c.op} ${c.path}`;

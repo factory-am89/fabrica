@@ -47,6 +47,12 @@ export function makeWriteApi(token, fetchFn = fetch, check = assertAllowed) {
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${call.method} ${call.path} -> ${res.status}`);
+    // GraphQL answers a failed mutation with status 200 and an `errors` list: say the first message GitHub gave, nothing of the request.
+    if (call.path === '/graphql') {
+      const answer = await res.json().catch(() => null);
+      if (!answer) throw new Error(`${call.method} ${call.path} -> ${res.status}, la respuesta no es JSON`);
+      if (Array.isArray(answer.errors) && answer.errors.length > 0) throw new Error(`${call.method} ${call.path} -> ${res.status} con errors: ${String(answer.errors[0]?.message).slice(0, 200)}`);
+    }
     return res.status;
   };
 }

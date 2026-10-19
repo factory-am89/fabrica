@@ -183,6 +183,10 @@ test('the reading token does not ask for administration (it showed nothing the p
 test('red by mutation: a wider token, an if, an order change or a shared token on the workflow are detected', () => {
   const real = readFileSync(path.join(RAIZ, WORKFLOW), 'utf8');
   const cambia = (de, a) => { const r = real.replace(de, a); assert.notEqual(r, real, `mutation anchor not found: ${de}`); return r; };
+  const bloque = real.match(/ {6}# Trozo 7\. Va DESPUES[\s\S]*?(?= {6}# La rama ops)/)[0];
+  const delante = real.replace(bloque, '').replace('      - run: node scripts/admin/aplicar.mjs', () => bloque + '      - run: node scripts/admin/aplicar.mjs');
+  assert.notEqual(delante, real);
+  assert.match(reglaDeHumo(delante).join('\n'), /order must be/);
   assert.match(reglaDeHumo(cambia('permission-pull-requests: write', 'permission-pull-requests: write\n          permission-workflows: write')).join('\n'), /exactly/);
   assert.match(reglaDeHumo(cambia('      - id: humo\n', '      - id: humo\n        if: always()\n')).join('\n'), /no if/);
   assert.match(reglaDeHumo(cambia('      - run: node scripts/admin/humo.mjs', '      - continue-on-error: true\n        run: node scripts/admin/humo.mjs')).join('\n'), /continue-on-error/);
