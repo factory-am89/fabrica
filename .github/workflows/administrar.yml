@@ -9,6 +9,7 @@ name: administrar
 #   escritura administration: write (crear el environment y su politica de ramas) y environments: write (clave publica y
 #             secretos del environment; la tabla de permisos de GitHub pide `environments`, no `secrets`), metadata: read.
 # Trozo 4: leer-plan.mjs imprime en el resumen lo que le falta a cada repo de proyectos/ y solo envia GET.
+# Trozo 8: crear.mjs (token de escritura, el mismo del paso de secretos) crea los repos nuevos antes de todo lo demas.
 # Trozo 5: secretos.mjs escribe el environment `revisor` y sus tres secretos (cifrados) y nada mas del plan.
 # Trozo 6: aplicar.mjs (paso `aplicar`: token con administration, contents y workflows en write) ajusta, sube los ficheros a main y
 #          crea o completa el ruleset; solo corre si el paso de secretos acabo bien.
@@ -79,6 +80,15 @@ jobs:
           permission-administration: write
           permission-environments: write
           permission-metadata: read
+
+      # Trozo 8. Crea los repos de proyectos/ que aun no existen (crear.mjs, auto_init: nace con un primer commit en main). Va ANTES de los secretos, que
+      # exigen el repo, y SIN `if` ni continue-on-error: si crear falla, no se escribe nada mas. Usa el token de escritura de arriba tal cual: GitHub documenta
+      # `administration: write` para POST /orgs/{org}/repos (tabla de permisos server-to-server), asi que no se anade ningun permiso. test/admin-crear.test.js lo vigila.
+      - id: crear
+        run: node scripts/admin/crear.mjs 2>&1 | tee -a "$RUNNER_TEMP/administrar.log"
+        env:
+          GH_TOKEN_LECTURA: ${{ steps.lectura.outputs.token }}
+          GH_TOKEN_ESCRITURA: ${{ steps.escritura.outputs.token }}
 
       # Escribe el environment `revisor` (solo main) y sus tres secretos cifrados en cada repo de proyectos/.
       - id: secretos

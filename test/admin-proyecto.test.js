@@ -22,8 +22,9 @@ const TEMPLATES = {
   'revisor.yml': leer(PLANTILLAS, 'revisor.yml'),
   'CLAUDE.md': leer(PLANTILLAS, 'CLAUDE.md'),
   'ficha.json': leer(PLANTILLAS, 'ficha.json'),
-  'package.json': '{"name":"__NOMBRE__","private":true,"scripts":{"test":"node --test"}}\n',
-  'package-lock.json': '{"name":"__NOMBRE__","lockfileVersion":3,"packages":{}}\n',
+  'package.json': leer(PLANTILLAS, 'package.json'),
+  'package-lock.json': leer(PLANTILLAS, 'package-lock.json'),
+  'arranque.test.js.txt': leer(PLANTILLAS, 'arranque.test.js.txt'),
 };
 const REVISOR_APP_ID = 1234567;
 const PROJECT = { repo: 'factory-am89/demo', visibilidad: 'publico', descripcion: 'Proyecto de prueba' };
@@ -72,7 +73,7 @@ test('new repo: creates it public, then files, settings, environment, secrets, r
   const calls = plan(nuevo());
   assert.deepEqual(ops(calls), [
     'create-repo',
-    'put-file', 'put-file', 'put-file', 'put-file', 'put-file', // tests.yml, revisor.yml, CLAUDE.md, package.json, package-lock.json
+    'put-file', 'put-file', 'put-file', 'put-file', 'put-file', 'put-file', // tests.yml, revisor.yml, CLAUDE.md, package.json, package-lock.json, test/arranque.test.js
     'update-settings', 'put-environment', 'add-branch-policy',
     'put-secret', 'put-secret', 'put-secret',
     'create-ruleset',
@@ -81,20 +82,37 @@ test('new repo: creates it public, then files, settings, environment, secrets, r
   const crear = calls[0];
   assert.equal(crear.method, 'POST');
   assert.equal(crear.path, `/orgs/${ORG}/repos`);
-  assert.deepEqual(crear.body, { name: 'demo', description: 'Proyecto de prueba', private: false });
+  assert.deepEqual(crear.body, { name: 'demo', description: 'Proyecto de prueba', private: false, auto_init: true });
   const puts = calls.filter((c) => c.op === 'put-file');
-  assert.deepEqual(puts.slice(0, 5).map((c) => c.path.split('/contents/')[1]), [...WORKFLOWS_Y_CLAUDE, 'package.json', 'package-lock.json']);
+  assert.deepEqual(puts.slice(0, 6).map((c) => c.path.split('/contents/')[1]), [...WORKFLOWS_Y_CLAUDE, 'package.json', 'package-lock.json', 'test/arranque.test.js']);
   const claude = Buffer.from(puts[2].body.content, 'base64').toString('utf8');
   assert.match(claude, /^# demo$/m, 'the template placeholders are filled in');
   assert.ok(!/__REPO__|__NOMBRE__/.test(claude));
   assert.equal(puts[2].body.branch, 'main');
-  const ficha = JSON.parse(Buffer.from(puts[5].body.content, 'base64').toString('utf8'));
+  const ficha = JSON.parse(Buffer.from(puts[6].body.content, 'base64').toString('utf8'));
   assert.equal(ficha.repo, 'factory-am89/demo', '.fabrica.json goes in the smoke PR, never straight to main');
-  assert.equal(puts[5].body.branch, 'ops/fabrica-ficha');
+  assert.equal(puts[6].body.branch, 'ops/fabrica-ficha');
   assert.deepEqual(calls.filter((c) => c.op === 'put-secret').map((c) => c.path.split('/').pop()), [...REVISOR_SECRETS]);
   const regla = calls.find((c) => c.op === 'create-ruleset');
   assert.deepEqual(regla.body, rulesetBody({ revisorAppId: REVISOR_APP_ID }));
   assert.equal(calls.find((c) => c.op === 'create-ref').body.sha, 'a'.repeat(40));
+});
+
+test('the real state of a repo that does not exist has no sha of main: the plan still works and leaves the smoke PR for the next reading', () => {
+  const real = { ...nuevo(), mainSha: null };
+  const orden = ops(plan(real));
+  assert.equal(orden[0], 'create-repo');
+  assert.ok(orden.includes('create-ruleset'));
+  assert.ok(!orden.includes('create-ref') && !orden.includes('open-pr'), 'no sha, no branch for the smoke PR yet');
+  assert.throws(() => plan({ ...nuevo(), mainSha: 'abc' }), /estado\.mainSha/, 'a sha that is not 40 characters is still refused');
+});
+
+test('a repo GitHub just created with auto_init (only its README) still gets the package files and the start test; one with anything else does not', () => {
+  const recienCreado = { ...nuevo(), repo: { private: false, allow_auto_merge: false, delete_branch_on_merge: false }, files: ['README.md'] };
+  const subidos = (state) => plan(state).filter((c) => c.op === 'put-file' && c.body.branch === 'main').map((c) => c.path.split('/contents/')[1]);
+  assert.deepEqual(subidos(recienCreado), [...WORKFLOWS_Y_CLAUDE, 'package.json', 'package-lock.json', 'test/arranque.test.js']);
+  assert.deepEqual(subidos({ ...recienCreado, files: ['README.md', 'index.js'] }), WORKFLOWS_Y_CLAUDE, 'a repo with code of its own keeps its package files');
+  assert.ok(!ops(plan(recienCreado)).includes('create-repo'), 'the repo exists now');
 });
 
 test('existing unprotected repo (homenu-panel): adopts it, creates nothing, writes only what is missing', () => {
