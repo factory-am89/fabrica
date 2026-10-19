@@ -1,0 +1,9 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+// Test de arranque: existe para que `tests / tests` (el check que exige el ruleset de main) pueda pasar
+// en un proyecto vacio, porque el lint de la Fabrica no acepta un repo sin ningun fichero JavaScript.
+// Borralo cuando el proyecto tenga sus propios tests.
+test('el proyecto arranca', () => {
+  assert.ok(true);
+});

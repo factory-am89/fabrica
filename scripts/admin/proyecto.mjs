@@ -17,13 +17,15 @@ export const REVISOR_ENV = 'revisor';
 export const FICHA = '.fabrica.json';
 
 // Files left straight on `main` BEFORE protecting it (a PR cannot be judged in a repo with no reviewer yet).
-// `soloVacio`: only for an empty repo, which `tests.yml` needs to run. `.fabrica.json` is not here: it is the smoke PR.
+// `soloVacio`: only for a repo with no project of its own yet (see isEmpty), which `tests.yml` needs to run: the package files, and a test file because the
+// Factory lint stops with «all files are ignored» on a repo with no JavaScript file (test/admin-crear.test.js proves it). `.fabrica.json` is not here: it is the smoke PR.
 export const PROJECT_FILES = [
   { path: '.github/workflows/tests.yml', template: 'tests.yml' },
   { path: '.github/workflows/revisor.yml', template: 'revisor.yml' },
   { path: 'CLAUDE.md', template: 'CLAUDE.md' },
   { path: 'package.json', template: 'package.json', soloVacio: true },
   { path: 'package-lock.json', template: 'package-lock.json', soloVacio: true },
+  { path: 'test/arranque.test.js', template: 'arranque.test.js.txt', soloVacio: true },
 ];
 // Every template planProject can ask for: the ones above plus the smoke PR's.
 export const FICHA_TEMPLATE = 'ficha.json';
@@ -148,8 +150,12 @@ function templateText(templates, name) {
   return t;
 }
 
+// A repo with nothing but the README GitHub writes on creation (auto_init) has no project of its own yet; one with any other file does, and its
+// package files are left alone.
+const isEmpty = (files) => files.every((f) => f === 'README.md');
+
 function fileCalls(project, state, templates) {
-  const vacio = state.files.length === 0;
+  const vacio = isEmpty(state.files);
   return PROJECT_FILES.filter((f) => (!f.soloVacio || vacio) && !state.files.includes(f.path)).map((f) => call(
     'put-file', 'PUT', `/repos/${project.repo}/contents/${f.path}`,
     { message: `Fabrica: ${f.path}`, content: b64(render(templateText(templates, f.template), project)), branch: 'main' },
@@ -191,6 +197,9 @@ function smokeCalls(project, state, templates) {
   if (pr) return pr.autoMerge ? [] : [call('arm-auto-merge', 'POST', '/graphql', { operation: 'enablePullRequestAutoMerge', pullRequestId: pr.nodeId, mergeMethod: 'SQUASH' })];
   const out = [];
   if (!branchExists) {
+    // A repo with no commit on main (about to be created, or just created and empty) has no sha to branch from: the files go to main first and the
+    // next reading of the real state, which humo.mjs makes, has it. «No sha yet» is not an error; a sha that is not 40 characters is.
+    if (state.mainSha === null) return [];
     if (typeof state.mainSha !== 'string' || state.mainSha.length !== 40) fail('estado.mainSha: hace falta el sha de main para abrir la rama del PR de humo');
     out.push(call('create-ref', 'POST', `/repos/${r}/git/refs`, { ref: `refs/heads/${SMOKE_BRANCH}`, sha: state.mainSha }));
   }
@@ -216,7 +225,7 @@ export function planProject(project, state, templates) {
   checkState(state);
   if (state.repo?.private) fail(`${project.repo} es privado: ${PRIVATE_MSG}`);
   const out = [];
-  if (!state.repo) out.push(call('create-repo', 'POST', `/orgs/${ORG}/repos`, { name: project.name, description: project.descripcion, private: false }));
+  if (!state.repo) out.push(call('create-repo', 'POST', `/orgs/${ORG}/repos`, { name: project.name, description: project.descripcion, private: false, auto_init: true }));
   out.push(...fileCalls(project, state, templates));
   // Only a visible false asks for the PATCH; null (not visible to this token) is neither asked for nor assumed to be on.
   if (!state.repo || state.repo.allow_auto_merge === false || state.repo.delete_branch_on_merge === false) {
