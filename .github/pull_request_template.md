@@ -12,7 +12,7 @@
 
 ## Decisions
 
-<!-- Write "None", or one line per decision: "- principio <n> | eligió: <x> | descartó: <y> | motivo: <class of the closed list in standards/intervention.md> o decidido"; an exception: "- excepción a principio <n> | motivo: <text> | coste: <text>". -->
+<!-- Write "None", or one line per decision: "- principio <n> | eligió: <x> | descartó: <y> | motivo: <class> o decidido" (<class> is a class of the closed list in standards/intervention.md); an exception: "- excepción a principio <n> | motivo: <text> | coste: <text>". -->
 
 ## Not verified
 

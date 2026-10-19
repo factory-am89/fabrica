@@ -1,11 +1,11 @@
 // What a PR body must contain. SECTIONS is the single definition; the template and the checks derive from it.
-import { decisionFaults } from './decision.mjs';
+import { decisionFaults, FORMS, CLASS_PLACEHOLDER } from './decision.mjs';
 
 export const SECTIONS = [
   { name: 'What changes', needs: 'always', hint: 'What this PR changes and why, in a few lines.' },
   { name: 'Evidence', needs: 'always', hint: 'Paste the output of `npm run evidence` (add `-- --focus <testfile>` for your tests); other claims need their command and output in a code block.' },
   { name: 'Red before', needs: 'tests', hint: 'How each new test was seen failing before the change (command and output). Required when a file under test/ changes.' },
-  { name: 'Decisions', needs: 'always', hint: 'Write "None", or one line per decision: "- principio <n> | eligió: <x> | descartó: <y> | motivo: <class of the closed list in standards/intervention.md> o decidido"; an exception: "- excepción a principio <n> | motivo: <text> | coste: <text>".' },
+  { name: 'Decisions', needs: 'always', hint: `Write "None", or one line per decision: "${FORMS.decision}" (${CLASS_PLACEHOLDER} is a class of the closed list in standards/intervention.md); an exception: "${FORMS.exception}".` },
   { name: 'Not verified', needs: 'always', hint: 'What you could not check. Write "Nothing" if there is nothing.' },
 ];
 

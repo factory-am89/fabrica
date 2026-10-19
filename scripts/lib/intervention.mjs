@@ -46,10 +46,12 @@ export function touchesClosedList(file, globs) {
 }
 
 // The root is built from a path, not from a URL relative to this file: test/gate-files.test.js reads that as an import.
-export function loadClasses(root = path.resolve(import.meta.dirname, '..', '..')) {
+export const defaultRoot = () => path.resolve(import.meta.dirname, '..', '..');
+
+export function loadClasses(root = defaultRoot()) {
   return parseClasses(readFileSync(path.join(root, INTERVENTION_FILE), 'utf8'));
 }
 
-export function loadClosedPaths(root = path.resolve(import.meta.dirname, '..', '..')) {
+export function loadClosedPaths(root = defaultRoot()) {
   return parseClosedPaths(readFileSync(path.join(root, INTERVENTION_FILE), 'utf8'));
 }

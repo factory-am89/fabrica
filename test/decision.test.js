@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { decisionFaults, DECISION_FAULTS, DECIDED, parsePrinciples, loadRules } from '../scripts/lib/decision.mjs';
+import { decisionFaults, DECISION_FAULTS, DECIDED, FORMS, CLASS_PLACEHOLDER, PRINCIPLE_PLACEHOLDER, parsePrinciples, loadRules } from '../scripts/lib/decision.mjs';
+import { SECTIONS } from '../scripts/lib/pr-body.mjs';
 import { parseClasses, CLASS_COUNT, INTERVENTION_FILE } from '../scripts/lib/intervention.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -20,6 +21,22 @@ test('good: None, a decision with a closed-list class, a decision with «decidid
   assert.deepEqual(codes(`- principio ${firstPrinciple} | eligió: a | descartó: b | motivo: ${DECIDED}`), []);
   assert.deepEqual(codes(`- excepción a principio ${firstPrinciple} | motivo: no cabe | coste: una comprobación a mano`), []);
   assert.deepEqual(codes(`- principio ${firstPrinciple} | eligió: a | descartó: b | motivo: ${DECIDED}\n\n- excepción a principio ${firstPrinciple} | motivo: m | coste: c\n`), []);
+});
+
+// The forms the author reads in the PR template hint, filled with valid values, must pass the reader.
+test('the two forms in the Decisions hint, filled in with valid values, have no faults', () => {
+  const hint = SECTIONS.find((s) => s.name === 'Decisions').hint;
+  const lines = [...hint.matchAll(/"(- [^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(lines, [FORMS.decision, FORMS.exception]);
+  for (const form of lines) {
+    let k = 0;
+    const filled = form
+      .replace(PRINCIPLE_PLACEHOLDER, String(firstPrinciple))
+      .replace(`${CLASS_PLACEHOLDER} o ${DECIDED}`, DECIDED)
+      .replace(/<[a-z]+>/g, () => `valor${k++}`);
+    assert.deepEqual(decisionFaults(filled, rules), [], filled);
+  }
+  assert.ok(hint.includes(CLASS_PLACEHOLDER));
 });
 
 // [fault code, a content that must raise exactly that code]
