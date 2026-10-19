@@ -120,15 +120,17 @@ const STATE_KEYS = ['repo', 'files', 'environment', 'secretNames', 'rulesets', '
 function checkState(s) {
   if (!isObject(s)) fail('estado: tiene que ser un objeto');
   for (const k of Object.keys(s)) if (!STATE_KEYS.includes(k)) fail(`estado: clave desconocida '${k}'`);
-  const isBoolMap = (r) => isObject(r) && ['private', 'allow_auto_merge', 'delete_branch_on_merge'].every((k) => typeof r[k] === 'boolean');
-  // GitHub leaves allow_auto_merge and delete_branch_on_merge out of the repo for a caller without administration read:
-  // absent is not false, and reading it as false would ask for update-settings on every run.
-  if (s.repo !== null && !isBoolMap(s.repo)) fail('estado.repo: null o un objeto con private, allow_auto_merge y delete_branch_on_merge (booleanos; GitHub omite los dos ultimos sin permiso administration: read y no se dan por falsos)');
+  // The two settings are true, false or null. null is what readState writes when GitHub did not return the field to this token
+  // ("not visible"): it is never read as false (that would ask for update-settings on every run) and planProject skips it.
+  // undefined (a field nobody classified) is refused. Which permission shows the field is documented by GitHub, not decided here.
+  const isSetting = (v) => v === null || typeof v === 'boolean';
+  const isRepo = (r) => isObject(r) && typeof r.private === 'boolean' && isSetting(r.allow_auto_merge) && isSetting(r.delete_branch_on_merge);
+  if (s.repo !== null && !isRepo(s.repo)) fail('estado.repo: null o un objeto con private (booleano) y allow_auto_merge y delete_branch_on_merge (booleano, o null si el token no los ve); un campo ausente no se da por falso');
   for (const k of ['files', 'secretNames', 'rulesets']) if (!Array.isArray(s[k])) fail(`estado.${k}: tiene que ser una lista`);
   if (!s.rulesets.every((r) => isObject(r) && Number.isInteger(r.id))) fail('estado.rulesets: cada ruleset tiene que traer su id numerico');
-  // Same for bypass_actors of a ruleset. Absent is not empty: the guard never assumes it (and comparing against a hidden
-  // bypass would ask for update-ruleset on every run).
-  if (!s.rulesets.every((r) => Array.isArray(r.bypass_actors))) fail('estado.rulesets: un ruleset no trae bypass_actors (GitHub lo omite sin permiso administration: read); no se da por vacio');
+  // Same for bypass_actors of a ruleset: a list, or bypassHidden: true when the token did not get it (a flag, not a value for the field). Absent is not empty: the guard never
+  // assumes it, and a non-empty visible list is always drift.
+  if (!s.rulesets.every((r) => Array.isArray(r.bypass_actors) || r.bypassHidden === true)) fail('estado.rulesets: un ruleset sin bypass_actors (lista, o bypassHidden: true si el token no lo ve); un campo ausente no se da por vacio');
   if (!Number.isInteger(s.revisorAppId) || s.revisorAppId <= 0) fail('estado.revisorAppId: tiene que ser el App ID numerico de la App revisora');
   if (s.environment !== null && !(isObject(s.environment) && typeof s.environment.customBranchPolicies === 'boolean' && Array.isArray(s.environment.branches))) {
     fail('estado.environment: null o { customBranchPolicies, branches }');
@@ -171,7 +173,9 @@ function environmentCalls(project, state) {
 
 function rulesetCalls(project, state) {
   const body = rulesetBody({ revisorAppId: state.revisorAppId });
-  if (state.rulesets.some((r) => covers(r, body))) return [];
+  // bypassHidden = bypass_actors not visible: compare everything else, and say so apart (hiddenFields). A visible list is compared as ever.
+  const wants = (r) => (r.bypassHidden !== true ? body : Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'bypass_actors')));
+  if (state.rulesets.some((r) => covers(r, wants(r)))) return [];
   const mine = state.rulesets.find((r) => r.name === body.name);
   if (mine) return [call('update-ruleset', 'PUT', `/repos/${project.repo}/rulesets/${mine.id}`, body)];
   return [call('create-ruleset', 'POST', `/repos/${project.repo}/rulesets`, body)];
@@ -197,6 +201,15 @@ function smokeCalls(project, state, templates) {
   return out;
 }
 
+// What the plan could not look at because the token did not return it (null or bypassHidden in the state). The plan prints it next to the
+// calls: «0 cambios» with something here means «0 cambios visibles», never «ya esta».
+export function hiddenFields(state) {
+  const out = [];
+  if (state.repo && (state.repo.allow_auto_merge === null || state.repo.delete_branch_on_merge === null)) out.push('ajustes allow_auto_merge y delete_branch_on_merge');
+  for (const r of state.rulesets) if (r.bypassHidden === true) out.push(`bypass_actors del ruleset ${r.id}`);
+  return out;
+}
+
 // From (project parsed by parseProject, real state, templates by name) to the calls, in this order:
 // repo, files on main, settings, environment + secrets, ruleset, smoke PR. Throws on a state it must not touch.
 export function planProject(project, state, templates) {
@@ -205,7 +218,8 @@ export function planProject(project, state, templates) {
   const out = [];
   if (!state.repo) out.push(call('create-repo', 'POST', `/orgs/${ORG}/repos`, { name: project.name, description: project.descripcion, private: false }));
   out.push(...fileCalls(project, state, templates));
-  if (!state.repo || !state.repo.allow_auto_merge || !state.repo.delete_branch_on_merge) {
+  // Only a visible false asks for the PATCH; null (not visible to this token) is neither asked for nor assumed to be on.
+  if (!state.repo || state.repo.allow_auto_merge === false || state.repo.delete_branch_on_merge === false) {
     out.push(call('update-settings', 'PATCH', `/repos/${project.repo}`, { allow_auto_merge: true, delete_branch_on_merge: true }));
   }
   out.push(...environmentCalls(project, state), ...rulesetCalls(project, state), ...smokeCalls(project, state, templates));

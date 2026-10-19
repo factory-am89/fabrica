@@ -197,7 +197,7 @@ test('workflow: the reading token is read-only and the writing token has exactly
   assert.deepEqual(permisosDe('escritura'), { 'permission-administration': 'write', 'permission-environments': 'write', 'permission-metadata': 'read' });
 });
 
-test('workflow: the reading token has administration: read, without it GitHub omits bypass_actors and the repo settings', () => {
+test('workflow: the reading token keeps administration: read (#97); it is NOT what shows the settings or bypass_actors, see leer-plan.mjs', () => {
   assert.equal(permisosDe('lectura')['permission-administration'], 'read');
 });
 

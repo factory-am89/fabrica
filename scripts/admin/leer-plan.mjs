@@ -6,7 +6,7 @@
 // The token comes in GH_TOKEN (the caller mints it); this file never names where it comes from and never prints it.
 import { readFileSync, readdirSync, existsSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
-import { FICHA, REVISOR_ENV, SMOKE_BRANCH, TEMPLATE_NAMES, parseProject, planProject } from './proyecto.mjs';
+import { FICHA, REVISOR_ENV, SMOKE_BRANCH, TEMPLATE_NAMES, hiddenFields, parseProject, planProject } from './proyecto.mjs';
 import { REVISOR_APP_SLUG } from '../lib/repo.mjs';
 
 export const API = 'https://api.github.com';
@@ -41,16 +41,27 @@ const whole = (items, route) => {
   return items;
 };
 
+// A field GitHub did not return is never read as false or empty. GitHub documents that some fields only reach callers with more
+// than read access (merge settings: contents read and write; bypass_actors needs write access to the ruleset), so:
+//   - without `settingsApi` (the read-only runs: leer-plan, secretos) the field is null = «no visible con este token»;
+//   - with `settingsApi` (aplicar.mjs: a GET-only api made from the token that can write) those two reads go through it and
+//     the field MUST come back: if even that token does not get it, this throws, saying what was observed and no cause.
+const notReturned = (route, field) => new Error(`GET ${route}: la respuesta no trae ${field} ni con el token de aplicar; no se da por falso ni por vacio`);
+
 // The state object planProject expects (see checkState in proyecto.mjs), read with GET calls.
-export async function readState(api, project) {
+export async function readState(api, project, { settingsApi } = {}) {
   const r = project.repo;
   const repoRes = await api(`/repos/${r}`, [404]);
+  let settings = repoRes.body;
+  if (settings && settingsApi) {
+    settings = (await settingsApi(`/repos/${r}`)).body;
+    for (const k of ['allow_auto_merge', 'delete_branch_on_merge']) if (typeof settings[k] !== 'boolean') throw notReturned(`/repos/${r}`, k);
+  }
+  const seen = (k) => (typeof settings[k] === 'boolean' ? settings[k] : null);
   const repo = repoRes.status === 404 ? null : {
     private: repoRes.body.private === true,
-    // Raw on purpose: the token `lectura` has administration: read, without which GitHub leaves these two out; planProject
-    // (checkState) refuses an absent one instead of reading it as false.
-    allow_auto_merge: repoRes.body.allow_auto_merge,
-    delete_branch_on_merge: repoRes.body.delete_branch_on_merge,
+    allow_auto_merge: seen('allow_auto_merge'),
+    delete_branch_on_merge: seen('delete_branch_on_merge'),
   };
   if (repo) {
     // A public repo is readable with any token, so reading it proves nothing about the installation: ask the installation.
@@ -87,7 +98,12 @@ export async function readState(api, project) {
   }
   const list = await api(`/repos/${r}/rulesets?per_page=${PER_PAGE}`);
   const rulesets = [];
-  for (const s of whole(list.body, 'rulesets')) rulesets.push((await api(`/repos/${r}/rulesets/${s.id}`)).body);
+  for (const s of whole(list.body, 'rulesets')) {
+    const route = `/repos/${r}/rulesets/${s.id}`;
+    const rs = (await (settingsApi ?? api)(route)).body;
+    if (settingsApi && !Array.isArray(rs.bypass_actors)) throw notReturned(route, 'bypass_actors');
+    rulesets.push(Array.isArray(rs.bypass_actors) ? rs : { ...rs, bypassHidden: true });
+  }
   const ref = await api(`/repos/${r}/git/ref/heads/${SMOKE_BRANCH}`, [404]);
   const branchExists = ref.status === 200;
   const fileOnBranch = branchExists && (await api(`/repos/${r}/contents/${FICHA}?ref=${enc(SMOKE_BRANCH)}`, [404])).status === 200;
@@ -104,11 +120,13 @@ export function loadTemplates(dir) {
 }
 
 // One block of Markdown per project: operation, method and path of each call. Never the bodies (they hold file contents).
-export function renderPlan(project, calls) {
+// `hidden` (hiddenFields): what this token could not see; it is listed, and «0 cambios» becomes «0 cambios visibles».
+export function renderPlan(project, calls, hidden = []) {
   const head = `### ${project.repo}\n\n`;
-  if (calls.length === 0) return `${head}0 cambios: el repo ya esta como dice su ficha.\n`;
+  const note = hidden.length === 0 ? '' : `\nNo visible con el token de lectura (lo comprueba aplicar.mjs con su token): ${hidden.join('; ')}.\n`;
+  if (calls.length === 0) return hidden.length === 0 ? `${head}0 cambios: el repo ya esta como dice su ficha.\n` : `${head}0 cambios visibles.\n${note}`;
   const rows = calls.map((c, i) => `${i + 1}. \`${c.op}\` ${c.method} \`${c.path}\``);
-  return `${head}Falta (${calls.length} llamadas; este run NO aplica nada):\n\n${rows.join('\n')}\n`;
+  return `${head}Falta (${calls.length} llamadas; este run NO aplica nada):\n\n${rows.join('\n')}\n${note}`;
 }
 
 export async function main({ dir = 'proyectos', templatesDir = path.join('apps', 'proyecto-nuevo'), api, summaryFile } = {}) {
@@ -120,7 +138,8 @@ export async function main({ dir = 'proyectos', templatesDir = path.join('apps',
   for (const f of files) {
     try {
       const project = parseProject(JSON.parse(readFileSync(path.join(dir, f), 'utf8')), { fileName: f });
-      blocks.push(renderPlan(project, planProject(project, await readState(api, project), templates)));
+      const state = await readState(api, project);
+      blocks.push(renderPlan(project, planProject(project, state, templates), hiddenFields(state)));
     } catch (e) {
       errors.push(`${f}: ${e.message}`);
       blocks.push(`### ${f}\n\nFALLO: ${e.message}\n`);
