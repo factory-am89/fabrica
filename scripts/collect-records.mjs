@@ -2,7 +2,7 @@
 // scripts/records.mjs can count them. GET calls only; writes nothing but the two files in --out.
 //   node scripts/collect-records.mjs --out <dir> [--since YYYY-MM-DD] [--repo owner/name]
 // <dir>/check-runs.json is the array records.mjs reads (--file); <dir>/pulls.json lists each PR with its commits.
-// Calls: 1 per page of PRs + 1 per PR (commits) + 1 per commit (check-runs); --since limits the PRs by creation date.
+// Calls: 1 per page of PRs + 1 per PR (files of the PR, not per commit) + 1 per PR (commits) + 1 per commit (check-runs); --since limits the PRs by creation date.
 // Reads with `node scripts/token.mjs -- gh api` (the constructor identity). A failed call, a cut list or a malformed
 // answer throws: a partial download would pass for a complete one.
 import { spawnSync } from 'node:child_process';
@@ -13,6 +13,7 @@ import { REPO } from './lib/repo.mjs';
 
 const PER_PAGE = 100;
 const MAX_PAGES = 50;
+const FILES_CAP = 3000; // GitHub stops listing a PR's files here without saying so
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TOKEN_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'token.mjs');
 
@@ -47,12 +48,15 @@ export async function listPulls(get, repo, since) {
   return all.filter((p) => since === null || p.created_at.slice(0, 10) >= since);
 }
 
-// { pulls: [{number, state, created_at, merged_at, commits: [sha]}], checkRuns: [check-run] } with the `revisor` check-runs of every commit.
+// { pulls: [{number, state, created_at, merged_at, head_ref, files: [path], commits: [sha]}], checkRuns: [check-run] } with the `revisor` check-runs of every commit.
 export async function collect({ get, repo = REPO, since = null }) {
   const pulls = [];
   const checkRuns = [];
   const seen = new Set();
   for (const p of await listPulls(get, repo, since)) {
+    if (typeof p.head?.ref !== 'string') throw new Error(`PR #${p.number}: no head.ref in the answer`);
+    const files = (await pages(get, `repos/${repo}/pulls/${p.number}/files`)).map((f) => f.filename);
+    if (files.length >= FILES_CAP) throw new Error(`PR #${p.number}: ${files.length} files reaches GitHub's listing cap (${FILES_CAP}); the list may be cut`);
     const commits = (await pages(get, `repos/${repo}/pulls/${p.number}/commits`)).map((c) => c.sha);
     for (const sha of commits) {
       const res = await get(`repos/${repo}/commits/${sha}/check-runs?check_name=revisor&per_page=${PER_PAGE}`);
@@ -65,7 +69,7 @@ export async function collect({ get, repo = REPO, since = null }) {
         checkRuns.push(c);
       }
     }
-    pulls.push({ number: p.number, state: p.state, created_at: p.created_at, merged_at: p.merged_at ?? null, commits });
+    pulls.push({ number: p.number, state: p.state, created_at: p.created_at, merged_at: p.merged_at ?? null, head_ref: p.head.ref, files, commits });
   }
   return { pulls, checkRuns };
 }
