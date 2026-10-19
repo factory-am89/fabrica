@@ -61,7 +61,10 @@ const MUTATIONS = {
     ['any file and line', set('sources', ['#9', 'standards/code.md:12'])],
   ],
   BAD_SIGNAL: [['signal nobody', set('signal', 'human')], ['signal null', set('signal', null)]],
-  MACHINE_SIGNAL_NOT_MACHINE: [['a machine signal whose mechanism is a standard', (fx) => ({ ...set('mechanism', 'standards/code.md')(fx), files: { 'standards/code.md': '// lesson: good-one\n' } })]],
+  MACHINE_SIGNAL_NOT_MACHINE: [
+    ['a machine signal whose mechanism is a standard', (fx) => ({ ...set('mechanism', 'standards/code.md')(fx), files: { 'standards/code.md': '// lesson: good-one\n' } })],
+    ['a machine signal whose mechanism is a skill', (fx) => ({ ...set('mechanism', '.claude/skills/github/SKILL.md')(fx), files: { '.claude/skills/github/SKILL.md': '// lesson: good-one\n' } })],
+  ],
   SIGNAL_NONE_WITHOUT_REASON: [
     ['signal none and no reason', set('signal', SIGNAL_NONE)],
     ['signal none and only the single-case reason', (fx) => set('reason', [REASON_SINGLE])(set('signal', SIGNAL_NONE)(set('sources', ['#9'])(fx)))],
