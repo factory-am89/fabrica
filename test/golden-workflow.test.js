@@ -1,4 +1,4 @@
-// .github/workflows/golden.yml: la pasada del revisor sobre el corpus, solo a mano sobre el corpus. Lo que no se puede probar sin GitHub
+// .github/workflows/golden.yml: la pasada del revisor sobre el corpus, solo a mano. Lo que no se puede probar sin GitHub
 // (que arranque de verdad) se deja a workflow_dispatch; aquí, las reglas que una máquina sí comprueba: cuándo corre,
 // con qué permisos y secretos, en qué orden baja los esperados y que no falla por detección baja.
 import { test } from 'node:test';
