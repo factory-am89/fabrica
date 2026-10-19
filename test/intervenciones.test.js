@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CAMPOS, CLASES, ORIGENES, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
+import { CAMINOS, CAMPOS, CLASES, FALTAS, FALTA_DE_CLASE, ORIGENES, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
 import { anotarBangs, anotarPermiso, bangsDe } from '../scripts/intervenciones.mjs';
 import { informe } from '../scripts/hitl.mjs';
 
@@ -29,11 +29,11 @@ const bang = (cmd, extra) => fila(`<bash-input>${cmd}</bash-input>`, extra);
 
 test('vocabulary: closed lists, exported once, in the shape of the other logs', () => {
   assert.equal(rutaDeRegistroIntervenciones(() => '/home/x'), join('/home/x', '.fabrica', 'intervenciones.jsonl'));
-  assert.deepEqual(CAMPOS, ['t', 'clase', 'origen']);
-  assert.deepEqual(ORIGENES, ['bang', 'permiso', 'bang-sin-hora']);
-  assert.equal(CLASES.length, 10);
-  assert.equal(new Set(CLASES).size, 10);
-  for (const c of ['aviso-de-permiso', 'sin-clasificar', 'aprobar-puerta', 'desatasco']) assert.ok(CLASES.includes(c), c);
+  assert.deepEqual(CAMPOS, ['t', 'clase', 'origen', 'falta']);
+  assert.deepEqual(ORIGENES, ['bang', 'permiso', 'bang-sin-hora', 'agente']);
+  assert.equal(CLASES.length, 13);
+  assert.equal(new Set(CLASES).size, 13);
+  for (const c of ['aviso-de-permiso', 'sin-clasificar', 'aprobar-puerta', 'desatasco', 'contexto-aportado', 'pregunta-fuera-de-lista', 'revision-de-diff']) assert.ok(CLASES.includes(c), c);
 });
 
 test('registrarIntervencion: a class or origin outside the vocabulary is refused and nothing is written', () => conCasa((_c, _h, ruta) => {
@@ -47,7 +47,7 @@ test('a permission prompt gives one line of class aviso-de-permiso, with no fiel
   assert.equal(anotarPermiso({ casa, reloj: () => AHORA.getTime() }), 1);
   const l = lineas(ruta);
   assert.equal(l.length, 1);
-  assert.deepEqual(l[0], { t: '2026-10-16T10:30:00.000Z', clase: 'aviso-de-permiso', origen: 'permiso' });
+  assert.deepEqual(l[0], { t: '2026-10-16T10:30:00.000Z', clase: 'aviso-de-permiso', origen: 'permiso', falta: 'sin-clasificar' });
   assert.deepEqual(Object.keys(l[0]), CAMPOS);
 }));
 
@@ -83,7 +83,7 @@ test('a `!` gives one line, once: a second look at the same transcript adds none
   writeFileSync(transcript, fila('hola') + bang(SECRETO) + fila('<bash-stdout>x</bash-stdout>'));
   const entrada = { session_id: 'sesion-1234', transcript_path: transcript };
   assert.equal(anotarBangs(entrada, { casa: h, ahora: AHORA }), 1);
-  assert.deepEqual(lineas(ruta)[0], { t: '2026-10-16T10:29:00.000Z', clase: 'sin-clasificar', origen: 'bang' });
+  assert.deepEqual(lineas(ruta)[0], { t: '2026-10-16T10:29:00.000Z', clase: 'sin-clasificar', origen: 'bang', falta: 'sin-clasificar' });
   assert.equal(anotarBangs(entrada, { casa: h, ahora: AHORA }), 0);
   appendFileSync(transcript, bang('git status'));
   assert.equal(anotarBangs(entrada, { casa: h, ahora: AHORA }), 1);
@@ -99,7 +99,7 @@ test('a `!` without a readable time is logged anyway, marked bang-sin-hora with 
 ${ilegible}
 `);
   assert.equal(anotarBangs({ session_id: 'sesion-1234', transcript_path: transcript }, { casa: h, ahora: AHORA }), 2);
-  assert.deepEqual(lineas(ruta), [{ t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora' }, { t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora' }]);
+  assert.deepEqual(lineas(ruta), [{ t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora', falta: 'sin-clasificar' }, { t: null, clase: 'sin-clasificar', origen: 'bang-sin-hora', falta: 'sin-clasificar' }]);
   const c = contarIntervenciones({ ruta });
   assert.deepEqual(c.corruptas, []);
   assert.equal(c.porOrigen['bang-sin-hora'], 2);
@@ -151,7 +151,7 @@ test('contarIntervenciones: counts per class and origin, every class listed (als
   assert.equal(c.porClase['aviso-de-permiso'], 2);
   assert.equal(c.porClase['sin-clasificar'], 1);
   assert.equal(c.porClase['desatasco'], 0);
-  assert.deepEqual(c.porOrigen, { bang: 1, permiso: 2, 'bang-sin-hora': 0 });
+  assert.deepEqual(c.porOrigen, { bang: 1, permiso: 2, 'bang-sin-hora': 0, agente: 0 });
   assert.deepEqual(c.corruptas, []);
 }));
 
@@ -176,7 +176,7 @@ test('npm run hitl -- --json: the JSON contract, and exit 1 with the lines named
   const bueno = hitl('--json');
   assert.equal(bueno.status, 0, bueno.stderr);
   const j = JSON.parse(bueno.stdout);
-  assert.deepEqual(Object.keys(j), ['registro', 'total', 'porClase', 'porOrigen', 'corruptas']);
+  assert.deepEqual(Object.keys(j), ['registro', 'total', 'porClase', 'porOrigen', 'porFalta', 'sinFalta', 'caminos', 'nota', 'corruptas']);
   assert.equal(j.registro, ruta);
   assert.equal(j.porClase['aviso-de-permiso'], 1);
   assert.match(hitl().stdout, /aviso-de-permiso: 1/);
@@ -195,3 +195,57 @@ test('.claude/settings.json: PermissionRequest, Stop and SessionEnd call interve
   assert.ok(ordenes('SessionStart').length > 0);
   assert.ok(ordenes('PreToolUse').some((c) => c.includes('carpeta-principal.mjs')));
 });
+
+test('falta: closed vocabulary, one way out per kind of lack, and a class gets a falta only where it is unambiguous', () => {
+  assert.deepEqual(FALTAS, ['intencion', 'autoridad', 'conocimiento', 'verificacion', 'acceso', 'memoria', 'otro', 'sin-clasificar']);
+  assert.deepEqual(Object.keys(CAMINOS), ['conocimiento', 'verificacion', 'acceso', 'memoria', 'intencion', 'autoridad']);
+  assert.match(CAMINOS.intencion, /residuo/);
+  assert.match(CAMINOS.autoridad, /residuo/);
+  assert.match(CAMINOS.conocimiento, /datos/);
+  for (const [clase, falta] of Object.entries(FALTA_DE_CLASE)) {
+    assert.ok(CLASES.includes(clase), clase);
+    assert.ok(FALTAS.includes(falta) && falta !== 'otro' && falta !== 'sin-clasificar', clase);
+  }
+  for (const ambigua of ['aviso-de-permiso', 'sin-clasificar', 'desatasco', 'correccion-de-agente']) assert.equal(FALTA_DE_CLASE[ambigua], undefined, ambigua);
+});
+
+test('registrarIntervencion: a falta outside the vocabulary, or otro without a reason, is refused; an unambiguous class gets its falta, an ambiguous one sin-clasificar (never an invented value)', () => conCasa((_c, _h, ruta) => {
+  assert.throws(() => registrarIntervencion({ clase: 'contexto-aportado', origen: 'agente', falta: 'inventada', ruta }), /outside the vocabulary/);
+  assert.throws(() => registrarIntervencion({ clase: 'contexto-aportado', origen: 'agente', falta: 'otro', ruta }), /motivo/);
+  assert.throws(() => registrarIntervencion({ clase: 'contexto-aportado', origen: 'agente', falta: 'conocimiento', motivo: 'x', ruta }), /motivo/);
+  assert.equal(existsSync(ruta), false);
+  registrarIntervencion({ clase: 'alta-de-credencial', origen: 'bang', ruta });
+  registrarIntervencion({ clase: 'aviso-de-permiso', origen: 'permiso', ruta });
+  registrarIntervencion({ clase: 'revision-de-diff', origen: 'agente', falta: 'otro', motivo: 'miro un diff por costumbre', ruta });
+  assert.deepEqual(lineas(ruta).map((l) => [l.falta, l.motivo]), [['acceso', undefined], ['sin-clasificar', undefined], ['otro', 'miro un diff por costumbre']]);
+}));
+
+test('contarIntervenciones: counts per falta; old lines without falta count apart (not migrated, not corrupt); a bad falta line is corrupt', () => conCasa((_c, _h, ruta) => {
+  registrarIntervencion({ clase: 'contexto-aportado', origen: 'agente', ruta });
+  const vieja = { t: '2026-10-10T10:00:00.000Z', clase: 'desatasco', origen: 'bang' };
+  appendFileSync(ruta, `${JSON.stringify(vieja)}\n${JSON.stringify({ ...vieja, falta: 'rara' })}\n${JSON.stringify({ ...vieja, falta: 'otro' })}\n`);
+  const c = contarIntervenciones({ ruta });
+  assert.deepEqual(Object.keys(c.porFalta), FALTAS);
+  assert.equal(c.porFalta.conocimiento, 1);
+  assert.equal(c.sinFalta, 1);
+  assert.deepEqual(c.corruptas, [3, 4], 'unknown falta, and otro without motivo');
+}));
+
+test('node scripts/hitl.mjs marcar <clase> <falta>: one line of origen agente, exit 1 outside the vocabulary; --json says it is self-declared and lists the way out per falta', () => conCasa((casa, _h, ruta) => {
+  const hitl = (...args) => spawnSync(process.execPath, [join(AQUI, '..', 'scripts', 'hitl.mjs'), ...args], { encoding: 'utf8', env: { ...process.env, HOME: casa, USERPROFILE: casa } });
+  const ok = hitl('marcar', 'contexto-aportado', 'conocimiento');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(Object.keys(lineas(ruta)[0]), ['t', 'clase', 'origen', 'falta']);
+  assert.equal(lineas(ruta)[0].origen, 'agente');
+  assert.equal(hitl('marcar', 'contexto-aportado', 'inventada').status, 1);
+  assert.equal(hitl('marcar', 'contexto-aportado').status, 1);
+  assert.equal(hitl('marcar', 'inventada', 'acceso').status, 1);
+  assert.equal(hitl('marcar', 'revision-de-diff', 'otro').status, 1, 'otro needs a reason');
+  assert.equal(hitl('marcar', 'revision-de-diff', 'otro', 'motivo claro').status, 0);
+  assert.equal(lineas(ruta).length, 2);
+  const j = JSON.parse(hitl('--json').stdout);
+  assert.equal(j.porFalta.conocimiento, 1);
+  assert.equal(j.porOrigen.agente, 2);
+  assert.deepEqual(j.caminos, CAMINOS);
+  assert.match(j.nota, /autodeclar/);
+}));
