@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, audit, auditData, cliAudit, mainAudit } from '../scripts/audit.mjs';
+import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { BOUND, CAVEAT, DATA_INDICATORS, ESCAPE_DAYS, FIX_PREFIX, REWORK_HOURS } from '../scripts/lib/audit-data.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { LESSONS_DIR, NO_LESSON_FILE, NO_QUESTION } from '../scripts/lib/lessons.mjs';
@@ -38,7 +39,7 @@ test('the data indicators are registered in INDICATORS and auditData returns exa
   const ids = Object.values(INDICATORS);
   for (const id of DATA_INDICATORS) assert.ok(ids.includes(id), id);
   assert.deepEqual(Object.keys(run()).sort(), [...DATA_INDICATORS].sort());
-  assert.deepEqual(Object.keys(audit(RAIZ)).sort(), ids.filter((id) => !DATA_INDICATORS.includes(id)).sort());
+  assert.deepEqual(Object.keys(audit(RAIZ)).sort(), ids.filter((id) => !DATA_INDICATORS.includes(id) && !HITL_INDICATORS.includes(id)).sort());
 });
 
 test('rounds: one per record, per PR, mean; a lower bound', () => {
