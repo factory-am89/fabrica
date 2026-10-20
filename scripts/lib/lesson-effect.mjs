@@ -6,18 +6,17 @@ import path from 'node:path';
 import { CORPUS, MIN_CASES_PER_CELL, STANDARD, answersOf, loadCorpus, loadOutputs } from '../golden.mjs';
 import { variance } from '../golden-run.mjs';
 import { cargarPreguntas } from '../veredicto.mjs';
-import { NO_LESSON_KEYS, NO_QUESTION, REASON_NOISE, readLessons, readNoLesson } from './lessons.mjs';
+import { NO_LESSON_KEYS, NO_QUESTION, REASON_NOISE, readLessons, readNoLesson, sourceNumber } from './lessons.mjs';
 import { ANSWER, OVERRIDE_TITLE, aggregate, readCheckRuns } from './record.mjs';
 
 // Why a lesson has no conclusive effect (a list: it can be several).
-export const WHY = Object.freeze({ noQuestion: 'lesson-without-question', noDate: 'no-merged-source-pr', fewCases: 'few-cases-on-a-side' });
+export const WHY = Object.freeze({ noQuestion: 'lesson-without-question', noDate: 'no-merged-source-pr', sourceNotInData: 'source-pr-not-in-data', fewCases: 'few-cases-on-a-side' });
 export const CAVEAT = Object.freeze({
   overridesPerRound: 'an-override-counts-once-per-no-question-of-the-round-it-overrides',
   caseIsAnswered: 'cases-are-rounds-that-answered-si-or-no',
 });
 export const MIN_TRIALS = 2;
 const TRIAL_FILE = /^\d+\.json$/;
-const SOURCE_PREFIX = '#';
 
 const rate = (n, d) => (d === 0 ? null : n / d);
 
@@ -26,7 +25,7 @@ const rate = (n, d) => (d === 0 ? null : n / d);
 export function readTriagedNo(root) {
   const d = JSON.parse(readNoLesson(root));
   if (!Array.isArray(d.entries)) throw new Error('triaged «no»: entries must be a list');
-  return d.entries.map((e) => ({ source: Number(String(e[NO_LESSON_KEYS.source]).slice(SOURCE_PREFIX.length)), question: e[NO_LESSON_KEYS.question], noise: e[NO_LESSON_KEYS.reason] === REASON_NOISE }));
+  return d.entries.map((e) => ({ source: sourceNumber(e[NO_LESSON_KEYS.source]), question: e[NO_LESSON_KEYS.question], noise: e[NO_LESSON_KEYS.reason] === REASON_NOISE }));
 }
 
 // [{id, question, sources: [PR number]}] from lessons/; a lesson without a list of sources stops the figure.
@@ -34,7 +33,7 @@ export function readLessonSources(root) {
   return readLessons(root).map((l) => {
     const d = JSON.parse(l.text);
     if (!Array.isArray(d.sources)) throw new Error(`lesson ${l.id}: no list of sources`);
-    return { id: l.id, question: d.question, sources: d.sources.map((s) => Number(String(s).slice(SOURCE_PREFIX.length))) };
+    return { id: l.id, question: d.question, sources: d.sources.map(sourceNumber) };
   });
 }
 
@@ -77,11 +76,15 @@ function lessonEffect(lessons, prs, records) {
     return { created: pr.created, answers: r.answers };
   });
   const out = lessons.map((l) => {
-    const merged = l.sources.map((n) => byNumber.get(n)?.merged ?? null).filter((m) => m !== null);
-    const date = merged.length === 0 ? null : Math.max(...merged);
+    // A source PR missing from the data (outside --since, say) hides what the latest merge was: the date is unknown, said apart from «not merged».
+    const found = l.sources.map((n) => byNumber.get(n));
+    const missing = found.includes(undefined);
+    const merged = found.filter((p) => p !== undefined && p.merged !== null).map((p) => p.merged);
+    const date = missing || merged.length === 0 ? null : Math.max(...merged);
     const why = [];
     if (l.question === NO_QUESTION) why.push(WHY.noQuestion);
-    if (date === null) why.push(WHY.noDate);
+    if (missing) why.push(WHY.sourceNotInData);
+    else if (date === null) why.push(WHY.noDate);
     if (why.length > 0) return { id: l.id, question: l.question, date: date === null ? null : new Date(date).toISOString(), before: null, after: null, change: null, conclusive: false, why };
     const before = side(rounds.filter((r) => r.created < date), l.question);
     const after = side(rounds.filter((r) => r.created >= date), l.question);

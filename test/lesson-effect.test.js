@@ -87,9 +87,11 @@ test('lesson effect: the date is the latest merged source; a lesson without ques
   const later = DATE + 10 * DAY;
   const pulls = [pull(1, T0, DATE), pull(2, T0, later), pull(4, T0)];
   const lessons = [
-    { id: 'latest', question: Q, sources: ['#1', '#2', '#3', '#4'] },
+    { id: 'latest', question: Q, sources: ['#1', '#2', '#4'] },
     { id: 'noq', question: NO_QUESTION, sources: ['#1'] },
-    { id: 'nodate', question: Q, sources: ['#4', '#3'] },
+    { id: 'nodate', question: Q, sources: ['#4'] },
+    { id: 'absent', question: Q, sources: ['#3'] },
+    { id: 'partial', question: Q, sources: ['#1', '#3'] },
     { id: 'neither', question: NO_QUESTION, sources: ['#3'] },
   ];
   const effect = measure(t, { lessons }, pulls, [])[DATA_IDS.lessonEffect];
@@ -99,7 +101,9 @@ test('lesson effect: the date is the latest merged source; a lesson without ques
   assert.deepEqual(byId.latest.why, [WHY.fewCases]);
   assert.deepEqual([byId.noq.date, byId.noq.why, byId.noq.before, byId.noq.after, byId.noq.conclusive], [iso(DATE), [WHY.noQuestion], null, null, false]);
   assert.deepEqual([byId.nodate.date, byId.nodate.why, byId.nodate.before], [null, [WHY.noDate], null]);
-  assert.deepEqual(byId.neither.why, [WHY.noQuestion, WHY.noDate]);
+  assert.deepEqual([byId.absent.date, byId.absent.why], [null, [WHY.sourceNotInData]]);
+  assert.deepEqual([byId.partial.date, byId.partial.why], [null, [WHY.sourceNotInData]]);
+  assert.deepEqual(byId.neither.why, [WHY.noQuestion, WHY.sourceNotInData]);
 });
 
 test('unsorted «no»: a (PR, question) with a «no» that no lesson of that PR and question, nor triaged entry, covers; sorted, with its rounds', (t) => {
@@ -179,6 +183,12 @@ test('the triaged «no» are read in one place and come out normalised; broken i
   const noSources = root(t);
   writeFileSync(path.join(noSources, LESSONS_DIR, 'x.json'), JSON.stringify({ question: Q }));
   assert.throws(() => measure(t, {}, [], [], { root: noSources }), /lesson x: no list of sources/);
+  for (const bad of ['4', '#0', '#x', 4]) {
+    const lesson = root(t, { lessons: [{ id: 'bad', question: Q, sources: [bad] }] });
+    assert.throws(() => measure(t, {}, [], [], { root: lesson }), /must be #<n>/, String(bad));
+    const entry = root(t, { entries: [{ source: bad, question: Q, reason: REASON_NOISE }] });
+    assert.throws(() => measure(t, {}, [], [], { root: entry }), /must be #<n>/, String(bad));
+  }
   assert.throws(() => measure(t, {}, [pull(1, T0)], [round(2, { [Q]: ANSWER.yes })]), /PR #2 has no PR/);
   assert.throws(() => measure(t, {}, [], [{ output: { title: OVERRIDE_TITLE } }]), /override check-run has no head_sha/);
   assert.throws(() => measure(t, {}, [], [{ head_sha: sha(1), output: { text: 'sin registro' } }]), /readable record/);
