@@ -1,0 +1,56 @@
+diff --git a/scripts/lib/cuota-local.mjs b/scripts/lib/cuota-local.mjs
+new file mode 100644
+index 0000000..d41c7a6
+--- /dev/null
++++ b/scripts/lib/cuota-local.mjs
+@@ -0,0 +1,14 @@
++// La cuota de llamadas a GitHub que guarda la sesión en un JSON: { "restantes": n, "reinicio": "<fecha ISO>" }.
++import { readFileSync } from 'node:fs';
++
++export function leerCuota(fichero) {
++  let datos;
++  try {
++    datos = JSON.parse(readFileSync(fichero, 'utf8'));
++  } catch (e) {
++    throw new Error(`no se pudo leer la cuota de ${fichero}`, { cause: e });
++  }
++  if (!Number.isInteger(datos.restantes) || datos.restantes < 0) throw new Error(`${fichero}: «restantes» debe ser un entero no negativo`);
++  if (Number.isNaN(Date.parse(datos.reinicio))) throw new Error(`${fichero}: «reinicio» debe ser una fecha ISO`);
++  return { restantes: datos.restantes, reinicio: datos.reinicio };
++}
+diff --git a/test/cuota-local.test.js b/test/cuota-local.test.js
+new file mode 100644
+index 0000000..9a05e3c
+--- /dev/null
++++ b/test/cuota-local.test.js
+@@ -0,0 +1,30 @@
++// leerCuota: un fichero válido y los tres modos de fallo.
++import { test, after } from 'node:test';
++import assert from 'node:assert/strict';
++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import { leerCuota } from '../scripts/lib/cuota-local.mjs';
++
++const dir = mkdtempSync(path.join(tmpdir(), 'cuota-'));
++after(() => rmSync(dir, { recursive: true, force: true }));
++const escribir = (nombre, texto) => {
++  const f = path.join(dir, nombre);
++  writeFileSync(f, texto);
++  return f;
++};
++
++test('cuota: un fichero válido se lee', () => {
++  const f = escribir('ok.json', '{"restantes": 4200, "reinicio": "2026-10-20T11:00:00Z"}');
++  assert.deepEqual(leerCuota(f), { restantes: 4200, reinicio: '2026-10-20T11:00:00Z' });
++});
++
++test('cuota: un fichero que falta o no es JSON lanza con su ruta', () => {
++  assert.throws(() => leerCuota(path.join(dir, 'no-existe.json')), /no se pudo leer la cuota de .*no-existe\.json/);
++  assert.throws(() => leerCuota(escribir('roto.json', '{')), /no se pudo leer la cuota/);
++});
++
++test('cuota: un número o una fecha que no valen lanzan', () => {
++  assert.throws(() => leerCuota(escribir('neg.json', '{"restantes": -1, "reinicio": "2026-10-20T11:00:00Z"}')), /«restantes»/);
++  assert.throws(() => leerCuota(escribir('fecha.json', '{"restantes": 1, "reinicio": "mañana"}')), /«reinicio»/);
++});

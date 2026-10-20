@@ -1,0 +1,47 @@
+diff --git a/scripts/lib/retencion.mjs b/scripts/lib/retencion.mjs
+new file mode 100644
+index 0000000..71c0d4e
+--- /dev/null
++++ b/scripts/lib/retencion.mjs
+@@ -0,0 +1,11 @@
++// Cuántos días se guarda un fichero de sesión sin tocar antes de poder purgarlo.
++const DIA_MS = 24 * 60 * 60 * 1000;
++
++export function diasDeRetencion(env = process.env) {
++  return Number(env.FABRICA_RETENCION_DIAS) || 30;
++}
++
++// `ultima` y `ahora` son instantes en milisegundos; el reloj entra siempre por parámetro.
++export function esVieja(ultima, ahora, dias) {
++  return ahora - ultima > dias * DIA_MS;
++}
+diff --git a/test/retencion.test.js b/test/retencion.test.js
+new file mode 100644
+index 0000000..a1b72f5
+--- /dev/null
++++ b/test/retencion.test.js
+@@ -0,0 +1,24 @@
++// retencion: días de retención desde el entorno y si una sesión ya es vieja.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { diasDeRetencion, esVieja } from '../scripts/lib/retencion.mjs';
++
++const DIA = 24 * 60 * 60 * 1000;
++
++test('retencion: sin variable, 30 días', () => {
++  assert.equal(diasDeRetencion({}), 30);
++});
++
++test('retencion: con la variable puesta manda la variable', () => {
++  assert.equal(diasDeRetencion({ FABRICA_RETENCION_DIAS: '7' }), 7);
++});
++
++test('retencion: una variable que no es un número vuelve a los 30 días', () => {
++  assert.equal(diasDeRetencion({ FABRICA_RETENCION_DIAS: 'treinta' }), 30);
++});
++
++test('retencion: es vieja pasados los días y no antes', () => {
++  const ahora = Date.UTC(2026, 9, 20);
++  assert.equal(esVieja(ahora - 31 * DIA, ahora, 30), true);
++  assert.equal(esVieja(ahora - 29 * DIA, ahora, 30), false);
++});

@@ -1,0 +1,39 @@
+diff --git a/scripts/lib/fecha-corta.mjs b/scripts/lib/fecha-corta.mjs
+new file mode 100644
+index 0000000..c40a7e9
+--- /dev/null
++++ b/scripts/lib/fecha-corta.mjs
+@@ -0,0 +1,5 @@
++// Un instante en milisegundos como «20/10/2026», en la hora de Madrid.
++export function formatearFecha(ms) {
++  if (!Number.isInteger(ms)) throw new Error('la fecha debe ser un instante entero en milisegundos');
++  return new Date(ms).toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric' });
++}
+diff --git a/test/fecha-corta.test.js b/test/fecha-corta.test.js
+new file mode 100644
+index 0000000..8d3b1f2
+--- /dev/null
++++ b/test/fecha-corta.test.js
+@@ -0,0 +1,22 @@
++// formatearFecha: instante -> dd/mm/aaaa en Madrid.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { formatearFecha } from '../scripts/lib/fecha-corta.mjs';
++
++test('fecha corta: un día cualquiera', () => {
++  assert.equal(formatearFecha(Date.UTC(2026, 9, 20, 10, 0, 0)), '20/10/2026');
++});
++
++test('fecha corta: a las 23:30 UTC ya es el día siguiente en Madrid', () => {
++  assert.equal(formatearFecha(Date.UTC(2026, 6, 15, 23, 30, 0)), '16/07/2026');
++});
++
++test('madrid-time: el cambio de hora de octubre no repite la hora', () => {
++  const antes = Date.UTC(2026, 9, 25, 0, 30, 0);
++  const despues = Date.UTC(2026, 9, 25, 1, 30, 0);
++  assert.notEqual(formatearFecha(despues), formatearFecha(antes));
++});
++
++test('fecha corta: lo que no es un entero lanza', () => {
++  for (const x of [1.5, '5', NaN]) assert.throws(() => formatearFecha(x), /instante entero/, String(x));
++});

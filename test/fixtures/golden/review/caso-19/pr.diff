@@ -1,0 +1,42 @@
+diff --git a/scripts/lib/etiqueta-estado.mjs b/scripts/lib/etiqueta-estado.mjs
+new file mode 100644
+index 0000000..a07d4b1
+--- /dev/null
++++ b/scripts/lib/etiqueta-estado.mjs
+@@ -0,0 +1,15 @@
++// El texto corto de un estado de PR, para las líneas de `npm run sesiones`.
++export function etiquetaDeEstado(estado) {
++  switch (estado) {
++    case 'abierto':
++      return 'PR abierto';
++    case 'borrador':
++      return 'PR en borrador';
++    case 'fusionado':
++      return 'PR fusionado';
++    case 'cerrado':
++      return 'PR cerrado sin fusionar';
++    default:
++      throw new Error(`estado de PR desconocido: ${estado}`);
++  }
++}
+diff --git a/test/etiqueta-estado.test.js b/test/etiqueta-estado.test.js
+new file mode 100644
+index 0000000..b84e2f5
+--- /dev/null
++++ b/test/etiqueta-estado.test.js
+@@ -0,0 +1,15 @@
++// etiquetaDeEstado: un texto por estado y error con uno desconocido.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { etiquetaDeEstado } from '../scripts/lib/etiqueta-estado.mjs';
++
++test('etiqueta: los cuatro estados', () => {
++  assert.equal(etiquetaDeEstado('abierto'), 'PR abierto');
++  assert.equal(etiquetaDeEstado('borrador'), 'PR en borrador');
++  assert.equal(etiquetaDeEstado('fusionado'), 'PR fusionado');
++  assert.equal(etiquetaDeEstado('cerrado'), 'PR cerrado sin fusionar');
++});
++
++test('etiqueta: un estado desconocido lanza con el valor', () => {
++  assert.throws(() => etiquetaDeEstado('merged'), /desconocido: merged/);
++});

@@ -1,0 +1,45 @@
+diff --git a/scripts/lib/formato-viejo.mjs b/scripts/lib/formato-viejo.mjs
+deleted file mode 100644
+index 3be90a7..0000000
+--- a/scripts/lib/formato-viejo.mjs
++++ /dev/null
+@@ -1,16 +0,0 @@
+-// Lee una ficha de sesión del formato anterior: una línea `clave=valor` por campo.
+-// Las fichas actuales son JSON (scripts/lib/session-log.mjs); esto solo sirvió durante el cambio.
+-export function leerFormatoViejo(texto) {
+-  const ficha = {};
+-  for (const linea of texto.split('\n')) {
+-    if (linea.trim() === '') continue;
+-    const i = linea.indexOf('=');
+-    if (i === -1) throw new Error(`ficha vieja: línea sin «=»: ${linea}`);
+-    ficha[linea.slice(0, i)] = linea.slice(i + 1);
+-  }
+-  return ficha;
+-}
+-
+-export function esFormatoViejo(texto) {
+-  return !texto.trimStart().startsWith('{');
+-}
+diff --git a/test/formato-viejo.test.js b/test/formato-viejo.test.js
+deleted file mode 100644
+index 6d2f0b4..0000000
+--- a/test/formato-viejo.test.js
++++ /dev/null
+@@ -1,17 +0,0 @@
+-// leerFormatoViejo: clave=valor por línea.
+-import { test } from 'node:test';
+-import assert from 'node:assert/strict';
+-import { esFormatoViejo, leerFormatoViejo } from '../scripts/lib/formato-viejo.mjs';
+-
+-test('formato viejo: una línea por campo', () => {
+-  assert.deepEqual(leerFormatoViejo('rama=feat/a\nsesion=12\n'), { rama: 'feat/a', sesion: '12' });
+-});
+-
+-test('formato viejo: una línea sin igual lanza', () => {
+-  assert.throws(() => leerFormatoViejo('rama'), /sin «=»/);
+-});
+-
+-test('formato viejo: se reconoce porque no empieza por una llave', () => {
+-  assert.equal(esFormatoViejo('rama=feat/a'), true);
+-  assert.equal(esFormatoViejo('{"rama":"feat/a"}'), false);
+-});

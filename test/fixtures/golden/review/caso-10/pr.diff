@@ -1,0 +1,80 @@
+diff --git a/scripts/ajustes.mjs b/scripts/ajustes.mjs
+new file mode 100644
+index 0000000..b41d7e2
+--- /dev/null
++++ b/scripts/ajustes.mjs
+@@ -0,0 +1,13 @@
++// Preferencias locales de la sesión.
++//   node scripts/ajustes.mjs poner <clave> <valor>
++import { fileURLToPath } from 'node:url';
++import { ponerAjuste } from './lib/ajustes.mjs';
++
++if (process.argv[1] === fileURLToPath(import.meta.url)) {
++  const [orden, clave, valor] = process.argv.slice(2);
++  if (orden !== 'poner' || !clave || valor === undefined) {
++    console.error('uso: node scripts/ajustes.mjs poner <clave> <valor>');
++    process.exit(1);
++  }
++  console.log(JSON.stringify(ponerAjuste(clave, valor)));
++}
+diff --git a/scripts/lib/ajustes.mjs b/scripts/lib/ajustes.mjs
+new file mode 100644
+index 0000000..5d0c3a9
+--- /dev/null
++++ b/scripts/lib/ajustes.mjs
+@@ -0,0 +1,20 @@
++// Preferencias locales de la sesión, en un JSON plano de la carpeta de trabajo.
++import { readFileSync, writeFileSync } from 'node:fs';
++
++export const FICHERO_AJUSTES = '.fabrica-ajustes.json';
++
++// El fichero puede no existir todavía (sesión nueva) o no ser legible: en esos casos, sin ajustes.
++export function leerAjustes(fichero = FICHERO_AJUSTES) {
++  try {
++    return JSON.parse(readFileSync(fichero, 'utf8'));
++  } catch {
++    return {};
++  }
++}
++
++// Guarda una clave y conserva las demás.
++export function ponerAjuste(clave, valor, fichero = FICHERO_AJUSTES) {
++  const ajustes = { ...leerAjustes(fichero), [clave]: valor };
++  writeFileSync(fichero, `${JSON.stringify(ajustes, null, 2)}\n`);
++  return ajustes;
++}
+diff --git a/test/ajustes.test.js b/test/ajustes.test.js
+new file mode 100644
+index 0000000..c3e8f10
+--- /dev/null
++++ b/test/ajustes.test.js
+@@ -0,0 +1,29 @@
++// ajustes: leer y poner preferencias locales.
++import { test, after } from 'node:test';
++import assert from 'node:assert/strict';
++import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import { leerAjustes, ponerAjuste } from '../scripts/lib/ajustes.mjs';
++
++const dir = mkdtempSync(path.join(tmpdir(), 'ajustes-'));
++after(() => rmSync(dir, { recursive: true, force: true }));
++
++test('ajustes: sin fichero no hay ajustes', () => {
++  assert.deepEqual(leerAjustes(path.join(dir, 'no-existe.json')), {});
++});
++
++test('ajustes: poner una clave conserva las que ya había', () => {
++  const f = path.join(dir, 'a.json');
++  ponerAjuste('silencio-hooks', 'si', f);
++  ponerAjuste('color', 'no', f);
++  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { 'silencio-hooks': 'si', color: 'no' });
++});
++
++test('ajustes: un fichero que no es JSON se trata como vacío y la clave nueva se guarda igual', () => {
++  const f = path.join(dir, 'roto.json');
++  writeFileSync(f, '{"silencio-hooks": "si", ');
++  assert.deepEqual(leerAjustes(f), {});
++  ponerAjuste('color', 'no', f);
++  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { color: 'no' });
++});

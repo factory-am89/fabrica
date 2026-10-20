@@ -1,0 +1,31 @@
+diff --git a/plans/nombre-de-plan.md b/plans/nombre-de-plan.md
+new file mode 100644
+index 0000000..a93c0f5
+--- /dev/null
++++ b/plans/nombre-de-plan.md
+@@ -0,0 +1,25 @@
++# Plan: Que el nombre de un plan sea un nombre en minúsculas y con guiones
++
++Verdict: los planes de `plans/` se nombran a ojo y el nombre sale en ramas, PR y notas; un check que rechaza un nombre con mayúsculas, espacios o tildes evita renombrar después, en un trozo.
++
++Todo lo dicho sobre el repo se comprobó en `origin/main` `5b543f2`, salvo lo que va en «Not verified».
++
++## Chunks
++
++### 1. `slugValido` y un test que lo aplica a cada fichero de `plans/`
++Files: `scripts/lib/plan-slug.mjs`, `test/plan-slug.test.js`
++Depends on: none
++Blocked by: none
++Existing: `git grep -n -i -E "slugValido|plan-slug" origin/main -- scripts test` -> sin salida (código 1). Los cuatro planes de hoy ya cumplen la regla (`git ls-tree --name-only origin/main plans/` -> `plans/app-admin.md`, `plans/menuplan-separation.md`, `plans/registro-de-no.md`, `plans/trabajar-solos.md`).
++Not done: renombrar planes ya existentes (ninguno lo necesita); exigir que el nombre del plan coincida con el de la rama; comprobarlo en `scripts/check-plan.mjs`, que es de la puerta.
++Regla nueva: un fichero de `plans/` se llama `<minúsculas, dígitos y guiones>.md`. Lector: `test/plan-slug.test.js`, que lista `plans/` y llama a `slugValido` con cada nombre. Disparador: `ci-test` (lo recoge `npm test`, que `tests.yml` corre en cada PR).
++Done:
++```sh
++node -e "import('./scripts/lib/plan-slug.mjs').then((m) => process.exit(m.slugValido('Plan Nuevo.md') ? 1 : 0))"
++```
++
++## Decisions taken
++None
++
++## Not verified
++- Que `tests.yml` corra `npm test` en cada PR de este repo: lo doy por cierto por cómo se describe el check `tests`, no he releído el workflow.

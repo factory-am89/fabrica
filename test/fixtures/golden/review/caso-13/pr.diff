@@ -1,0 +1,65 @@
+diff --git a/scripts/lib/estado-prs.mjs b/scripts/lib/estado-prs.mjs
+new file mode 100644
+index 0000000..d8e4b10
+--- /dev/null
++++ b/scripts/lib/estado-prs.mjs
+@@ -0,0 +1,8 @@
++// El estado de los PR de varias ramas, preguntado a la vez.
++// `consulta(rama)` devuelve una promesa de { numero, titulo, verde }.
++export async function estadoDePrs(ramas, consulta) {
++  const resultados = await Promise.allSettled(ramas.map((rama) => consulta(rama)));
++  return resultados.filter((r) => r.status === 'fulfilled').map((r) => r.value);
++}
++
++export const linea = (pr) => `#${pr.numero} ${pr.titulo}: ${pr.verde ? 'verde' : 'pendiente'}`;
+diff --git a/scripts/ramas-abiertas.mjs b/scripts/ramas-abiertas.mjs
+new file mode 100644
+index 0000000..3c07e95
+--- /dev/null
++++ b/scripts/ramas-abiertas.mjs
+@@ -0,0 +1,19 @@
++// Estado de los PR de las ramas dadas.
++//   node scripts/ramas-abiertas.mjs <rama> [<rama> ...]
++import { execFile } from 'node:child_process';
++import { promisify } from 'node:util';
++import { fileURLToPath } from 'node:url';
++import { estadoDePrs, linea } from './lib/estado-prs.mjs';
++
++const run = promisify(execFile);
++
++async function consultaDeGitHub(rama) {
++  const { stdout } = await run('gh', ['pr', 'view', rama, '--json', 'number,title,statusCheckRollup']);
++  const pr = JSON.parse(stdout);
++  return { numero: pr.number, titulo: pr.title, verde: pr.statusCheckRollup.every((c) => c.conclusion === 'SUCCESS') };
++}
++
++if (process.argv[1] === fileURLToPath(import.meta.url)) {
++  const prs = await estadoDePrs(process.argv.slice(2), consultaDeGitHub);
++  for (const pr of prs) console.log(linea(pr));
++}
+diff --git a/test/estado-prs.test.js b/test/estado-prs.test.js
+new file mode 100644
+index 0000000..b21f7c6
+--- /dev/null
++++ b/test/estado-prs.test.js
+@@ -0,0 +1,20 @@
++// estadoDePrs: una consulta por rama, con una consulta falsa.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { estadoDePrs, linea } from '../scripts/lib/estado-prs.mjs';
++
++const consulta = async (rama) => ({ numero: rama.length, titulo: `PR de ${rama}`, verde: rama.startsWith('feat/') });
++
++test('estadoDePrs: un estado por rama, en el orden de las ramas', async () => {
++  const prs = await estadoDePrs(['feat/a', 'fix/bb'], consulta);
++  assert.deepEqual(prs.map((p) => p.titulo), ['PR de feat/a', 'PR de fix/bb']);
++});
++
++test('estadoDePrs: sin ramas no hay estados', async () => {
++  assert.deepEqual(await estadoDePrs([], consulta), []);
++});
++
++test('linea: verde y pendiente', () => {
++  assert.equal(linea({ numero: 7, titulo: 'x', verde: true }), '#7 x: verde');
++  assert.equal(linea({ numero: 8, titulo: 'y', verde: false }), '#8 y: pendiente');
++});

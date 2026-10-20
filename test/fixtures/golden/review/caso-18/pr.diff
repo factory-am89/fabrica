@@ -1,0 +1,36 @@
+diff --git a/scripts/lib/rondas.mjs b/scripts/lib/rondas.mjs
+new file mode 100644
+index 0000000..e3b50a8
+--- /dev/null
++++ b/scripts/lib/rondas.mjs
+@@ -0,0 +1,7 @@
++// ¿Hay que parar? Un PR con demasiadas rondas de «no» no se arregla seguido: se para y se deja escrito.
++// `rondas` es el número de veces que el revisor ha dicho no a la cabeza del PR hasta ahora.
++export function debeParar(rondas) {
++  if (!Number.isInteger(rondas) || rondas < 0) throw new Error('las rondas deben ser un entero no negativo');
++  if (rondas > 3) return `${rondas} rondas con «no»: para y déjalo escrito, más de 3 no se arreglan seguidas`;
++  return null;
++}
+diff --git a/test/rondas.test.js b/test/rondas.test.js
+new file mode 100644
+index 0000000..7f2a9c3
+--- /dev/null
++++ b/test/rondas.test.js
+@@ -0,0 +1,17 @@
++// debeParar: hasta cuántas rondas se sigue.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { debeParar } from '../scripts/lib/rondas.mjs';
++
++test('rondas: con 3 o menos se sigue', () => {
++  for (const r of [0, 1, 3]) assert.equal(debeParar(r), null, String(r));
++});
++
++test('rondas: con 4 se para y el motivo dice cuántas', () => {
++  assert.match(debeParar(4), /^4 rondas/);
++  assert.match(debeParar(9), /^9 rondas/);
++});
++
++test('rondas: lo que no es un entero no negativo lanza', () => {
++  for (const x of [-1, 1.5, '2', NaN]) assert.throws(() => debeParar(x), /entero no negativo/, String(x));
++});

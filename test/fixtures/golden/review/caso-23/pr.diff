@@ -1,0 +1,45 @@
+diff --git a/scripts/lib/tamano.mjs b/scripts/lib/tamano.mjs
+new file mode 100644
+index 0000000..6c1b9f0
+--- /dev/null
++++ b/scripts/lib/tamano.mjs
+@@ -0,0 +1,14 @@
++// Bytes como texto corto: «512 B», «1,5 KiB», «3,0 MiB». Base 1024, una cifra decimal desde KiB.
++const UNIDADES = ['B', 'KiB', 'MiB', 'GiB'];
++const BASE = 1024;
++
++export function formatearTamano(bytes) {
++  if (!Number.isInteger(bytes) || bytes < 0) throw new Error('el tamaño debe ser un entero de bytes, no negativo');
++  let valor = bytes;
++  let i = 0;
++  while (valor >= BASE && i < UNIDADES.length - 1) {
++    valor /= BASE;
++    i += 1;
++  }
++  return i === 0 ? `${valor} B` : `${valor.toFixed(1).replace('.', ',')} ${UNIDADES[i]}`;
++}
+diff --git a/test/tamano.test.js b/test/tamano.test.js
+new file mode 100644
+index 0000000..5e0a7d3
+--- /dev/null
++++ b/test/tamano.test.js
+@@ -0,0 +1,19 @@
++// formatearTamano: bytes -> texto corto.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { formatearTamano } from '../scripts/lib/tamano.mjs';
++
++test('tamano: bytes sueltos', () => {
++  assert.equal(formatearTamano(0), '0 B');
++  assert.equal(formatearTamano(512), '512 B');
++});
++
++test('tamano: KiB, MiB y GiB con una cifra decimal', () => {
++  assert.equal(formatearTamano(1536), '1,5 KiB');
++  assert.equal(formatearTamano(3 * 1024 * 1024), '3,0 MiB');
++  assert.equal(formatearTamano(2 * 1024 ** 3), '2,0 GiB');
++});
++
++test('tamano: lo que no es un entero no negativo lanza', () => {
++  for (const x of [-1, 1.5, '5', NaN]) assert.throws(() => formatearTamano(x), /entero de bytes/, String(x));
++});

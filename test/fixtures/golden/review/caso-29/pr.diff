@@ -1,0 +1,31 @@
+diff --git a/plans/tiempo-de-tests-en-el-pr.md b/plans/tiempo-de-tests-en-el-pr.md
+new file mode 100644
+index 0000000..4e8d2a9
+--- /dev/null
++++ b/plans/tiempo-de-tests-en-el-pr.md
+@@ -0,0 +1,25 @@
++# Plan: Que el constructor apunte cuánto tardó `tests` en cada PR
++
++Verdict: no hay ningún dato de cuánto tarda `tests` en cada PR, y sin él no se puede ver si la suite se hace lenta; el runbook de subir un PR pide ahora apuntarlo en el cuerpo, en un trozo.
++
++Todo lo dicho sobre el repo se comprobó en `origin/main` `5b543f2`, salvo lo que va en «Not verified».
++
++## Chunks
++
++### 1. Un paso del runbook de subir un PR: apuntar la duración de `tests`
++Files: `.claude/skills/github/referencias/subir.md`, `test/subir-runbook.test.js`
++Depends on: none
++Blocked by: none
++Existing: `git grep -n -i -E "duración de tests|tardó" origin/main -- .claude test scripts` -> sin salida (código 1). `.claude/skills/github/referencias/subir.md` tiene hoy 8 pasos numerados (`grep -c -E "^[0-9]+\. \*\*" .claude/skills/github/referencias/subir.md` -> 8) y ninguno habla de tiempos.
++Not done: calcular la media o guardar las duraciones fuera del cuerpo del PR; leer la duración desde `gh` (la apunta el constructor a mano); tocar `.github/workflows/**`.
++Regla nueva: tras ver `tests` en verde, el constructor añade al final de `Not verified` una línea «tests tardó <n> min». Ningún script ni ninguna pregunta la lee, y el plan no añade un check que lo vea: es una frase del runbook que cada constructor cumple o no.
++Done:
++```sh
++node --test test/subir-runbook.test.js
++```
++
++## Decisions taken
++None
++
++## Not verified
++- Cuánto tarda hoy `tests` en un PR: no lo he medido, por eso se quiere apuntar.

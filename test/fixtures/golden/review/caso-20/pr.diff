@@ -1,0 +1,38 @@
+diff --git a/scripts/lib/prioridad.mjs b/scripts/lib/prioridad.mjs
+new file mode 100644
+index 0000000..d70b4f6
+--- /dev/null
++++ b/scripts/lib/prioridad.mjs
+@@ -0,0 +1,8 @@
++// La prioridad de una reserva de reparto.json: cuál de dos ramas que se pisan debe ceder.
++// `reserva` es { rama, ficheros, hasta, prioridad }; lanza si la prioridad falta o no es ninguna de las tres.
++export function validarPrioridad(reserva) {
++  if (!['alta', 'media', 'baja'].includes(reserva.prioridad)) {
++    throw new Error(`reserva de ${reserva.rama}: prioridad debe ser alta, media o baja`);
++  }
++  return reserva;
++}
+diff --git a/test/prioridad.test.js b/test/prioridad.test.js
+new file mode 100644
+index 0000000..c2e8d1a
+--- /dev/null
++++ b/test/prioridad.test.js
+@@ -0,0 +1,18 @@
++// validarPrioridad: las tres prioridades valen y cualquier otra cosa lanza.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { validarPrioridad } from '../scripts/lib/prioridad.mjs';
++
++const reserva = (prioridad) => ({ rama: 'feat/a', ficheros: ['scripts/a.mjs'], hasta: '2026-10-21T10:00:00Z', prioridad });
++
++test('prioridad: las tres prioridades valen', () => {
++  for (const p of ['alta', 'media', 'baja']) assert.equal(validarPrioridad(reserva(p)).prioridad, p);
++});
++
++test('prioridad: una prioridad fuera de las tres lanza', () => {
++  assert.throws(() => validarPrioridad(reserva('urgente')), /prioridad debe ser alta, media o baja/);
++});
++
++test('prioridad: una reserva sin prioridad lanza', () => {
++  assert.throws(() => validarPrioridad({ rama: 'feat/a', ficheros: ['scripts/a.mjs'], hasta: '2026-10-21T10:00:00Z' }), /reserva de feat\/a/);
++});

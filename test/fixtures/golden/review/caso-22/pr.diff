@@ -1,0 +1,48 @@
+diff --git a/scripts/lib/contar-respuestas.mjs b/scripts/lib/contar-respuestas.mjs
+new file mode 100644
+index 0000000..c8d41a2
+--- /dev/null
++++ b/scripts/lib/contar-respuestas.mjs
+@@ -0,0 +1,13 @@
++// Cuenta las respuestas de un revisor: cuántos sí, cuántos no y cuántos no aplica.
++// `respuestas` es la lista { id, respuesta, prueba } que contesta el juez.
++export function contarRespuestas(respuestas) {
++  const cuenta = { sí: 0, no: 0, 'no aplica': 0 };
++  for (const r of respuestas) {
++    if (r.respuesta !== 'sí' && r.respuesta !== 'no' && r.respuesta !== 'no aplica') throw new Error(`${r.id}: respuesta fuera de vocabulario: ${r.respuesta}`);
++    cuenta[r.respuesta] += 1;
++  }
++  return cuenta;
++}
++
++// Las preguntas con «no», en el orden en que vienen.
++export const conNo = (respuestas) => respuestas.filter((r) => r.respuesta === 'no').map((r) => r.id);
+diff --git a/test/contar-respuestas.test.js b/test/contar-respuestas.test.js
+new file mode 100644
+index 0000000..a39f6e0
+--- /dev/null
++++ b/test/contar-respuestas.test.js
+@@ -0,0 +1,23 @@
++// contarRespuestas y conNo.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { conNo, contarRespuestas } from '../scripts/lib/contar-respuestas.mjs';
++
++const respuestas = [
++  { id: 'C5', respuesta: 'sí', prueba: 'x' },
++  { id: 'C6', respuesta: 'no', prueba: 'y' },
++  { id: 'C13', respuesta: 'no aplica', prueba: 'z' },
++  { id: 'C9', respuesta: 'no', prueba: 'w' },
++];
++
++test('contar: una cuenta por respuesta', () => {
++  assert.deepEqual(contarRespuestas(respuestas), { sí: 1, no: 2, 'no aplica': 1 });
++});
++
++test('contar: una respuesta fuera de vocabulario lanza', () => {
++  assert.throws(() => contarRespuestas([{ id: 'C5', respuesta: 'quizá', prueba: 'x' }]), /fuera de vocabulario: quizá/);
++});
++
++test('conNo: los ids con no, en orden', () => {
++  assert.deepEqual(conNo(respuestas), ['C6', 'C9']);
++});

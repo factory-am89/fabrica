@@ -1,0 +1,64 @@
+diff --git a/scripts/lib/carpeta-limpia.mjs b/scripts/lib/carpeta-limpia.mjs
+new file mode 100644
+index 0000000..2e6b1c7
+--- /dev/null
++++ b/scripts/lib/carpeta-limpia.mjs
+@@ -0,0 +1,7 @@
++// ¿La carpeta no tiene nada sin guardar? Es la mitad de la condición para poder borrarla.
++import { spawnSync } from 'node:child_process';
++
++export function carpetaLimpia(carpeta) {
++  const r = spawnSync('git', ['status', '--porcelain'], { cwd: carpeta, encoding: 'utf8' });
++  return r.stdout.trim() === '';
++}
+diff --git a/scripts/limpiar-lista.mjs b/scripts/limpiar-lista.mjs
+new file mode 100644
+index 0000000..a85b0d3
+--- /dev/null
++++ b/scripts/limpiar-lista.mjs
+@@ -0,0 +1,8 @@
++// Lista las carpetas dadas con su estado (solo lista; no borra nada).
++//   node scripts/limpiar-lista.mjs <carpeta> [<carpeta> ...]
++import { fileURLToPath } from 'node:url';
++import { carpetaLimpia } from './lib/carpeta-limpia.mjs';
++
++if (process.argv[1] === fileURLToPath(import.meta.url)) {
++  for (const carpeta of process.argv.slice(2)) console.log(`${carpeta}: ${carpetaLimpia(carpeta) ? 'limpia' : 'con cambios'}`);
++}
+diff --git a/test/carpeta-limpia.test.js b/test/carpeta-limpia.test.js
+new file mode 100644
+index 0000000..f9b04a8
+--- /dev/null
++++ b/test/carpeta-limpia.test.js
+@@ -0,0 +1,31 @@
++// carpetaLimpia: un repo temporal sin cambios, con un fichero sin añadir y una carpeta que no es repo.
++import { test, after } from 'node:test';
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import { carpetaLimpia } from '../scripts/lib/carpeta-limpia.mjs';
++
++const dir = mkdtempSync(path.join(tmpdir(), 'limpia-'));
++after(() => rmSync(dir, { recursive: true, force: true }));
++const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
++
++test('carpetaLimpia: un repo recién creado está limpio', () => {
++  git(dir, 'init', '-q');
++  assert.equal(carpetaLimpia(dir), true);
++});
++
++test('carpetaLimpia: un fichero sin añadir la ensucia', () => {
++  writeFileSync(path.join(dir, 'a.txt'), 'hola');
++  assert.equal(carpetaLimpia(dir), false);
++});
++
++test('carpetaLimpia: una carpeta que no es un repo devuelve un booleano', () => {
++  const fuera = mkdtempSync(path.join(tmpdir(), 'fuera-'));
++  try {
++    assert.equal(typeof carpetaLimpia(fuera), 'boolean');
++  } finally {
++    rmSync(fuera, { recursive: true, force: true });
++  }
++});
