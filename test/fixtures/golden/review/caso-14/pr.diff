@@ -1,0 +1,60 @@
+diff --git a/scripts/lib/indice-lecciones.mjs b/scripts/lib/indice-lecciones.mjs
+new file mode 100644
+index 0000000..9a41c5d
+--- /dev/null
++++ b/scripts/lib/indice-lecciones.mjs
+@@ -0,0 +1,12 @@
++// Las lecciones agrupadas por pregunta, recorriendo la lista una sola vez.
++export function indicePorPregunta(lecciones) {
++  const indice = new Map();
++  for (const leccion of lecciones) {
++    const grupo = indice.get(leccion.question) ?? [];
++    grupo.push(leccion);
++    indice.set(leccion.question, grupo);
++  }
++  return indice;
++}
++
++export const deLaPregunta = (indice, pregunta) => indice.get(pregunta) ?? [];
+diff --git a/scripts/lessons.mjs b/scripts/lessons.mjs
+index 41b7a03..b6c9d2e 100644
+--- a/scripts/lessons.mjs
++++ b/scripts/lessons.mjs
+@@ -9,5 +9,7 @@
+ import { fileURLToPath } from 'node:url';
+ import { readLessons } from './lib/lessons.mjs';
++import { deLaPregunta, indicePorPregunta } from './lib/indice-lecciones.mjs';
+
+ const lecciones = readLessons();
++const indice = indicePorPregunta(lecciones);
+
+@@ -31,6 +33,6 @@ function resumen() {
+   const porPregunta = {};
+   for (const q of preguntas) {
+-    porPregunta[q.id] = lecciones.filter((l) => l.question === q.id).length;
++    porPregunta[q.id] = deLaPregunta(indice, q.id).length;
+   }
+   return porPregunta;
+ }
+diff --git a/test/indice-lecciones.test.js b/test/indice-lecciones.test.js
+new file mode 100644
+index 0000000..e07a4f8
+--- /dev/null
++++ b/test/indice-lecciones.test.js
+@@ -0,0 +1,16 @@
++// indicePorPregunta: agrupa por pregunta sin perder ninguna lección.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { deLaPregunta, indicePorPregunta } from '../scripts/lib/indice-lecciones.mjs';
++
++const lecciones = [{ id: 'a', question: 'C5' }, { id: 'b', question: 'C9' }, { id: 'c', question: 'C5' }];
++
++test('indice: agrupa por pregunta', () => {
++  const indice = indicePorPregunta(lecciones);
++  assert.deepEqual(deLaPregunta(indice, 'C5').map((l) => l.id), ['a', 'c']);
++  assert.deepEqual(deLaPregunta(indice, 'C9').map((l) => l.id), ['b']);
++});
++
++test('indice: una pregunta sin lecciones da una lista vacía', () => {
++  assert.deepEqual(deLaPregunta(indicePorPregunta(lecciones), 'C12'), []);
++});

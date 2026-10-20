@@ -1,0 +1,40 @@
+diff --git a/scripts/lib/quien-cede.mjs b/scripts/lib/quien-cede.mjs
+new file mode 100644
+index 0000000..e5a09c3
+--- /dev/null
++++ b/scripts/lib/quien-cede.mjs
+@@ -0,0 +1,9 @@
++// Cuando dos reservas de reparto.json se pisan en un fichero, ¿cuál cede?
++import { solapan } from './work-split.mjs';
++
++// `a` y `b` son reservas { rama, ficheros, hasta }. Devuelve la rama que cede, o null si no se pisan.
++export function quienCede(a, b) {
++  const sePisan = a.ficheros.some((fa) => b.ficheros.some((fb) => solapan(fa, fb)));
++  if (!sePisan) return null;
++  return Date.parse(a.hasta) >= Date.parse(b.hasta) ? a.rama : b.rama;
++}
+diff --git a/test/quien-cede.test.js b/test/quien-cede.test.js
+new file mode 100644
+index 0000000..2f47b1d
+--- /dev/null
++++ b/test/quien-cede.test.js
+@@ -0,0 +1,19 @@
++// quienCede: dos reservas que se pisan y dos que no.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { quienCede } from '../scripts/lib/quien-cede.mjs';
++
++const reserva = (rama, ficheros, hasta) => ({ rama, ficheros, hasta });
++
++test('quien-cede: si se pisan cede la que reserva hasta más tarde', () => {
++  const a = reserva('feat/a', ['scripts/x.mjs'], '2026-10-21T10:00:00Z');
++  const b = reserva('feat/b', ['scripts/x.mjs'], '2026-10-20T18:00:00Z');
++  assert.equal(quienCede(a, b), 'feat/a');
++  assert.equal(quienCede(b, a), 'feat/a');
++});
++
++test('quien-cede: si no se pisan no cede nadie', () => {
++  const a = reserva('feat/a', ['scripts/x.mjs'], '2026-10-21T10:00:00Z');
++  const b = reserva('feat/b', ['test/y.test.js'], '2026-10-20T18:00:00Z');
++  assert.equal(quienCede(a, b), null);
++});

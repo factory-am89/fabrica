@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { MAX_CALLS } from '../scripts/golden-run.mjs';
 
 const RAIZ = path.join(import.meta.dirname, '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'golden-run.mjs');
@@ -14,18 +15,20 @@ const WORKFLOW = path.join(RAIZ, '.github', 'workflows', 'revisor.yml');
 const temporales = [];
 after(() => temporales.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-// Un corpus de 3 casos (uno por pregunta mala, otro y un limpio) para los tests que no necesitan los 9: cada llamada cuesta ~0,7 s.
-function corpusChico() {
+// Un corpus con solo los casos `ids` del real, para los tests que no necesitan todos: cada llamada cuesta ~0,7 s.
+const REAL = path.join(RAIZ, 'test', 'fixtures', 'golden', 'review');
+function corpusDe(ids) {
   const dir = mkdtempSync(path.join(tmpdir(), 'golden-corpus-'));
   temporales.push(dir);
-  const real = path.join(RAIZ, 'test', 'fixtures', 'golden', 'review');
-  const esperado = JSON.parse(readFileSync(path.join(real, 'expected.json'), 'utf8'));
-  const ids = ['caso-01', 'caso-02', 'caso-07'];
-  for (const id of ids) cpSync(path.join(real, id), path.join(dir, id), { recursive: true });
+  const esperado = JSON.parse(readFileSync(path.join(REAL, 'expected.json'), 'utf8'));
+  for (const id of ids) cpSync(path.join(REAL, id), path.join(dir, id), { recursive: true });
   writeFileSync(path.join(dir, 'expected.json'), JSON.stringify(Object.fromEntries(ids.map((id) => [id, esperado[id]]))));
   return dir;
 }
-const CHICO = ['--corpus', corpusChico()];
+// 3 casos (uno por pregunta mala, otro y un limpio) y los 9 primeros, que son los del tope de llamadas de la primera pasada.
+const CHICO = ['--corpus', corpusDe(['caso-01', 'caso-02', 'caso-07'])];
+const NUEVE = ['--corpus', corpusDe(Array.from({ length: 9 }, (_, i) => `caso-0${i + 1}`))];
+const CASOS_REALES = readdirSync(REAL, { withFileTypes: true }).filter((e) => e.isDirectory()).length;
 
 // Una pasada con el claude falso. `tmp` es el directorio temporal que ve la pasada (TEMP/TMP/TMPDIR): al acabar debe estar vacío.
 function pasada(args = [], env = {}) {
@@ -43,7 +46,7 @@ function pasada(args = [], env = {}) {
 }
 
 test('9 casos por 3 intentos son 27 llamadas; se anuncian antes de la primera y cada una imprime su coste', () => {
-  const x = pasada();
+  const x = pasada(NUEVE);
   assert.equal(x.r.status, 0, x.r.stderr);
   assert.equal(x.llamadas.length, 27);
   const anuncio = x.r.stdout.indexOf('27 calls');
@@ -54,12 +57,13 @@ test('9 casos por 3 intentos son 27 llamadas; se anuncian antes de la primera y 
   assert.equal(readdirSync(path.join(x.out, 'caso-01')).length, 3);
 });
 
-test('el espacio de trabajo no contiene expected.json ni nada del corpus, y sí el juez y el caso', () => {
-  const x = pasada(['--trials', '1']);
+test('el espacio de trabajo no contiene expected.json ni nada del corpus ni de los casos de juez, y sí el juez y el caso', () => {
+  const x = pasada(['--trials', '1', ...NUEVE]);
   assert.equal(x.r.status, 0, x.r.stderr);
   assert.equal(x.llamadas.length, 9);
   for (const l of x.llamadas) {
     assert.ok(!l.ficheros.some((f) => /expected\.json$/.test(f) || /test\/fixtures\/golden\//.test(f)), l.ficheros.filter((f) => /golden/.test(f)).join(', '));
+    assert.ok(!l.ficheros.some((f) => /test\/fixtures\/invariants\//.test(f)), l.ficheros.filter((f) => /invariants/.test(f)).join(', '));
     for (const f of ['pr.diff', 'body.md', '.fabrica/standards/code.md', '.fabrica/.claude/agents/revisor.md']) assert.ok(l.ficheros.includes(f), f);
   }
   assert.ok(x.llamadas.every((l) => !l.cwd.startsWith(RAIZ)), 'el claude no corre dentro del repo');
@@ -95,10 +99,10 @@ test('el prompt es el del workflow con solo el número, la ruta del diff y la fr
   assert.match(stdin, /El diff exacto está en .*pr\.diff/);
 });
 
-test('más de 27 llamadas se rechaza antes de llamar a nadie', () => {
+test('más llamadas que el tope se rechaza antes de llamar a nadie', () => {
   const x = pasada(['--trials', '4']);
   assert.equal(x.r.status, 1);
-  assert.match(x.r.stderr, /36 calls.*27/);
+  assert.match(x.r.stderr, new RegExp(`${CASOS_REALES * 4} calls.*${MAX_CALLS}`));
   assert.equal(x.llamadas.length, 0);
 });
 

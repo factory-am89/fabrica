@@ -1,0 +1,30 @@
+diff --git a/plans/arranque-rapido.md b/plans/arranque-rapido.md
+new file mode 100644
+index 0000000..d17f3a6
+--- /dev/null
++++ b/plans/arranque-rapido.md
+@@ -0,0 +1,24 @@
++# Plan: Que `npm run lessons` lea las lecciones una sola vez
++
++Verdict: `npm run lessons` es lo más lento del arranque de cada sesión porque lee cada lección varias veces; leerlas una sola vez baja el arranque de unos 4 s a 1 s, en un trozo.
++
++Todo lo dicho sobre el repo se comprobó en `origin/main` `5b543f2`, salvo lo que va en «Not verified».
++
++## Chunks
++
++### 1. Un lector de lecciones que guarda lo leído durante la ejecución
++Files: `scripts/lib/lecciones-leidas.mjs`, `test/lecciones-leidas.test.js`
++Depends on: none
++Blocked by: none
++Existing: `git grep -n -i -E "lecciones-leidas|leerUnaVez" origin/main -- scripts test` -> sin salida (código 1). `readLessons(root)` está en `scripts/lib/lessons.mjs:102` y lee el directorio entero en cada llamada.
++Not done: cambiar `scripts/lessons.mjs` para que use el lector nuevo (trozo siguiente); guardar lo leído entre ejecuciones; invalidar la caché si una lección cambia durante la ejecución.
++Done:
++```sh
++node --test test/lecciones-leidas.test.js
++```
++
++## Decisions taken
++None
++
++## Not verified
++- Cuántas veces llama hoy cada script a `readLessons`: no lo he contado.

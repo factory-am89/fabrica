@@ -25,7 +25,7 @@ test('the guard and scripts/golden.mjs share one corpus path and one clean marke
 
 test('good: an unchanged corpus, a new case, a new expect, clean -> question and question -> question never brake', () => {
   assert.deepEqual(run(copy()), []);
-  assert.deepEqual(run({ ...copy(), 'caso-10': { author: 'sonnet', expect: CLEAN }, 'caso-11': { author: 'sonnet', expect: 'C9' } }), []);
+  assert.deepEqual(run({ ...copy(), 'caso-nuevo-a': { author: 'sonnet', expect: CLEAN }, 'caso-nuevo-b': { author: 'sonnet', expect: 'C9' } }), []);
   const more = copy();
   more['caso-07'].expect = 'C5';
   assert.deepEqual(run(more), []);

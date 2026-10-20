@@ -1,0 +1,30 @@
+diff --git a/plans/aviso-de-cuota.md b/plans/aviso-de-cuota.md
+new file mode 100644
+index 0000000..b17c3e4
+--- /dev/null
++++ b/plans/aviso-de-cuota.md
+@@ -0,0 +1,24 @@
++# Plan: Avisar al arrancar cuando queda poca cuota de GitHub
++
++Verdict: una sesión se entera de que se ha quedado sin llamadas a GitHub cuando `gh` ya falla; un aviso en el arranque lo dice antes, y cabe en un solo trozo.
++
++Todo lo dicho sobre el repo se comprobó en `origin/main` `5b543f2`, salvo lo que va en «Not verified».
++
++## Chunks
++
++### 1. Un paso de arranque que avisa cuando quedan pocas llamadas
++Files: `scripts/lib/aviso-cuota.mjs`, `test/aviso-cuota.test.js`
++Depends on: none
++Blocked by: none
++Existing: `git grep -n -i "aviso-cuota" origin/main -- scripts test` -> sin salida (código 1). `PASOS` de `scripts/al-arrancar.mjs:26` lista los pasos del arranque (`pasoAlDia`, `pasoLimpiar`, `pasoSesiones`, `pasoPeriodico`, `pasoHora`) y ninguno habla de la cuota.
++Not done: enchufar el paso en `PASOS` (el trozo siguiente, que toca `scripts/al-arrancar.mjs`); decidir el umbral de aviso con datos reales de una semana de sesiones; avisar por otro canal que no sea la salida del arranque.
++Done:
++```sh
++npm test
++```
++
++## Decisions taken
++None
++
++## Not verified
++- Cuántas llamadas le quedan de media a una sesión al arrancar: no lo he medido, el umbral lo fijará el trozo siguiente.

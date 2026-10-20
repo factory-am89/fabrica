@@ -1,0 +1,31 @@
+diff --git a/plans/fuente-de-leccion.md b/plans/fuente-de-leccion.md
+new file mode 100644
+index 0000000..c52d7e8
+--- /dev/null
++++ b/plans/fuente-de-leccion.md
+@@ -0,0 +1,25 @@
++# Plan: Que cada lección diga en qué PR se vio el fallo por primera vez
++
++Verdict: para saber cuánto tarda una lección en pagarse hay que saber de qué PR salió, y hoy hay que adivinarlo leyendo su texto; un campo en la lección lo dice, en un trozo.
++
++Todo lo dicho sobre el repo se comprobó en `origin/main` `5b543f2`, salvo lo que va en «Not verified».
++
++## Chunks
++
++### 1. El campo `fuente` en las lecciones, con su prueba
++Files: `scripts/lib/lessons.mjs`, `test/lessons.test.js`, `fields.json`
++Depends on: none
++Blocked by: none
++Existing: `git grep -n -i -E "fuente" origin/main -- lessons fields.json entities.json scripts/lib/lessons.mjs test/lessons.test.js` -> sin salida (código 1). `FIELDS` de `scripts/lib/lessons.mjs:40` tiene nueve campos y ninguno nombra el PR de origen.
++Not done: rellenar `fuente` en las lecciones que ya existen (se hace con una migración aparte, una por lección); leer `fuente` desde `npm run hygiene` o `audit`; tocar `scripts/lib/entities.mjs`.
++Campo nuevo: `fuente`, el `#<n>` del PR donde se vio el fallo por primera vez. Es un atributo de la entidad `lesson`, con valores de tipo `id`, opcional (las lecciones que ya existen no lo tienen) y escrito por quien crea la lección; `fields.json` lo declara como `nueva` con motivo `sin-equivalente`, y `FIELDS` lo lista.
++Done:
++```sh
++node --test test/lessons.test.js test/fields.test.js
++```
++
++## Decisions taken
++None
++
++## Not verified
++- Que el orden de `FIELDS` importe a algún lector de las lecciones: no lo he buscado.

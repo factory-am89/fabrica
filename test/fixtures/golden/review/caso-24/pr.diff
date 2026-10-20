@@ -1,0 +1,59 @@
+diff --git a/package.json b/package.json
+index 7d2c4a8..b5e91f3 100644
+--- a/package.json
++++ b/package.json
+@@ -35,5 +35,6 @@
+   },
+   "dependencies": {
+-    "libsodium-wrappers": "0.8.4"
++    "libsodium-wrappers": "0.8.4",
++    "semver": "7.7.1"
+   }
+ }
+diff --git a/package-lock.json b/package-lock.json
+index c40e9d2..18fa6b7 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "fabrica",
+       "dependencies": {
+-        "libsodium-wrappers": "0.8.4"
++        "libsodium-wrappers": "0.8.4",
++        "semver": "7.7.1"
+       },
+       "devDependencies": {
+         "@eslint/js": "^9.0.0",
+diff --git a/scripts/lib/version-node.mjs b/scripts/lib/version-node.mjs
+new file mode 100644
+index 0000000..a2d70c5
+--- /dev/null
++++ b/scripts/lib/version-node.mjs
+@@ -0,0 +1,8 @@
++// ¿La versión de Node cumple el mínimo de `engines.node` de package.json?
++import semver from 'semver';
++
++export function cumpleNode(version, rango) {
++  if (semver.validRange(rango) === null) throw new Error(`rango de Node no válido: ${rango}`);
++  if (semver.valid(version) === null) throw new Error(`versión de Node no válida: ${version}`);
++  return semver.satisfies(version, rango);
++}
+diff --git a/test/version-node.test.js b/test/version-node.test.js
+new file mode 100644
+index 0000000..3f6b8e4
+--- /dev/null
++++ b/test/version-node.test.js
+@@ -0,0 +1,14 @@
++// cumpleNode: una versión frente al rango de engines.node.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { cumpleNode } from '../scripts/lib/version-node.mjs';
++
++test('version-node: dentro y fuera del rango', () => {
++  assert.equal(cumpleNode('22.4.0', '>=22'), true);
++  assert.equal(cumpleNode('20.11.1', '>=22'), false);
++});
++
++test('version-node: una versión o un rango que no valen lanzan', () => {
++  assert.throws(() => cumpleNode('veintidos', '>=22'), /versión de Node no válida: veintidos/);
++  assert.throws(() => cumpleNode('22.4.0', 'mayor que 22'), /rango de Node no válido/);
++});

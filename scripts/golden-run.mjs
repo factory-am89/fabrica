@@ -5,8 +5,8 @@
 // Prompt, model, max turns, allowed tools and schema are READ from .github/workflows/revisor.yml (step `claude`) with js-yaml:
 // that file is their only source. The only changes made to the prompt are the PR number, the diff path and the sentence that
 // sends the reviewer to `gh pr view` (there is no PR here: it points to body.md instead); Bash tools are dropped for the same reason.
-// Each call gets its own temp workspace: .fabrica/ = `git archive` of --ref (HEAD by default) WITHOUT test/fixtures/golden/ (the
-// reviewer must not read the expectations), plus pr.diff and body.md of the case. At most MAX_CALLS calls per pass.
+// Each call gets its own temp workspace: .fabrica/ = `git archive` of --ref (HEAD by default) WITHOUT test/fixtures/golden/ and
+// test/fixtures/invariants/ (the reviewer must not read the expectations nor the list of judge cases), plus pr.diff and body.md of the case. At most MAX_CALLS calls per pass.
 // Outputs go to DIR/<case>/<trial>.json (default: a folder of its own under the OS temp, kept), then scripts/golden.mjs scores
 // them (no floor) and the report adds the variance: how many cases get an unstable verdict across the trials.
 // GOLDEN_CLAUDE_BIN replaces the claude binary (tests: test/fixtures/claude-falso.mjs).
@@ -21,11 +21,12 @@ import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
-export const MAX_CALLS = 27;
+export const MAX_CALLS = 96; // 32 cases of the corpus x DEFAULT_TRIALS (test/golden-workflow.test.js keeps the corpus under it)
 export const DEFAULT_TRIALS = 3;
 export const PHASES = ['all', 'collect', 'score'];
 const WORKFLOW = path.join(RAIZ, '.github', 'workflows', 'revisor.yml');
-const EXCLUDED = 'test/fixtures/golden';
+// What the judge must not see: the corpus with its expectations, and the invariant cases (cases.json names, for each judge case, the question that must say no).
+const EXCLUDED = ['test/fixtures/golden', 'test/fixtures/invariants'];
 const FAKE_PR = '0';
 const FAKE_REPO = 'corpus';
 const GH_SENTENCE = 'el resto del PR, con `gh pr view`';
@@ -115,7 +116,7 @@ export function resolveClaude(env = process.env) {
 // The commit under test without the corpus, extracted once; returns the folder. Relative paths to tar: GNU tar reads "C:" as a host.
 function exportJudge(ref, dir) {
   const tar = path.join(dir, 'judge.tar');
-  const a = spawnSync('git', ['archive', '--format=tar', '-o', tar, ref, '--', '.', `:(exclude)${EXCLUDED}`], { cwd: RAIZ, encoding: 'utf8' });
+  const a = spawnSync('git', ['archive', '--format=tar', '-o', tar, ref, '--', '.', ...EXCLUDED.map((p) => `:(exclude)${p}`)], { cwd: RAIZ, encoding: 'utf8' });
   if (a.status !== 0) throw new Error(`git archive ${ref} failed: ${a.stderr}`);
   const tree = path.join(dir, 'judge');
   mkdirSync(tree);

@@ -1,0 +1,46 @@
+diff --git a/scripts/resumen-lecciones.mjs b/scripts/resumen-lecciones.mjs
+new file mode 100644
+index 0000000..b83f1d7
+--- /dev/null
++++ b/scripts/resumen-lecciones.mjs
+@@ -0,0 +1,17 @@
++// Resumen de lecciones por pregunta, en CSV: una línea `pregunta,lecciones` por pregunta que tiene alguna.
++//   node scripts/resumen-lecciones.mjs
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { readLessons } from './lib/lessons.mjs';
++
++const RAIZ = path.resolve(import.meta.dirname, '..');
++
++// `lecciones` es la lista de lecciones ya leídas: objetos con su `question`.
++export function resumenCsv(lecciones) {
++  const cuenta = new Map();
++  for (const l of lecciones) cuenta.set(l.question, (cuenta.get(l.question) ?? 0) + 1);
++  const filas = [...cuenta].sort(([a], [b]) => (a < b ? -1 : 1)).map(([pregunta, n]) => `${pregunta},${n}`);
++  return ['pregunta,lecciones', ...filas].join('\n');
++}
++
++if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(resumenCsv(readLessons(RAIZ).map((l) => JSON.parse(l.text))));
+diff --git a/test/resumen-lecciones.test.js b/test/resumen-lecciones.test.js
+new file mode 100644
+index 0000000..70c2e5a
+--- /dev/null
++++ b/test/resumen-lecciones.test.js
+@@ -0,0 +1,17 @@
++// resumenCsv: una fila por pregunta, ordenadas, con cabecera.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import path from 'node:path';
++import { resumenCsv } from '../scripts/resumen-lecciones.mjs';
++
++test('resumen: cuenta por pregunta y ordena', () => {
++  const lecciones = [{ question: 'C9' }, { question: 'C5' }, { question: 'C9' }];
++  assert.equal(resumenCsv(lecciones), 'pregunta,lecciones\nC5,1\nC9,2');
++});
++
++test('resumen: lanzado como comando imprime la cabecera', () => {
++  const r = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'resumen-lecciones.mjs')], { encoding: 'utf8' });
++  assert.equal(r.status, 0, r.stderr);
++  assert.match(r.stdout, /^pregunta,lecciones\n/);
++});

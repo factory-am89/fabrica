@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
-import { CLEAN, CORPUS, STANDARD, answersOf, belowFloor, loadCorpus, run } from '../scripts/golden.mjs';
+import { CLEAN, CORPUS, MIN_CASES_PER_CELL, STANDARD, answersOf, belowFloor, loadCorpus, run } from '../scripts/golden.mjs';
 import { cargarPreguntas } from '../scripts/veredicto.mjs';
 import { SENSIBLE } from '../scripts/lib/skills.mjs';
 
@@ -33,32 +33,43 @@ function escribir(porCaso, trials = 1) {
 }
 const perfecto = (c) => salida(c.expect === CLEAN ? [] : [c.expect]);
 const cli = (...args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+// Casos malos por pregunta (trozo 24): C5, C9, C14, C15 y C16 llegan al mínimo de una celda conclusiva; las otras cuatro tienen uno.
+const MALOS = { C5: 5, C6: 1, C8: 1, C9: 5, C12: 1, C13: 1, C14: 5, C15: 5, C16: 5 };
+const PREGUNTAS_MALAS = Object.keys(MALOS);
+const LIMPIOS = 3;
 
-test('corpus: 6 malos con su pregunta y 3 limpios, las seis preguntas distintas y todas del revisor', () => {
-  assert.equal(cases.length, 9);
-  assert.deepEqual(cases.filter((c) => c.expect !== CLEAN).map((c) => c.expect).sort(), ['C12', 'C13', 'C5', 'C6', 'C8', 'C9']);
-  assert.equal(cases.filter((c) => c.expect === CLEAN).length, 3);
+test('corpus: 29 malos con su pregunta y 3 limpios, nueve preguntas distintas y todas del revisor', () => {
+  assert.equal(cases.length, 32);
+  const porPregunta = {};
+  for (const c of cases.filter((x) => x.expect !== CLEAN)) porPregunta[c.expect] = (porPregunta[c.expect] ?? 0) + 1;
+  assert.deepEqual(porPregunta, MALOS);
+  for (const id of PREGUNTAS_MALAS) assert.ok(reviewerIds.includes(id), `${id} no es una pregunta del revisor`);
+  assert.equal(cases.filter((c) => c.expect === CLEAN).length, LIMPIOS);
 });
 
-test('corpus: un revisor perfecto detecta las 6 y no da ningún no falso', () => {
+test('corpus: un revisor perfecto detecta las 29 y no da ningún no falso; la celda es conclusiva con el mínimo de casos', () => {
   const { informe, faults } = run({ outputs: escribir(perfecto) });
   assert.deepEqual(faults, []);
-  for (const id of ['C5', 'C6', 'C8', 'C9', 'C12', 'C13']) assert.equal(informe.deteccion[id].tasa, 1, id);
-  assert.deepEqual(informe.falsosNo, { limpios: 3, falsos: 0, tasa: 0 });
+  for (const id of PREGUNTAS_MALAS) {
+    assert.equal(informe.deteccion[id].tasa, 1, id);
+    assert.equal(informe.deteccion[id].malos, MALOS[id], id);
+    assert.equal(informe.deteccion[id].concluyente, MALOS[id] >= MIN_CASES_PER_CELL, id);
+  }
+  assert.deepEqual(informe.falsosNo, { limpios: LIMPIOS, falsos: 0, tasa: 0 });
 });
 
-test('corpus: por autor, 1 caso malo de opus es «no concluyente» y 5 de sonnet ya cuentan', () => {
+test('corpus: por autor, 1 caso malo de opus es «no concluyente» y los 28 de sonnet ya cuentan', () => {
   const { informe } = run({ outputs: escribir(perfecto) });
   assert.deepEqual(Object.keys(informe.porAutor).sort(), ['opus', 'sonnet']);
   assert.deepEqual(informe.porAutor.opus, { malos: 1, cazados: 1, tasa: 1, concluyente: false });
-  assert.deepEqual(informe.porAutor.sonnet, { malos: 5, cazados: 5, tasa: 1, concluyente: true });
+  assert.deepEqual(informe.porAutor.sonnet, { malos: 28, cazados: 28, tasa: 1, concluyente: true });
   assert.match(cli('--outputs', escribir(perfecto)).stdout, /detection by author opus: 1\/1 \(100%\), no concluyente/);
 });
 
 test('un revisor que siempre dice sí no detecta nada y el suelo lo para', () => {
   const outputs = escribir(() => salida());
   const { informe, faults } = run({ outputs });
-  for (const id of ['C5', 'C6', 'C8', 'C9', 'C12', 'C13']) assert.equal(informe.deteccion[id].tasa, 0, id);
+  for (const id of PREGUNTAS_MALAS) assert.equal(informe.deteccion[id].tasa, 0, id);
   assert.deepEqual(faults, []);
   const suelo = path.join(outputs, 'suelo.json');
   writeFileSync(suelo, JSON.stringify({ deteccion: { C5: 1, C13: 0.5 }, falsosNo: 0 }));
@@ -108,7 +119,7 @@ test('con 3 intentos manda la mayoría: 2 de 3 detectan, 1 de 3 no', () => {
   assert.equal(run({ outputs: dos, trials: 3 }).informe.deteccion.C6.tasa, 1);
   const uno = escribir((c, t) => (c.expect === 'C6' && t > 1 ? salida() : perfecto(c)), 3);
   assert.equal(run({ outputs: uno, trials: 3 }).informe.deteccion.C6.tasa, 0);
-  assert.throws(() => run({ outputs: dos, trials: 4 }), /missing outputs \(9\)/);
+  assert.throws(() => run({ outputs: dos, trials: 4 }), new RegExp(`missing outputs \\(${cases.length}\\)`));
 });
 
 test('answersOf lee por decidir: un no es un no, y un id repetido o ajeno lo rechaza el juez', () => {
