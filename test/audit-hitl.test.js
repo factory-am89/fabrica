@@ -51,7 +51,7 @@ test('the weeks start on Monday 00:00 UTC: Sunday 23:59:59 is the week before; e
       { at: W0 + WEEK, falta: ACCESO },
       { at: null, falta: CONOCIMIENTO },
     ],
-    messages: [W0 + 5, W0 + 6, W0 + WEEK + 5],
+    messages: [W0 + 5, W0 + WEEK - 1, W0 + WEEK + 5],
     raw: [JSON.stringify({ t: new Date(W0 + WEEK + 1000).toISOString(), clase: OTHER_CLASE, origen: BANG })],
   }));
   assert.deepEqual(r.weeks, [
@@ -77,11 +77,13 @@ test('trend: the last TREND_WEEKS weeks against the TREND_WEEKS before, counted 
       ...times(6, W0, MEMORIA), ...times(5, week(TREND_WEEKS), MEMORIA),
       ...times(5, W0, FALTAS[0]), ...times(5, week(TREND_WEEKS), FALTAS[0]),
     ],
+    messages: [...Array(5).fill(W0), ...Array(6).fill(week(TREND_WEEKS))],
   }));
   const side = (recent, previous) => ({ weeks: TREND_WEEKS, minCases: MIN_CASES_PER_CELL, recent, previous });
   assert.deepEqual(r.byFalta[CONOCIMIENTO].trend, { ...side(5, 7), change: -2, direction: DIRECTION.down, conclusive: true, why: [] });
   assert.deepEqual(r.byFalta[MEMORIA].trend, { ...side(6, 5), change: 1, direction: DIRECTION.up, conclusive: true, why: [] });
   assert.deepEqual(r.byFalta[FALTAS[0]].trend, { ...side(5, 5), change: 0, direction: DIRECTION.flat, conclusive: true, why: [] });
+  assert.deepEqual(r.messages.trend, { ...side(5, 6), change: -1, direction: DIRECTION.down, conclusive: true, why: [] });
   assert.deepEqual(r.byFalta[ACCESO].trend, { ...side(4, 9), change: null, direction: null, conclusive: false, why: [WHY.fewCases] });
   assert.deepEqual(r.byFalta[VERIFICACION].trend, { ...side(5, 4), change: null, direction: null, conclusive: false, why: [WHY.fewCases] });
   assert.deepEqual([r.events.trend.recent, r.events.trend.previous], [4 + 1 + 4 + 5 + 6 + 5, 6 + 1 + 9 + 4 + 5 + 5]);
@@ -121,14 +123,14 @@ test('delegation: each delegable falta with its way out, the classes that weigh 
   const d = measure(t, {
     events: [
       ...times(3, W0, CONOCIMIENTO, BIG), ...times(2, W0, CONOCIMIENTO, TIE_B), ...times(2, W0, CONOCIMIENTO, TIE_A), ...times(1, W0, CONOCIMIENTO, SMALL),
-      ...times(1, W0, ACCESO, BIG),
+      ...times(1, W0, ACCESO, BIG), { at: null, falta: CONOCIMIENTO, clase: SMALL },
     ],
   })[HITL_IDS.delegation];
   assert.equal(d.question, DELEGATE_QUESTION);
   assert.equal(d.answeredBy, DELEGATE_ANSWER);
   assert.deepEqual(d.types.map((x) => x.falta), DELEGABLE);
   assert.deepEqual(d.types.map((x) => x.camino), DELEGABLE.map((f) => CAMINOS[f]));
-  assert.deepEqual(d.types.map((x) => x.total), [8, 0, 1, 0]);
+  assert.deepEqual(d.types.map((x) => x.total), [9, 0, 1, 0]);
   assert.deepEqual(d.types.map((x) => x.answer), [null, null, null, null]);
   assert.equal(TOP_CLASSES, 3);
   assert.deepEqual(d.types[0].classes, [{ clase: BIG, count: 3 }, { clase: TIE_A, count: 2 }, { clase: TIE_B, count: 2 }]);
@@ -161,6 +163,7 @@ test('balance: the escapes figure sits beside the verificacion trend; the imbala
   assert.equal(at([5, 7], [5, 6]).verificacionDownEscapesUp, false, 'escapes also down');
   assert.equal(at([7, 5], [6, 5]).verificacionDownEscapesUp, false, 'verificacion up');
   assert.equal(at([5, 7], [6, 6]).verificacionDownEscapesUp, false, 'escapes flat');
+  assert.equal(at([5, 5], [6, 5]).verificacionDownEscapesUp, false, 'verificacion flat');
   assert.equal(at([4, 7], [6, 5]).verificacionDownEscapesUp, null, 'verificacion inconclusive');
   assert.equal(at([5, 7], [4, 5]).verificacionDownEscapesUp, null, 'escapes inconclusive');
   assert.deepEqual(Object.keys(bad).sort(), Object.keys({ caveats: 0, escapes: 0, escapesTrend: 0, verificacion: 0, verificacionDownEscapesUp: 0 }).sort());
