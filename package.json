@@ -21,6 +21,7 @@
     "check-pc": "node scripts/install-pc.mjs comprobar",
     "contract": "node scripts/contract.mjs",
     "lessons": "node scripts/lessons.mjs",
+    "hygiene": "node scripts/hygiene.mjs",
     "done": "node scripts/done.mjs",
     "audit": "node scripts/audit.mjs",
     "lint": "eslint . --max-warnings 0",

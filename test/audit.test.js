@@ -14,9 +14,10 @@ import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../scripts/lib/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { ENTITY, FIELDS_FILE, KEYS, TEXT, fieldId } from '../scripts/lib/fields.mjs';
+import { CODES, NEEDS_RECORDS, NOT_COMPUTED } from '../scripts/lib/hygiene.mjs';
 import { MIN_VALUES } from '../scripts/lib/free-values.mjs';
 import { CLASES, FALTAS, ORIGENES, ORIGEN_AGENTE, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
-import { INTERVENCIONES_FILE, LESSONS_DIR, LESSON_NOTE, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { INTERVENCIONES_FILE, LESSONS_DIR, LESSON_NOTE, NO_QUESTION, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { CHECKED_BY, FIELDS } from '../scripts/lib/questions.mjs';
 import { RULES_BUDGET_FILE } from '../scripts/lib/skills.mjs';
 import { marcar } from '../scripts/hitl.mjs';
@@ -39,9 +40,10 @@ function fixture(t, over = {}) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const files = {
     [STANDARDS[0]]: question(1, CHECKED_BY.machine) + question(2, CHECKED_BY.reviewer) + question(3, CHECKED_BY.reviewer),
-    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE] }),
-    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE] }),
-    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE }),
+    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'test/uses.test.js' }),
+    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'scripts/con.mjs' }),
+    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/sin.mjs' }),
+    'package.json': JSON.stringify({ scripts: {} }),
     [FIELDS_FILE]: JSON.stringify({ fields: [{ [KEYS.name]: LESSON_NOTE, [KEYS.owner]: ENTITY.lesson, [KEYS.values]: TEXT }] }),
     [RULES_BUDGET_FILE]: JSON.stringify({ budget: { uno: 3, dos: 4 } }),
     [INTERVENCIONES_FILE]: '# h\n2026-01-01 | clic | a | b | repetida: no\n2026-01-02 | clic | a | b | repetida: no\nsuelta\n',
@@ -55,6 +57,8 @@ function fixture(t, over = {}) {
   for (const [rel, text] of Object.entries(files)) put(root, rel, text);
   return root;
 }
+// What hygiene needs of any lesson (a lesson without them stops the audit).
+const READABLE = { signal: SIGNAL_NONE, question: NO_QUESTION, mechanism: 'scripts/con.mjs' };
 const run = (root) => audit(root, { logPath: path.join(root, NO_LOG) });
 
 test('INDICATORS is the closed list: the local audit returns exactly one value per non-data id', (t) => {
@@ -144,17 +148,32 @@ test('test duplication: a string shorter than the minimum, or not in an export c
 });
 
 test('free values: the text fields of the registry come with their repeated values and a proposal of enum', (t) => {
-  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ [LESSON_NOTE]: 'same' })]));
+  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ ...READABLE, [LESSON_NOTE]: 'same' })]));
   const f = run(fixture(t, notes))[INDICATORS.freeValues];
   assert.equal(f.count, 1);
   assert.deepEqual(f.fields.map((x) => [x.field, x.total, x.repeated, x.proposal]), [[fieldId({ [KEYS.owner]: ENTITY.lesson, [KEYS.name]: LESSON_NOTE }), MIN_VALUES, [{ value: 'same', count: MIN_VALUES }], ['same']]]);
 });
 
 test('free values: the text output has the indicator line and each proposal', (t) => {
-  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ [LESSON_NOTE]: 'same' })]));
+  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ ...READABLE, [LESSON_NOTE]: 'same' })]));
   const lines = humanLocal(run(fixture(t, notes))).split('\n');
   assert.ok(lines.includes(`${INDICATORS.freeValues}: 1 of 1 text fields with a proposal of enum`));
   assert.ok(lines.some((l) => l.endsWith('["same"]')));
+});
+
+test('hygiene: the candidates are counted by code; the codes that need records are null and said apart', (t) => {
+  const h = run(fixture(t))[INDICATORS.hygiene];
+  assert.deepEqual(h.byCode, { [CODES.MERGE]: 1, [CODES.PROMOTE]: 1, [CODES.RETIRE_TEXT]: null, [CODES.REWORK]: null, [CODES.OVERLAP]: 0, [CODES.DEAD_REF]: 0 });
+  assert.equal(h.total, 2);
+  assert.deepEqual(h.notComputed, NEEDS_RECORDS.map((code) => ({ code, reason: NOT_COMPUTED.noRecords })));
+  assert.equal(Object.hasOwn(h, 'candidates'), false);
+});
+
+test('hygiene: a lesson whose mechanism is gone counts as DEAD_REF, and the text output has the indicator line', (t) => {
+  const root = fixture(t, { [`${LESSONS_DIR}/d.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/gone.mjs' }) });
+  const r = run(root);
+  assert.equal(r[INDICATORS.hygiene].byCode[CODES.DEAD_REF], 1);
+  assert.ok(humanLocal(r).split('\n').includes(`${INDICATORS.hygiene}: 3 ${JSON.stringify(r[INDICATORS.hygiene].byCode)}`));
 });
 
 test('signals, not gates: a root full of faults still exits OK, in text and in --json', (t) => {

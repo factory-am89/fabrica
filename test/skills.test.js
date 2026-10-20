@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, REVISAR_DIAS, leerFrontmatter, skillsViejas, faltasDeReglasSinLector, RULES_BUDGET_FILE, SKILL_FAULTS } from '../scripts/lib/skills.mjs';
+import { comprobarSkill, carpetasDeSkills, MAX_LINEAS, REVISAR_DIAS, leerFrontmatter, skillsViejas, faltasDeReglasSinLector, RULES_BUDGET_FILE, SKILL_FAULTS, SKILL_FILE } from '../scripts/lib/skills.mjs';
 import { SIGNAL_MACHINE } from '../scripts/lib/lessons.mjs';
 import { readEntities } from '../scripts/lib/entities.mjs';
 
@@ -34,7 +34,7 @@ function skill(texto, extra = {}, hoy = HOY) {
   writeFileSync(path.join(raiz, '.claude', 'agents', 'constructor.md'), '---\nname: constructor\n---\n');
   const carpeta = path.join(raiz, '.claude', 'skills', 'prueba');
   mkdirSync(carpeta, { recursive: true });
-  writeFileSync(path.join(carpeta, 'SKILL.md'), texto);
+  writeFileSync(path.join(carpeta, SKILL_FILE), texto);
   for (const [ruta, contenido] of Object.entries(extra)) {
     mkdirSync(path.dirname(path.join(carpeta, ruta)), { recursive: true });
     writeFileSync(path.join(carpeta, ruta), contenido);
@@ -47,7 +47,7 @@ test('toda skill de .claude/skills/ tiene la forma de base/skill.md', () => {
   assert.ok(carpetas.length > 0, 'no hay ninguna skill que comprobar');
   for (const c of carpetas) {
     // Sin reloj: «hoy» es la propia fecha de la skill, así no queda en el futuro.
-    const hoy = leerFrontmatter(readFileSync(path.join(c, 'SKILL.md'), 'utf8'))?.comprobado;
+    const hoy = leerFrontmatter(readFileSync(path.join(c, SKILL_FILE), 'utf8'))?.comprobado;
     assert.ok(hoy, `${path.basename(c)}: sin fecha comprobado`);
     assert.deepEqual(comprobarSkill(c, { raiz: RAIZ, hoy }), [], path.basename(c));
   }
@@ -96,7 +96,7 @@ function raizConSkills(fechas) {
   fechas.forEach((fecha, n) => {
     const carpeta = path.join(raiz, '.claude', 'skills', `s${n}`);
     mkdirSync(carpeta, { recursive: true });
-    writeFileSync(path.join(carpeta, 'SKILL.md'), BIEN.replace('name: prueba', `name: s${n}`).replace('2026-10-01', fecha));
+    writeFileSync(path.join(carpeta, SKILL_FILE), BIEN.replace('name: prueba', `name: s${n}`).replace('2026-10-01', fecha));
   });
   return raiz;
 }
@@ -140,7 +140,7 @@ function raizDeReglas({ vinetas, lecciones = {}, presupuesto = { prueba: 1 }, fi
   const raiz = mkdtempSync(path.join(tmpdir(), 'trinquete-'));
   const carpeta = path.join(raiz, '.claude', 'skills', 'prueba');
   mkdirSync(carpeta, { recursive: true });
-  writeFileSync(path.join(carpeta, 'SKILL.md'), BIEN.replace(/- \*\*2026.*\n/, vinetas.join('')));
+  writeFileSync(path.join(carpeta, SKILL_FILE), BIEN.replace(/- \*\*2026.*\n/, vinetas.join('')));
   mkdirSync(path.join(raiz, 'lessons'));
   for (const [id, signal] of Object.entries(lecciones)) writeFileSync(path.join(raiz, 'lessons', `${id}.json`), LECCION(signal));
   if (fichero) writeFileSync(path.join(raiz, RULES_BUDGET_FILE), JSON.stringify({ version: 1, budget: presupuesto }));

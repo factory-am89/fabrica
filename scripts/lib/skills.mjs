@@ -20,6 +20,9 @@ export const SKILL_FAULTS = Object.freeze(
 );
 const LESSON_LINK = /lessons\/([a-z0-9-]+)\.json/g;
 
+// The folder layout of a skill: SKILL.md and, next to it, referencias/ (hygiene-refs.mjs reads the same names).
+export const SKILL_FILE = 'SKILL.md';
+export const REFERENCES_DIR = 'referencias';
 export const MAX_LINEAS = 120;
 export const REVISAR_DIAS = 90;
 export const MAX_DESCRIPCION = 600;
@@ -76,8 +79,8 @@ function faltasDeCabecera(f, carpeta, raiz, hoy) {
 function faltasDeCarpeta(carpeta, texto) {
   const faltas = [];
   for (const e of readdirSync(carpeta)) {
-    if (e === 'SKILL.md') continue;
-    if (e !== 'referencias' || !statSync(path.join(carpeta, e)).isDirectory()) {
+    if (e === SKILL_FILE) continue;
+    if (e !== REFERENCES_DIR || !statSync(path.join(carpeta, e)).isDirectory()) {
       faltas.push(`sobra «${e}»: solo caben SKILL.md y referencias/`);
       continue;
     }
@@ -152,7 +155,7 @@ export function faltasDeReglasSinLector(raiz) {
 }
 
 export function comprobarSkill(carpeta, { raiz, hoy }) {
-  const ruta = path.join(carpeta, 'SKILL.md');
+  const ruta = path.join(carpeta, SKILL_FILE);
   if (!existsSync(ruta)) return ['no tiene SKILL.md'];
   const texto = readFileSync(ruta, 'utf8');
   const f = leerFrontmatter(texto);
@@ -175,7 +178,7 @@ export function skillsViejas(raiz, hoy) {
   const viejas = [];
   for (const carpeta of carpetasDeSkills(raiz)) {
     const nombre = path.basename(carpeta);
-    const f = leerFrontmatter(readFileSync(path.join(carpeta, 'SKILL.md'), 'utf8'));
+    const f = leerFrontmatter(readFileSync(path.join(carpeta, SKILL_FILE), 'utf8'));
     if (!f || !fechaValida(f.comprobado)) throw new Error(`${nombre}: sin fecha «comprobado» legible`);
     const dias = diasDesde(f.comprobado, hoy);
     if (dias < 0) throw new Error(`${nombre}: comprobado ${f.comprobado} está en el futuro (hoy es ${hoy})`);
