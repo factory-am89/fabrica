@@ -14,8 +14,10 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    Check it by hand: the `HEAD <sha>` line of the body must equal `git rev-parse --short HEAD`.
 4. **Body before push.** The body must already cite the HEAD you are about to push. Updating an existing PR: run
    `node scripts/token.mjs -- gh pr edit <n> --body-file <scratchpad>/body.md` first, then push. If the push goes
-   first, the first `tests` run is red (stale-HEAD check in `scripts/lib/pr-body.mjs`) and a later run goes green.
-   This was observed once (reported by the coordinating session for #38; I could not confirm it from the PR text) and not reproduced since: treat it as likely, not established.
+   first, the edit and the push each start a `tests` run, and the run that read the old body is red (stale-HEAD check in `scripts/lib/pr-body.mjs`).
+   Established in #114 (head c70533c): the builder pushed and then edited the body; two `tests` runs started in the same
+   second on the same SHA, one red (run 39284981066, step "PR body has the template sections", old body) and one green
+   (run 39284980072). The PR stayed `mergeable_state=unstable` and did not merge for over 40 minutes with everything else green.
    A new PR cannot exist before its first push: push, then create at once with the final body file.
 5. **Push, create, edit, merge: each a STANDALONE command**, through the App:
    - `node scripts/token.mjs -- git push -u origin <branch>`
@@ -25,6 +27,13 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    lesson `git-not-from-main-folder`).
 6. **Look at CI once** (rules: skill `github`, "La cuota de GitHub"): `node scripts/token.mjs -- gh pr view <n> --json statusCheckRollup`.
    The constructor App cannot rerun runs: to get a new run, push a new commit (then redo step 2 and the body).
+   Rerunning a red run would not fix an old body anyway: GitHub replays it with the original event, so with the body of
+   that moment (observed: the rerun of 39284981066 failed again). The only way out is a new commit (it may be empty)
+   whose body is already right, and the body must name the new SHA BEFORE the push: `git commit` first (the local
+   commit already has its SHA), then edit the body with that SHA, then push. If you already pushed with an old SHA in the
+   body, editing the body to the right SHA fixes it (seen green in #114 after editing to ebc9fc3).
+   If checks are slow to start or stay queued, look at https://www.githubstatus.com first (Actions incident on
+   19 Oct 2026 from 15:49 UTC: 35-minute queues) and do not push or edit the body while there is a queue: each edit restarts runs.
 7. **Revisor says no with no reason.** Ask an independent revisor agent for the reason; do not argue with the verdict.
    Do not rebase without a real conflict: check with `git merge-tree --write-tree HEAD origin/main` (exit 0 = none).
    A rebase changes the SHAs your body cites, so the body must be redone from step 2. Each entry of a lesson's `sources` follows
