@@ -9,7 +9,7 @@ import { CAMPOS } from '../scripts/lib/intervention-log.mjs';
 import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FIELDS } from '../scripts/lib/plan.mjs';
 import {
-  ATTRIBUTE_KIND, FIELD_FAULTS, FIELD_SOURCES, KEYS, NEW, TEXT, discoveredFields, fieldFaults, fieldId, normalizeName, readFields,
+  ATTRIBUTE_KIND, ENTITY, FIELD_FAULTS, FIELD_SOURCES, KEYS, NEW, TEXT, discoveredFields, fieldFaults, fieldId, normalizeName, readFields,
 } from '../scripts/lib/fields.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,7 +37,7 @@ test('the sources are the real exports: lesson, no-lesson, intervention and plan
     ...Object.values(PLAN_FIELDS).map((n) => `plan.${n}`),
   ];
   assert.deepEqual([...found].sort(), expected.sort());
-  assert.deepEqual(Object.keys(FIELD_SOURCES).sort(), ['intervention', 'lesson', 'no-lesson', 'plan']);
+  assert.deepEqual(Object.keys(FIELD_SOURCES).sort(), Object.values(ENTITY).sort());
 });
 
 test('a source that returns no list or an empty one throws, never «no fields»', () => {
