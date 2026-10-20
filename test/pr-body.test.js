@@ -30,6 +30,15 @@ const mutations = [
   ['Evidence with empty block', withSection('Evidence', '```\n\n```'), [], /Evidence needs a closed/],
   ['Evidence block only inside a comment', withSection('Evidence', '<!--\n```\nx\n```\n-->'), [], /empty section: ## Evidence/],
   ['Evidence block never closed', '## What changes\n\nx\n\n## Not verified\n\nNothing\n\n## Evidence\n\n```\nx\n', [], /Evidence needs a closed/],
+  ['no Decisions', without('Decisions'), [], /missing section: ## Decisions/],
+  ['empty Decisions', withSection('Decisions', ''), [], /empty section: ## Decisions/],
+  ['Decisions with free text', withSection('Decisions', 'we chose a'), [], /## Decisions line 1: BAD_FORM/],
+  ['Decisions with a principle that does not exist', withSection('Decisions', '- principio 99 | eligió: a | descartó: b | motivo: decidido'), [], /UNKNOWN_PRINCIPLE/],
+  ['Decisions with a reason outside the closed list', withSection('Decisions', '- principio 5 | eligió: a | descartó: b | motivo: porque sí'), [], /UNKNOWN_CLASS/],
+  ['Decisions without what was discarded', withSection('Decisions', '- principio 5 | eligió: a | descartó: | motivo: decidido'), [], /NO_ALTERNATIVE/],
+  ['Decisions discarding what was chosen', withSection('Decisions', '- principio 5 | eligió: a | descartó: a | motivo: decidido'), [], /SAME_AS_CHOSEN/],
+  ['Decisions with an exception without cost', withSection('Decisions', '- excepción a principio 5 | motivo: m | coste:'), [], /EMPTY_FIELD/],
+  ['Decisions twice', `${good}\n## Decisions\n\nNone\n`, [], /duplicate section: ## Decisions/],
   ['no Not verified', without('Not verified'), [], /missing section: ## Not verified/],
   ['empty Not verified', withSection('Not verified', '   '), [], /empty section: ## Not verified/],
   ['test file, no Red before', without('Red before'), testFiles, /missing section: ## Red before/],
@@ -63,14 +72,18 @@ test('prBodyFaults: files that is not an array throws', () => {
   assert.throws(() => prBodyFaults(good, null), /files must be an array/);
 });
 
-test('template: headings are exactly SECTIONS and the untouched template has 3 faults', () => {
+test('prBodyFaults: Decisions "None" is fine', () => {
+  assert.deepEqual(prBodyFaults(withSection('Decisions', 'None'), []), []);
+});
+
+test('template: headings are exactly SECTIONS and the untouched template has 4 faults', () => {
   const headings = [...template.matchAll(/^## (.*)$/gm)].map((m) => m[1]);
   assert.deepEqual(headings, SECTIONS.map((s) => s.name));
   const hints = [...template.matchAll(/<!-- (.*?) -->/g)].map((m) => m[1]);
   assert.deepEqual(hints, SECTIONS.map((s) => s.hint));
   const faults = prBodyFaults(template, []);
-  assert.equal(faults.length, 3);
-  for (const name of ['What changes', 'Evidence', 'Not verified']) {
+  assert.equal(faults.length, 4);
+  for (const name of ['What changes', 'Evidence', 'Decisions', 'Not verified']) {
     assert.ok(faults.some((f) => f.includes(`## ${name}`)), `${name} not reported in ${JSON.stringify(faults)}`);
   }
 });
@@ -90,7 +103,15 @@ test('command: good body with a files file exits 0 and prints ok', () => {
 test('command: faults exit 1 and go to stderr', () => {
   const r = command(['--body-file', tmp('t.md', template), '--files-file', tmp('e.txt', '')]);
   assert.equal(r.code, 1);
-  assert.equal(r.err.filter((l) => !l.includes('note:')).length, 3);
+  assert.equal(r.err.filter((l) => !l.includes('note:')).length, 4);
+});
+
+test('command: a body without the Decisions section exits 1, the same body with it exits 0', () => {
+  const noFiles = tmp('none.txt', '');
+  const r = command(['--body-file', join(import.meta.dirname, 'fixtures', 'pr-body', 'no-decisions.md'), '--files-file', noFiles]);
+  assert.equal(r.code, 1);
+  assert.match(r.err.join('\n'), /missing section: ## Decisions/);
+  assert.equal(command(['--body-file', tmp('g3.md', good), '--files-file', noFiles]).code, 0);
 });
 
 test('command: compare file reads filename and previous_filename', () => {
@@ -158,7 +179,7 @@ test('the HEAD line evidence.mjs writes is the one pr-body.mjs reads', () => {
   };
   const { markdown } = collectEvidence({ cwd: '.', focus: [], runner: scripted });
   assert.ok(markdown.includes(headMark('1234567')));
-  const body = `## What changes\n\nx\n\n${markdown}\n## Not verified\n\nNothing\n`;
+  const body = `## What changes\n\nx\n\n${markdown}\n## Decisions\n\nNone\n\n## Not verified\n\nNothing\n`;
   assert.deepEqual(prBodyFaults(body, [], commits), []);
   assert.equal(prBodyFaults(body.replace(headMark('1234567'), headMark('7654321')), [], commits).length, 1);
 });

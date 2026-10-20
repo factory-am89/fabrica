@@ -1,6 +1,7 @@
 // What the Fábrica demands of itself (principle 5): CLAUDE.md, the three roles and the standard's questions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { parsePrinciples } from '../scripts/lib/decision.mjs';
 import { readQuestions } from '../scripts/lib/questions.mjs';
 import { leer, preguntas } from './apoyo/fabrica.mjs';
 
@@ -12,6 +13,8 @@ test('CLAUDE.md es corto y tiene los 6 principios por su palabra clave', () => {
   claves.forEach((clave, i) => {
     assert.match(texto, new RegExp(`^${i + 1}\\. ${clave}`, 'm'), `falta el principio ${i + 1}: ${clave}`);
   });
+  // Lo que lee la puerta (el lector de decisiones) ve exactamente esos principios.
+  assert.deepEqual(parsePrinciples(texto), claves.map((_, i) => i + 1));
 });
 
 test('el principio 6 conserva las obligaciones del viejo: no adivinar, no interrumpir, parar y apuntar sin evidencia (C13)', () => {

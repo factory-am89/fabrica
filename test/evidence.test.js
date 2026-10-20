@@ -224,7 +224,7 @@ test('main: refusals exit 1 with a message on stderr and write nothing', () => {
 
 test('the generated section passes the PR body check inside a full body', () => {
   const { markdown } = collect(fakeRunner());
-  const body = ['## What changes', 'x', markdown, '## Red before', 'x', '## Not verified', 'Nothing'].join('\n\n');
+  const body = ['## What changes', 'x', markdown, '## Red before', 'x', '## Decisions', 'None', '## Not verified', 'Nothing'].join('\n\n');
   assert.deepEqual(prBodyFaults(body, ['test/evidence.test.js']), []);
 });
 
