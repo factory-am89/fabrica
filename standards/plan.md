@@ -28,6 +28,9 @@ The gate flag of a chunk and the «needs Pablo» flag are computed from `Files`;
 | P7 | Chunks on the same file run in parallel and collide; `SHARED_FILE` in `scripts/lib/plan.mjs`. |
 | P8 | C13 of `standards/code.md`: nothing in the gate gets weaker. |
 | P9 | The closed list of `standards/intervention.md` is the only reason to ask Pablo; `CLOSED_WITHOUT_DECISION` in `scripts/lib/plan.mjs`. |
+| P10 | I1 and I2 (`goals.json`): a field or entity named twice, or in no table, is the cost the base files (`entities.json`, `fields.json`) exist to stop. |
+| P11 | I4 (`goals.json`): a decision only counts if it is written down with its principle and the alternative it discarded; `FORMS` in `scripts/lib/decision.mjs` checks the form, not the fit. |
+| P12 | I3 (`goals.json`): a rule with no reader and no trigger is a sentence, and a failure is asked for its class, not its case. |
 
 ## Questions
 
@@ -78,3 +81,21 @@ Quién: máquina (`node scripts/check-plan.mjs --file <plan> --closed-paths <lis
 The machine decides what it can compute: a chunk whose `Files` meet the closed paths needs `Blocked by`, and each decision has the fixed number of options with the first marked as recommended. The reviewer reads the rest (plain words, a question that is not on the list).
 Bien: a decision about `.github/workflows/**` with its options, the recommended one first, and the chunk marked `Blocked by: A`.
 Mal: asking Pablo which name to give a file, which is not on the closed list: the architect decides and writes it down.
+
+### P10 — Is each new field or entity in the plan classified, and compared with the ones that already exist in `entities.json` and `fields.json`?
+Quién: revisor.
+The base files are the comparison: the reviewer reads the chunk against them.
+Bien: «a new field `x`: type and owner as a row of `fields.json` has them, compared with `y` (same meaning, so it is reused and not added)».
+Mal: a chunk that adds a field or an entity and never says whether `entities.json` or `fields.json` already has one for it.
+
+### P11 — Does each line of `Decisions taken` apply the principle it cites (the discarded alternative would break it), and is each decision the request does not impose written there?
+Quién: revisor.
+The form of the line is checked by a machine (`scripts/lib/decision.mjs`); only the reviewer can tell if the choice fits the principle, and if a choice of the plan is missing from the section.
+Bien: a line that cites principle 4 and discards «a second copy of the table», which would break «one idea, one place».
+Mal: a line that cites a principle the discarded alternative would not break, or a chunk that picks a design the request did not ask for and writes it nowhere.
+
+### P12 — Does each new rule of the plan name its reader and its trigger, does the Done of each check prove it through its real entry point with a bad case in red, and does each chunk born from a failure name its class?
+Quién: revisor.
+The triggers are the closed list `TRIGGERS` of `scripts/lib/triggers.mjs`; `manual` is only valid when the plan declares it as debt.
+Bien: «reader `test/<name>.test.js`, trigger `ci-test`; Done runs `node --test test/<name>.test.js` and a bad fixture turns it red», and «class: a rule with no reader» for a chunk that comes from a failure.
+Mal: a rule written as a sentence in a standard with no reader, a Done that calls the function by hand and not the command CI runs, or a chunk that fixes one failure without naming its class.
