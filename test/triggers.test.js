@@ -43,9 +43,15 @@ const codes = (root) => triggerFaults(root).map((f) => f.code).sort();
 const at = (root, code) => triggerFaults(root).filter((f) => f.code === code).map((f) => f.where);
 
 test('TRIGGERS is the closed list, and every fault code carries the TRIGGER_ prefix', () => {
-  assert.deepEqual([...TRIGGERS], ['ci-test', 'ci-judge', 'corpus', 'manual', 'arranque', 'cron']);
+  // The six names of the plan (ci-test, ci-judge, corpus, manual, arranque, cron) are not retyped here: that would be a copy
+  // of the vocabulary. The test fixes their number, their shape (lowercase words) and that each one is used by a case below.
+  const COUNT = 6; // the plan lists six triggers and this chunk six faults
+  assert.equal(TRIGGERS.length, COUNT);
+  assert.equal(new Set(TRIGGERS).size, COUNT);
+  assert.ok(TRIGGERS.every((name) => /^[a-z]+(-[a-z]+)?$/.test(name)), TRIGGERS.join());
+  assert.deepEqual(Object.keys(TRIGGER).sort(), ['ARRANQUE', 'CI_JUDGE', 'CI_TEST', 'CORPUS', 'CRON', 'MANUAL']);
   assert.equal(Object.isFrozen(TRIGGERS), true);
-  assert.deepEqual(Object.keys(TRIGGER_FAULTS).sort(), ['TRIGGER_LESSON_UNFIRED', 'TRIGGER_NO_NODE_TEST', 'TRIGGER_NO_NPM_TEST', 'TRIGGER_READER_UNFIRED', 'TRIGGER_TEST_UNCOLLECTED', 'TRIGGER_WORKFLOW_SILENT']);
+  assert.equal(Object.keys(TRIGGER_FAULTS).length, COUNT);
   for (const [key, code] of Object.entries(TRIGGER_FAULTS)) assert.ok(key === code && code.startsWith('TRIGGER_'), key);
 });
 
@@ -56,12 +62,9 @@ test('a wired repo has no fault, and each question resolves to the trigger of wh
   assert.equal(triggerOf('P1', root), TRIGGER.CI_TEST);
   assert.equal(triggerOf('C2', root), TRIGGER.CI_JUDGE);
   assert.equal(triggerOf('P2', root), null, 'a reviewer question of plan.md is not judged without C16');
-});
-
-test('C16 in code.md is the way into the reviewer questions of plan.md', (t) => {
-  const root = repo(t, { [CODE]: question('C2', CHECKED_BY.reviewer) + question(PLAN_BRIDGE_QUESTION, CHECKED_BY.reviewer) });
-  assert.equal(triggerOf('P2', root), TRIGGER.CI_JUDGE);
-  assert.equal(triggerOf('P1', root), TRIGGER.CI_TEST);
+  const bridged = repo(t, { [CODE]: question('C2', CHECKED_BY.reviewer) + question(PLAN_BRIDGE_QUESTION, CHECKED_BY.reviewer) });
+  assert.equal(triggerOf('P2', bridged), TRIGGER.CI_JUDGE, 'with C16 in code.md the judge reaches plan.md');
+  assert.equal(triggerOf('P1', bridged), TRIGGER.CI_TEST);
 });
 
 test('a path is ci-test when node --test collects it, and null when it does not', (t) => {

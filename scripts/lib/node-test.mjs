@@ -15,7 +15,7 @@ export const NODE_TEST_PATTERNS = Object.freeze([
 ]);
 // The runner never descends into node_modules. Hidden folders and files (a name starting with a dot) are skipped by the glob
 // itself: test/node-test.test.js checks both on the real runner.
-export const SKIPPED_FOLDER = 'node_modules';
+const SKIPPED_FOLDER = 'node_modules';
 
 // `rel`: a path relative to the folder where `node --test` runs, with `/` (a Windows path is refused, not converted).
 export function collectedByNodeTest(rel) {
