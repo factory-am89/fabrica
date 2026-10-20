@@ -34,9 +34,9 @@ function goldenOutputs(t, trials, noOn = []) {
   return dir;
 }
 
-const REVIEWED = reviewerIds().find((id) => id !== Q);
+const REVIEWED = reviewerIds().find((id) => id.length > Q.length); // 'C11' sorts before 'C5' though it comes after it in the standard
 test('unstable questions: those whose answer changes between trials of the golden pass; one trial cannot show it', (t) => {
-  assert.deepEqual(unstableQuestions(goldenOutputs(t, 2, [[Q, 2], [REVIEWED, 1]]), RAIZ), [Q, REVIEWED].sort());
+  assert.deepEqual(unstableQuestions(goldenOutputs(t, 2, [[Q, 2], [REVIEWED, 1]]), RAIZ), [REVIEWED, Q]);
   assert.deepEqual(unstableQuestions(goldenOutputs(t, 3), RAIZ), []);
   assert.throws(() => unstableQuestions(goldenOutputs(t, 1), RAIZ), /at least 2 are needed/);
 });

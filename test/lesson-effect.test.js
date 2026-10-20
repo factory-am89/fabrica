@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { INDICATORS, auditData, cliAudit } from '../scripts/audit.mjs';
 import { MIN_CASES_PER_CELL, STANDARD } from '../scripts/golden.mjs';
 import { DATA_IDS, humanData } from '../scripts/lib/audit-data.mjs';
-import { WHY, readTriagedNo } from '../scripts/lib/lesson-effect.mjs';
+import { WHY, lessonIndicators, readTriagedNo } from '../scripts/lib/lesson-effect.mjs';
 import { LESSONS_DIR, NO_LESSON_FILE, NO_LESSON_KEYS, NO_QUESTION, REASON_COVERED, REASON_NOISE } from '../scripts/lib/lessons.mjs';
 import { ANSWER, ERROR, OVERRIDE_TITLE, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
 
@@ -92,7 +92,9 @@ test('lesson effect: the date is the latest merged source; a lesson without ques
     { id: 'nodate', question: Q, sources: ['#4', '#3'] },
     { id: 'neither', question: NO_QUESTION, sources: ['#3'] },
   ];
-  const byId = Object.fromEntries(measure(t, { lessons }, pulls, [])[DATA_IDS.lessonEffect].lessons.map((l) => [l.id, l]));
+  const effect = measure(t, { lessons }, pulls, [])[DATA_IDS.lessonEffect];
+  assert.deepEqual([effect.count, effect.conclusive], [lessons.length, 0]);
+  const byId = Object.fromEntries(effect.lessons.map((l) => [l.id, l]));
   assert.equal(byId.latest.date, iso(later));
   assert.deepEqual(byId.latest.why, [WHY.fewCases]);
   assert.deepEqual([byId.noq.date, byId.noq.why, byId.noq.before, byId.noq.after, byId.noq.conclusive], [iso(DATE), [WHY.noQuestion], null, null, false]);
@@ -101,8 +103,9 @@ test('lesson effect: the date is the latest merged source; a lesson without ques
 });
 
 test('unsorted «no»: a (PR, question) with a «no» that no lesson of that PR and question, nor triaged entry, covers; sorted, with its rounds', (t) => {
-  const pulls = [1, 2, 3, 4, 5, 6].map((n) => pull(n, T0));
+  const pulls = [1, 2, 3, 4, 5, 6, 7].map((n) => pull(n, T0));
   const runs = [
+    round(7, { [OTHER_Q]: ANSWER.no }),
     round(1, { [Q]: ANSWER.no, [OTHER_Q]: ANSWER.no }),
     round(2, { [Q]: ANSWER.no }),
     round(3, { [Q]: ANSWER.no, [OTHER_Q]: ANSWER.no }),
@@ -115,8 +118,8 @@ test('unsorted «no»: a (PR, question) with a «no» that no lesson of that PR 
   const lessons = [{ id: 'covers-1', question: Q, sources: ['#1'] }, { id: 'no-question', question: NO_QUESTION, sources: ['#4'] }, { id: 'other-pr', question: Q, sources: ['#9'] }];
   const entries = [{ source: '#2', question: Q, reason: REASON_COVERED }, { source: '#5', question: OTHER_Q, reason: REASON_NOISE }];
   const u = measure(t, { lessons, entries }, pulls, runs)[DATA_IDS.unsortedNo];
-  assert.deepEqual(u.items, [{ pr: 1, question: OTHER_Q, rounds: 1 }, { pr: 3, question: OTHER_Q, rounds: 1 }, { pr: 3, question: Q, rounds: 2 }, { pr: 4, question: Q, rounds: 1 }, { pr: 5, question: Q, rounds: 1 }]);
-  assert.deepEqual([u.total, u.count], [7, 5]);
+  assert.deepEqual(u.items, [{ pr: 1, question: OTHER_Q, rounds: 1 }, { pr: 3, question: OTHER_Q, rounds: 1 }, { pr: 3, question: Q, rounds: 2 }, { pr: 4, question: Q, rounds: 1 }, { pr: 5, question: Q, rounds: 1 }, { pr: 7, question: OTHER_Q, rounds: 1 }]);
+  assert.deepEqual([u.total, u.count], [8, 6]);
 });
 
 test('false «no»: (noise entries + overrides) over the «no» of each question; an override counts once per question of its round and an unplaced one is counted apart', (t) => {
@@ -125,6 +128,7 @@ test('false «no»: (noise entries + overrides) over the «no» of each question
     round(1, { [Q]: ANSWER.no }),
     round(2, { [Q]: ANSWER.no, [OTHER_Q]: ANSWER.no }),
     round(2, { [Q]: ANSWER.no, [OTHER_Q]: ANSWER.no }, { shaOf: sha(22) }),
+    round(2, { [Q]: ANSWER.no, [OTHER_Q]: ANSWER.no }),
     round(3, { [Q]: ANSWER.no }),
     round(4, { [Q]: ANSWER.yes, [OTHER_Q]: ANSWER.yes }),
     round(5, { [Q]: ANSWER.no }, { error: ERROR.outputUnreadable }),
@@ -135,8 +139,8 @@ test('false «no»: (noise entries + overrides) over the «no» of each question
     { source: '#3', question: 'C9', reason: REASON_NOISE },
   ];
   const f = measure(t, { entries }, pulls, runs)[DATA_IDS.falseNo];
-  assert.deepEqual(f.byQuestion[Q], { no: 4, noise: 2, overrides: 2, falseNo: 4, rate: 1, unstable: null });
-  assert.deepEqual(f.byQuestion[OTHER_Q], { no: 2, noise: 0, overrides: 2, falseNo: 2, rate: 1, unstable: null });
+  assert.deepEqual(f.byQuestion[Q], { no: 5, noise: 2, overrides: 2, falseNo: 4, rate: 0.8, unstable: null });
+  assert.deepEqual(f.byQuestion[OTHER_Q], { no: 3, noise: 0, overrides: 2, falseNo: 2, rate: 2 / 3, unstable: null });
   assert.deepEqual(f.byQuestion.C9, { no: 0, noise: 1, overrides: 0, falseNo: 1, rate: null, unstable: null });
   assert.deepEqual(Object.keys(f.byQuestion), [OTHER_Q, Q, 'C9']);
   assert.deepEqual([f.overridesUnattributed, f.unstableQuestions], [2, null]);
@@ -178,4 +182,5 @@ test('the triaged «no» are read in one place and come out normalised; broken i
   assert.throws(() => measure(t, {}, [pull(1, T0)], [round(2, { [Q]: ANSWER.yes })]), /PR #2 has no PR/);
   assert.throws(() => measure(t, {}, [], [{ output: { title: OVERRIDE_TITLE } }]), /override check-run has no head_sha/);
   assert.throws(() => measure(t, {}, [], [{ head_sha: sha(1), output: { text: 'sin registro' } }]), /readable record/);
+  assert.throws(() => lessonIndicators([], [{ head_sha: sha(1), output: { text: 'sin registro' } }], { lessons: [], triaged: [], unstable: null }), /readable record/);
 });

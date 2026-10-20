@@ -165,7 +165,7 @@ export function parseAuditArgs(args, defaultRoot) {
       out[args[i].slice(FLAG_PREFIX.length)] = args[++i];
     } else out.root = path.resolve(args[i]);
   }
-  const extras = VALUE_FLAGS.filter((f) => out[f.slice(FLAG_PREFIX.length)] !== null);
+  const extras = [FLAG.records, FLAG.repo, FLAG.since].filter((f) => out[f.slice(FLAG_PREFIX.length)] !== null);
   if (!out.data && extras.length > 0) throw new ExitError('USAGE', `${VALUE_FLAGS.join(', ')} go with ${FLAG.data}`);
   if (out.data && (out.records === null) === (out.repo === null)) throw new ExitError('USAGE', `${FLAG.data} needs exactly one of ${FLAG.records} <file> or ${FLAG.repo} <owner/name>`);
   if (out.golden !== null && out.records === null) throw new ExitError('USAGE', `${FLAG.golden} reads the Fábrica's own files: it goes with ${FLAG.records}, not ${FLAG.repo}`);
