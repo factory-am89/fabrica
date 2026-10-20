@@ -16,7 +16,7 @@ import { ADOPTED_FAULTS } from '../scripts/lib/adopted.mjs';
 import { DECISION_FAULTS } from '../scripts/lib/decision.mjs';
 import { ENTITY_FAULTS } from '../scripts/lib/entities.mjs';
 import { FIELD_FAULTS } from '../scripts/lib/fields.mjs';
-import { GOAL_FAULTS, KEY, LIST, readGoals } from '../scripts/lib/goals.mjs';
+import { CHECK, GOAL_FAULTS, KEY, LIST, readGoals } from '../scripts/lib/goals.mjs';
 import { CODES } from '../scripts/lib/hygiene.mjs';
 import { LESSON_FAULTS, NO_LESSON_FAULTS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FAULTS } from '../scripts/lib/plan.mjs';
@@ -27,7 +27,9 @@ const HERE = import.meta.dirname;
 const ROOT = path.join(HERE, '..');
 const CASES_DIR = path.join(HERE, 'fixtures', path.basename(import.meta.filename, '.test.js'));
 const FAULT_SETS = { ADOPTED_FAULTS, CODES, DECISION_FAULTS, ENTITY_FAULTS, FIELD_FAULTS, GOAL_FAULTS, LESSON_FAULTS, NO_LESSON_FAULTS, PLAN_FAULTS, SKILL_FAULTS, TRIGGER_FAULTS };
-const DETECTORS = { machine: 'machine', judge: 'juez', none: 'ninguno' };
+// The detectors are the words of goals.json «check» (who checks a rule today), read from goals-shape.mjs and not retyped.
+const DETECTORS = { machine: CHECK.machine, judge: CHECK.judge, none: CHECK.nobody };
+const INVARIANTS = readGoals(ROOT)[LIST.invariants].map((i) => i[KEY.id]);
 // Not `expected.json`: golden-run.test.js requires that no file of that name reaches the judge's workspace.
 const CASES_FILE = 'cases.json';
 const EXIT_OK = 'ok';
@@ -116,17 +118,15 @@ const isBad = (r) => !r.ok || r.shown.length > 0;
 // under MIN_CASES_PER_CELL cases.
 const NOT_CONCLUSIVE = 'no concluyente';
 const label = (detector, total, hit) => [detector, detector === DETECTORS.machine ? [hit, total].join('/') : total, ...(total < MIN_CASES_PER_CELL ? [NOT_CONCLUSIVE] : [])].join(' ');
-const invariantIds = () => readGoals(ROOT)[LIST.invariants].map((i) => i[KEY.id]);
-const table = (hits, list = cases) => invariantIds().map((inv) => {
+const table = (hits, list = cases) => INVARIANTS.map((inv) => {
   const cells = Object.values(DETECTORS).map((d) => label(d, list.filter((c) => c.invariant === inv && c.detector === d).length, hits.filter((h) => h.c.invariant === inv && h.yes).length));
   return `${inv}: ${cells.join('; ')}`;
 });
 
 test('the cases are well formed: closed detectors, invariants of goals.json, one folder per machine case and nothing else', () => {
-  const invariants = readGoals(ROOT)[LIST.invariants].map((i) => i[KEY.id]);
   assert.equal(new Set(cases.map((c) => c.id)).size, cases.length, 'repeated case id');
   for (const c of cases) {
-    assert.ok(invariants.includes(c.invariant), `${c.id}: ${c.invariant} is not an invariant of goals.json`);
+    assert.ok(INVARIANTS.includes(c.invariant), `${c.id}: ${c.invariant} is not an invariant of goals.json`);
     assert.ok(Object.values(DETECTORS).includes(c.detector), `${c.id}: unknown detector ${c.detector}`);
     if (c.detector === DETECTORS.machine) assert.ok(c.catch.length > 0 && existsSync(path.join(CASES_DIR, c.id, 'data.json')), `${c.id}: a machine case needs catch and data.json`);
     else assert.ok(c.why.trim() !== '' && !existsSync(path.join(CASES_DIR, c.id)), `${c.id}: a ${c.detector} case needs a motive and has no data`);
@@ -141,8 +141,8 @@ test('the table says «no concluyente» exactly under MIN_CASES_PER_CELL, and «
   assert.equal(label(DETECTORS.machine, enough, enough), `${DETECTORS.machine} ${enough}/${enough}`);
   assert.equal(label(DETECTORS.judge, few, 0), `${DETECTORS.judge} ${few} ${NOT_CONCLUSIVE}`);
   assert.equal(label(DETECTORS.none, enough, 0), `${DETECTORS.none} ${enough}`);
-  const two = [{ invariant: invariantIds()[0], detector: DETECTORS.machine }, { invariant: invariantIds()[0], detector: DETECTORS.machine }];
-  assert.ok(table([{ c: two[0], yes: true }, { c: two[1], yes: false }], two)[0].startsWith(`${invariantIds()[0]}: ${DETECTORS.machine} 1/2`), 'only the caught ones count, machine first');
+  const two = [{ invariant: INVARIANTS[0], detector: DETECTORS.machine }, { invariant: INVARIANTS[0], detector: DETECTORS.machine }];
+  assert.ok(table([{ c: two[0], yes: true }, { c: two[1], yes: false }], two)[0].startsWith(`${INVARIANTS[0]}: ${DETECTORS.machine} 1/2`), 'only the caught ones count, machine first');
 });
 
 test('a command runs isolated (own home so no control writes to the real ~/.fabrica, no test context), and the title of a failed test is dropped', () => {
@@ -171,8 +171,8 @@ test('every machine case is caught through the real entry point, and its control
   const badControl = machine.map((c) => ({ c, r: control(c, dataOf(c)) })).filter((x) => isBad(x.r));
   const lines = table(hits);
   console.log(`${lines.join('\n')}\nmachine: ${hits.filter((h) => h.yes).length}/${machine.length}`);
-  assert.equal(lines.length, invariantIds().length);
-  for (const inv of invariantIds()) {
+  assert.equal(lines.length, INVARIANTS.length);
+  for (const inv of INVARIANTS) {
     const own = hits.filter((h) => h.c.invariant === inv);
     assert.ok(lines.find((l) => l.startsWith(`${inv}:`)).includes(`${DETECTORS.machine} ${own.filter((h) => h.yes).length}/${own.length}`), `${inv}: the table does not match the cases run`);
   }
