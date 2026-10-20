@@ -16,7 +16,8 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    `node scripts/token.mjs -- gh pr edit <n> --body-file <scratchpad>/body.md` first, then push. If the push goes
    first, the edit and the push each start a `tests` run, and the run that read the old body is red (stale-HEAD check in `scripts/lib/pr-body.mjs`).
    Established in #114 (head c70533c): two `tests` runs on the same SHA with the same `created_at` (2026-10-19T16:22:55Z),
-   one red (run 39284981066, step "PR body has the template sections", old body) and one green (run 39284980072).
+   one red (run 39284981066, failing step "PR body has the template sections") and one green (run 39284980072).
+   Inferred, no command proves it: that the red run read the old body.
    Reported, not re-checked: that the builder pushed and then edited the body, and the `mergeable_state=unstable` it left.
    A new PR cannot exist before its first push: push, then create at once with the final body file.
 5. **Push, create, edit, merge: each a STANDALONE command**, through the App:
@@ -28,7 +29,7 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
 6. **Look at CI once** (rules: skill `github`, "La cuota de GitHub"): `node scripts/token.mjs -- gh pr view <n> --json statusCheckRollup`.
    The constructor App cannot rerun runs: to get a new run, push a new commit (then redo step 2 and the body).
    Rerunning a red run would not fix an old body anyway: GitHub replays it with the original event, so with the body of
-   that moment (observed: attempt 2 of 39284981066 also ended `failure`). The only way out is a new commit (it may be empty)
+   that moment (inferred: attempt 2 of 39284981066 also ended `failure` at the same step, which supports it but does not prove it). The only way out is a new commit (it may be empty)
    whose body is already right, and the body must name the new SHA BEFORE the push: `git commit` first (the local
    commit already has its SHA), then edit the body with that SHA, then push. If you already pushed with an old SHA in the
    body, editing the body to the right SHA fixes it (#114 at ebc9fc3: run 39369254527 `failure`, then run 39369395187 `success`).
