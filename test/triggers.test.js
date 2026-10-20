@@ -5,43 +5,17 @@
 // with no C16 in code.md (TRIGGER_PLAN_NO_BRIDGE) has its own case; that the judge then answers C16 is for the pass of the corpus, not here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
-import { LESSONS_DIR, SIGNAL_MACHINE, SIGNAL_NONE, STANDARDS } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { PLAN_BRIDGE_QUESTION, TRIGGER, TRIGGERS, TRIGGER_FAULTS, triggerFaults, triggerOf } from '../scripts/lib/triggers.mjs';
 import {
   CORPUS_WORKFLOW, JUDGE_EVENT, JUDGE_WORKFLOW, NODE_TEST_SCRIPT, NPM_TEST, PR_EVENT, SCHEDULE_EVENT, STANDARD_VARIABLE, TESTS_WORKFLOW, WORKFLOWS_DIR,
 } from '../scripts/lib/wiring.mjs';
+import { CODE, PLAN, at, codes, lesson, question, repo, tests, workflow } from './apoyo/triggers-repo.mjs';
 
 const REPO = path.join(import.meta.dirname, '..');
-const [CODE, PLAN] = STANDARDS;
-const workflow = (events, runs = [], env = {}) => yaml.dump({ on: events, jobs: { j: { steps: [{ uses: 'some/action' }, ...runs.map((run) => ({ run })), { env, run: 'true' }] } } });
-const question = (id, who) => `### ${id} — a question\nQuién: ${who}\n\n`;
-const lesson = (mechanism, signal = SIGNAL_MACHINE) => JSON.stringify({ signal, mechanism });
-// A repo where everything is wired: C1 and P1 are machine questions, C2 and P2 reviewer ones, and C16 (the bridge) is in code.md.
-const wired = () => ({
-  'package.json': JSON.stringify({ scripts: { test: NODE_TEST_SCRIPT, hora: 'x', hitl: 'x', nightly: 'x', 'nightly-all': 'x' } }),
-  [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: workflow({ [PR_EVENT]: null, push: null }, [`npm ci\n${NPM_TEST}`]),
-  [`${WORKFLOWS_DIR}/${JUDGE_WORKFLOW}`]: workflow({ [JUDGE_EVENT]: null }, [], { [STANDARD_VARIABLE]: `.fabrica/${CODE}` }),
-  [`${WORKFLOWS_DIR}/${CORPUS_WORKFLOW}`]: 'on: workflow_dispatch\n', // a string for `on:` and no jobs at all
-  [CODE]: question('C1', CHECKED_BY.machine) + question('C2', CHECKED_BY.reviewer) + question(PLAN_BRIDGE_QUESTION, CHECKED_BY.reviewer),
-  [PLAN]: question('P1', CHECKED_BY.machine) + question('P2', CHECKED_BY.reviewer),
-});
-function repo(t, changes = {}) {
-  const root = mkdtempSync(path.join(tmpdir(), 'fabrica-triggers-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const [rel, text] of Object.entries({ ...wired(), ...changes })) {
-    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
-    writeFileSync(path.join(root, rel), text);
-  }
-  return root;
-}
-const tests = (t, events, runs, extra = {}) => repo(t, { [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: workflow(events, runs), ...extra });
-const codes = (root) => triggerFaults(root).map((f) => f.code).sort();
-const at = (root, code) => triggerFaults(root).filter((f) => f.code === code).map((f) => f.where);
 
 test('TRIGGERS is the closed list, and every fault code carries the TRIGGER_ prefix', () => {
   // The six names of the plan (ci-test, ci-judge, corpus, manual, arranque, cron) are not retyped here: that would be a copy
