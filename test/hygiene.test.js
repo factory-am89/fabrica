@@ -14,6 +14,7 @@ import { EXIT } from '../scripts/lib/exit.mjs';
 import { CODES, GROUP, NEEDS_RECORDS, NOT_COMPUTED, hygiene, hygieneCounts, humanHygiene, mergeCandidates, promoteCandidates, readLessonRows, retireTextCandidates, reworkCandidates } from '../scripts/lib/hygiene.mjs';
 import { DOC, REF, overlaps } from '../scripts/lib/hygiene-refs.mjs';
 import { LESSONS_DIR, NO_LESSON_FILE, NO_QUESTION, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { REFERENCES_DIR, SKILL_FILE } from '../scripts/lib/skills.mjs';
 import { ANSWER, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,7 +24,6 @@ const lesson = (id, question, mechanism, signal = SIGNAL_MACHINE) => ({ id, ques
 const bullet = (text) => `- **b.** ${text}\n`;
 const skillText = (...bullets) => `# s\n## Lo que falló\n${bullets.join('')}`;
 const only = (r, code) => r.candidates.filter((c) => c.code === code);
-
 function put(root, rel, text) {
   mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
   writeFileSync(path.join(root, rel), text);
@@ -40,8 +40,8 @@ function root(t, { lessons = [], skills = {}, scripts = ['known'], missing = [],
   }
   for (const [name, s] of Object.entries(skills)) {
     const { skill, refs = {} } = typeof s === 'string' ? { skill: s } : s;
-    put(dir, `.claude/skills/${name}/SKILL.md`, skill);
-    for (const [f, text] of Object.entries(refs)) put(dir, `.claude/skills/${name}/referencias/${f}`, text);
+    put(dir, `.claude/skills/${name}/${SKILL_FILE}`, skill);
+    for (const [f, text] of Object.entries(refs)) put(dir, `.claude/skills/${name}/${REFERENCES_DIR}/${f}`, text);
   }
   return dir;
 }
@@ -122,9 +122,9 @@ test('DEAD_REF: a missing path (SKILL.md or referencias, trailing dot included) 
   const dead = only(r, CODES.DEAD_REF).map((c) => [c.items[0], c.file, c.ref, c.kind]);
   assert.deepEqual(dead, [
     ['lesson:gone', `${LESSONS_DIR}/gone.json`, 'scripts/gone.mjs', REF.path],
-    ['skill:sk', '.claude/skills/sk/SKILL.md', 'zabsent', REF.command],
-    ['skill:sk', '.claude/skills/sk/SKILL.md', 'scripts/nope.mjs', REF.path],
-    ['skill:sk', '.claude/skills/sk/referencias/r.md', 'scripts/aaa.mjs', REF.path],
+    ['skill:sk', `.claude/skills/sk/${SKILL_FILE}`, 'zabsent', REF.command],
+    ['skill:sk', `.claude/skills/sk/${SKILL_FILE}`, 'scripts/nope.mjs', REF.path],
+    ['skill:sk', `.claude/skills/sk/${REFERENCES_DIR}/r.md`, 'scripts/aaa.mjs', REF.path],
   ]);
 });
 

@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { LESSONS_DIR, mechanismKind } from './lessons.mjs';
-import { carpetasDeSkills, viñetas } from './skills.mjs';
+import { REFERENCES_DIR, SKILL_FILE, carpetasDeSkills, viñetas } from './skills.mjs';
 
 export const DOC = Object.freeze({ lesson: 'lesson', skill: 'skill' });
 export const REF = Object.freeze({ path: 'path', command: 'command' });
@@ -13,8 +13,6 @@ export const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const WORD = /[\w./-]+/g;
 const TRAILING_DOTS = /\.+$/;
 const NPM_RUN = /\bnpm run ([\w:-]+)/g;
-const REFERENCES_DIR = 'referencias';
-const SKILL_FILE = 'SKILL.md';
 
 // [{name, files: [{file, text}] (SKILL.md first, then its referencias/), bullets}] of .claude/skills/.
 export function readSkills(root) {
