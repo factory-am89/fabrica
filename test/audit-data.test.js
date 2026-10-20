@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { INDICATORS, audit, auditData, cliAudit, mainAudit } from '../scripts/audit.mjs';
 import { BOUND, CAVEAT, DATA_INDICATORS, ESCAPE_DAYS, FIX_PREFIX, REWORK_HOURS } from '../scripts/lib/audit-data.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
-import { LESSONS_DIR } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, NO_LESSON_FILE, NO_QUESTION } from '../scripts/lib/lessons.mjs';
 import { registrarMensaje, rutaDeMensajes } from '../scripts/lib/message-log.mjs';
 import { ANSWER } from '../scripts/lib/record.mjs';
 
@@ -114,7 +114,8 @@ test('escapes: the lessons with escaped true are added, those with false are not
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-lessons-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, LESSONS_DIR));
-  for (const [name, escaped] of [['a', true], ['b', false], ['c', true]]) writeFileSync(path.join(root, LESSONS_DIR, `${name}.json`), JSON.stringify({ escaped }));
+  for (const [name, escaped] of [['a', true], ['b', false], ['c', true]]) writeFileSync(path.join(root, LESSONS_DIR, `${name}.json`), JSON.stringify({ escaped, question: NO_QUESTION, sources: [] }));
+  writeFileSync(path.join(root, NO_LESSON_FILE), JSON.stringify({ entries: [] }));
   const e = auditData({ pulls: [pull(1, 'feat/x', 0, HOUR, ['f.js'])], checkRuns: [] }, { root, now: NOW, messagesPath: path.join(root, 'none.jsonl') })[INDICATORS.escapes];
   assert.deepEqual([e.lessonsEscaped, e.fixPrs, e.count, e.rate], [2, [], 2, 2]);
 });

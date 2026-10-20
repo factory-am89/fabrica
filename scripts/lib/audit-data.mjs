@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ExitError, runCommand } from './exit.mjs';
+import { lessonIndicators } from './lesson-effect.mjs';
 import { aggregate, readCheckRuns } from './record.mjs';
 
 export const BOUND = Object.freeze({ lower: 'lower', upper: 'upper' });
@@ -123,14 +124,18 @@ export const DATA_IDS = Object.freeze({
   clashes: 'clashes',
   escapes: 'escapes',
   projectCost: 'project-cost',
+  lessonEffect: 'lesson-effect',
+  unsortedNo: 'unsorted-no',
+  falseNo: 'false-no',
 });
 export const DATA_INDICATORS = Object.freeze(Object.values(DATA_IDS));
 
 // data = { pulls, checkRuns } as scripts/collect-records.mjs writes them. lessonsEscaped (a count) and messageCounts
-// (contarMensajes()) belong to the Fábrica's own files: null means not applicable (a --repo run).
-export function dataIndicators(data, { now, lessonsEscaped, messageCounts }) {
+// (contarMensajes()) and `local` (localInputs() of scripts/lib/lesson-effect.mjs) belong to the Fábrica's own files: null means not applicable (a --repo run).
+export function dataIndicators(data, { now, lessonsEscaped, messageCounts, local }) {
   const prs = readPulls(data.pulls);
   const r = rounds(data.checkRuns);
+  const lesson = lessonIndicators(prs, data.checkRuns, local);
   return {
     [DATA_IDS.rounds]: { records: r.records, prs: r.prs, mean: r.mean, byPr: r.byPr, bound: r.bound, caveat: r.caveat },
     [DATA_IDS.noPerQuestion]: r.noPerQuestion,
@@ -141,15 +146,18 @@ export function dataIndicators(data, { now, lessonsEscaped, messageCounts }) {
     [DATA_IDS.clashes]: clashes(prs, now),
     [DATA_IDS.escapes]: escapes(prs, lessonsEscaped),
     [DATA_IDS.projectCost]: projectCost(prs, data.checkRuns),
+    [DATA_IDS.lessonEffect]: lesson.lessonEffect,
+    [DATA_IDS.unsortedNo]: lesson.unsortedNo,
+    [DATA_IDS.falseNo]: lesson.falseNo,
   };
 }
 
-const FLAG = { data: '--data', records: '--records', repo: '--repo', since: '--since' };
-const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since];
+const FLAG = { data: '--data', records: '--records', repo: '--repo', since: '--since', golden: '--golden' };
+const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since, FLAG.golden];
 const FLAG_PREFIX = '--';
-// argv without --json -> { data, root, records, repo, since }; a flag that needs a value without one is a USAGE error.
+// argv without --json -> { data, root, records, repo, since, golden }; a flag that needs a value without one is a USAGE error.
 export function parseAuditArgs(args, defaultRoot) {
-  const out = { data: false, root: defaultRoot, records: null, repo: null, since: null };
+  const out = { data: false, root: defaultRoot, records: null, repo: null, since: null, golden: null };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === FLAG.data) out.data = true;
     else if (VALUE_FLAGS.includes(args[i])) {
@@ -157,9 +165,10 @@ export function parseAuditArgs(args, defaultRoot) {
       out[args[i].slice(FLAG_PREFIX.length)] = args[++i];
     } else out.root = path.resolve(args[i]);
   }
-  const extras = [FLAG.records, FLAG.repo, FLAG.since].filter((f) => out[f.slice(FLAG_PREFIX.length)] !== null);
+  const extras = VALUE_FLAGS.filter((f) => out[f.slice(FLAG_PREFIX.length)] !== null);
   if (!out.data && extras.length > 0) throw new ExitError('USAGE', `${VALUE_FLAGS.join(', ')} go with ${FLAG.data}`);
   if (out.data && (out.records === null) === (out.repo === null)) throw new ExitError('USAGE', `${FLAG.data} needs exactly one of ${FLAG.records} <file> or ${FLAG.repo} <owner/name>`);
+  if (out.golden !== null && out.records === null) throw new ExitError('USAGE', `${FLAG.golden} reads the Fábrica's own files: it goes with ${FLAG.records}, not ${FLAG.repo}`);
   return out;
 }
 
@@ -174,7 +183,7 @@ export function makeCommands({ root: defaultRoot, audit, auditData, humanLocal, 
       const a = parseAuditArgs(args, defaultRoot);
       if (!a.data) return audit(a.root);
       if (a.records === null) return auditData(collected, { now: Date.now() });
-      return auditData(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root });
+      return auditData(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, golden: a.golden });
     },
     human,
   });
