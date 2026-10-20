@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { DATA_IDS, dataIndicators, makeCommands } from './lib/audit-data.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
+import { freeValues, humanFreeValues } from './lib/free-values.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
+import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
 import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
 import { NoQuestionsError, readQuestions } from './lib/questions.mjs';
@@ -31,6 +33,7 @@ export const INDICATORS = Object.freeze({
   magicNumbers: 'magic-numbers',
   baseHoles: 'base-holes',
   testDuplication: 'test-duplication',
+  freeValues: 'free-values',
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
 });
 
@@ -118,21 +121,6 @@ function scriptsWithoutJson(root) {
   return { total: files.length, count: without.length, files: without };
 }
 
-// The quoted strings of a source, without line comments (a `//` after a space or at the start of a line).
-const QUOTED = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1/g;
-const stringsOf = (text) => [...text.replace(/(^|\s)\/\/.*$/gm, '$1').matchAll(QUOTED)].map((m) => m[2]);
-
-// The `export const` statements of a lib file: from each such line to the next line that starts a new top-level statement.
-export function exportedStrings(text) {
-  const out = [];
-  let inExport = false;
-  for (const line of text.split('\n')) {
-    if (/^\S/.test(line) && !/^[})\]]/.test(line)) inExport = line.startsWith('export const');
-    if (inExport) out.push(...stringsOf(line));
-  }
-  return out;
-}
-
 // Vocabulary copied into tests: strings of length >= minLength found in a test/ file and in an `export const` of scripts/lib/.
 export function duplicationInTests(root, minLength = MIN_DUP_LENGTH) {
   const lib = new Map();
@@ -162,6 +150,7 @@ export function audit(root, { logPath } = {}) {
     [INDICATORS.magicNumbers]: magicNumbers(root),
     [INDICATORS.baseHoles]: { holes: baseHoles(readEntities(root)) },
     [INDICATORS.testDuplication]: duplicationInTests(root),
+    [INDICATORS.freeValues]: freeValues(root),
   };
 }
 
@@ -188,6 +177,7 @@ export function humanLocal(r) {
     line(INDICATORS.baseHoles, String(r[INDICATORS.baseHoles].holes.length)),
     line(INDICATORS.testDuplication, `${r[INDICATORS.testDuplication].count} strings of >= ${r[INDICATORS.testDuplication].minLength} chars`),
     ...r[INDICATORS.testDuplication].values.map((v) => `  ${JSON.stringify(v.value)}: ${v.tests.join(', ')} <- ${v.lib.join(', ')}`),
+    ...humanFreeValues(INDICATORS.freeValues, r[INDICATORS.freeValues]),
   ].join('\n');
 }
 

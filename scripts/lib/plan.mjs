@@ -93,17 +93,19 @@ function parseDone(lines) {
   return { closed: true, code: lines.slice(open + 1, close).join('\n') };
 }
 
+// The plan's own word for an empty list in «Depends on» and «Blocked by».
+export const NONE_WORD = 'none';
 const listOf = (s) => s.split(',').map((t) => t.trim()).filter(Boolean);
 
 function parseDeps(value) {
   const tokens = listOf(value);
-  if (tokens.length === 1 && tokens[0].toLowerCase() === 'none') return [];
+  if (tokens.length === 1 && tokens[0].toLowerCase() === NONE_WORD) return [];
   return tokens.map((t) => (/^\d+$/.test(t) ? Number(t) : t));
 }
 
 function parseBlocked(value) {
   const tokens = listOf(value);
-  if (tokens.length === 1 && tokens[0].toLowerCase() === 'none') return [];
+  if (tokens.length === 1 && tokens[0].toLowerCase() === NONE_WORD) return [];
   return tokens;
 }
 
