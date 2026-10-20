@@ -57,7 +57,7 @@ const ID_RE = /^[a-z0-9-]+$/;
 export const PR_SOURCE = /^#[1-9]\d*$/;
 // A line number points at the wrong row as soon as main adds rows (merge=union hides the shift): refused.
 const LINE_SOURCE = /:[1-9]\d*$/;
-const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
+export const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
 const REPEATED = 'repetida: sí';
 const STANDARDS = ['standards/code.md', 'standards/plan.md'];
 

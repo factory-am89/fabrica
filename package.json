@@ -22,6 +22,7 @@
     "contract": "node scripts/contract.mjs",
     "lessons": "node scripts/lessons.mjs",
     "done": "node scripts/done.mjs",
+    "audit": "node scripts/audit.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test"
   },
