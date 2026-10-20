@@ -34,6 +34,7 @@ export const INDICATORS = Object.freeze({
 export const LONG_FILE_LINES = 200;
 export const MIN_DUP_LENGTH = 8;
 // no-magic-numbers is run here and not in lint, where it would turn everything red.
+const MAGIC_RULE = 'no-magic-numbers';
 const MAGIC_ALLOWED = [-1, 0, 1];
 const SOURCE_EXT = /\.(mjs|js)$/;
 const JSON_FLAG = '--json';
@@ -93,11 +94,15 @@ function longFiles(root) {
 // Numbers written in the code of scripts/ (no-magic-numbers of ESLint, as a warning so the exit code stays 0).
 function magicNumbers(root) {
   const cli = path.join(path.dirname(createRequire(import.meta.url).resolve('eslint')), '..', 'bin', 'eslint.js');
-  const rule = JSON.stringify({ 'no-magic-numbers': ['warn', { ignore: MAGIC_ALLOWED, ignoreArrayIndexes: true }] });
+  const rule = JSON.stringify({ [MAGIC_RULE]: ['warn', { ignore: MAGIC_ALLOWED, ignoreArrayIndexes: true }] });
   const r = spawnSync(process.execPath, [cli, '--no-config-lookup', '--format', 'json', '--rule', rule, 'scripts'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
   if (r.status !== 0 && r.status !== 1) throw new Error(`eslint failed (exit ${r.status}): ${r.stderr}`);
-  const files = JSON.parse(r.stdout)
-    .map((f) => ({ file: path.relative(root, f.filePath).split(path.sep).join('/'), count: f.messages.length }))
+  const results = JSON.parse(r.stdout);
+  // ESLint also exits 1 for a file it cannot read: that is a failure of the measure, never a number.
+  const fatal = results.flatMap((f) => f.messages.filter((m) => m.fatal).map((m) => `${f.filePath}: ${m.message}`));
+  if (fatal.length > 0) throw new Error(`eslint could not read: ${fatal.join('; ')}`);
+  const files = results
+    .map((f) => ({ file: path.relative(root, f.filePath).split(path.sep).join('/'), count: f.messages.filter((m) => m.ruleId === MAGIC_RULE).length }))
     .filter((f) => f.count > 0);
   return { count: files.reduce((a, f) => a + f.count, 0), files: files.sort((a, b) => b.count - a.count) };
 }

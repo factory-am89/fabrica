@@ -112,6 +112,13 @@ test('magic numbers: a number in a comparison counts, 0 and 1 do not', (t) => {
   assert.equal(m.count, 1);
 });
 
+test('magic numbers: only the rule counts (an unused eslint-disable is not a number) and an unreadable file fails loudly', (t) => {
+  const ok = fixture(t, { 'scripts/num.mjs': '// eslint-disable-next-line no-undef\nexport const f = (x) => (x > 4242 ? 1 : 0);\n' });
+  assert.equal(run(ok)[INDICATORS.magicNumbers].count, 1);
+  const bad = fixture(t, { 'scripts/roto.mjs': 'export const x = (;\n' });
+  assert.throws(() => run(bad), /could not read.*roto\.mjs/);
+});
+
 test('base holes lists the entities whose base is a hole', (t) => {
   assert.deepEqual(run(fixture(t))[INDICATORS.baseHoles].holes, ['e1']);
 });
