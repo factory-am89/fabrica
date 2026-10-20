@@ -7,12 +7,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DATA_IDS, dataIndicators, makeCommands } from './lib/audit-data.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
-import { runCommand, finish } from './lib/exit.mjs';
+import { finish } from './lib/exit.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
+import { contarMensajes } from './lib/message-log.mjs';
 import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
 import { NoQuestionsError, readQuestions } from './lib/questions.mjs';
 import { RULES_BUDGET_FILE } from './lib/skills.mjs';
+import { collect, getWithToken } from './collect-records.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -28,6 +31,7 @@ export const INDICATORS = Object.freeze({
   magicNumbers: 'magic-numbers',
   baseHoles: 'base-holes',
   testDuplication: 'test-duplication',
+  ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
 });
 
 // Parameters of the signals (none is a gate). MIN_DUP_LENGTH was fixed with the counts of the PR that created it.
@@ -70,6 +74,7 @@ function lessonsOf(root) {
   return {
     signal: { total: lessons.length, bySignal: tally(lessons.map((d) => d.signal)) },
     reason: tally(lessons.flatMap((d) => d.reason ?? [])),
+    escaped: lessons.filter((d) => d.escaped === true).length,
   };
 }
 
@@ -160,7 +165,16 @@ export function audit(root, { logPath } = {}) {
   };
 }
 
-export function humanText(r) {
+export function auditData(data, { root = null, now = Date.now(), messagesPath } = {}) {
+  const local = root !== null;
+  return dataIndicators(data, {
+    now,
+    lessonsEscaped: local ? lessonsOf(root).escaped : null,
+    messageCounts: local ? contarMensajes(messagesPath === undefined ? undefined : { ruta: messagesPath }) : null,
+  });
+}
+
+export function humanLocal(r) {
   const line = (id, text) => `${id}: ${text}`;
   return [
     line(INDICATORS.questions, `${r[INDICATORS.questions].total} ${JSON.stringify(r[INDICATORS.questions].byCheckedBy)}`),
@@ -177,6 +191,7 @@ export function humanText(r) {
   ].join('\n');
 }
 
-export const cliAudit = (argv) => runCommand(argv, { run: ([root = REPO]) => audit(path.resolve(root)), human: humanText });
+const downloadWithToken = (repo, since) => collect({ get: async (route) => getWithToken(route), repo, since });
+export const { cliAudit, mainAudit } = makeCommands({ root: REPO, audit, auditData, humanLocal, download: downloadWithToken });
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) finish(cliAudit(process.argv.slice(2)));
+if (process.argv[1] === fileURLToPath(import.meta.url)) finish(await mainAudit(process.argv.slice(2)));
