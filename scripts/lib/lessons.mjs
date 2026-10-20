@@ -56,6 +56,11 @@ export const NO_SIGNAL_REASONS = [...NO_QUESTION_REASONS, OTHER];
 const HUMAN_ORIGIN = 'pablo';
 const ID_RE = /^[a-z0-9-]+$/;
 export const PR_SOURCE = /^#[1-9]\d*$/;
+// The PR number of a source `#<n>`; anything else throws (a malformed source is never read as a number).
+export function sourceNumber(s) {
+  if (typeof s !== 'string' || !PR_SOURCE.test(s)) throw new Error(`source ${JSON.stringify(s)} must be #<n>`);
+  return Number(/\d+/.exec(s)[0]);
+}
 // A line number points at the wrong row as soon as main adds rows (merge=union hides the shift): refused.
 const LINE_SOURCE = /:[1-9]\d*$/;
 export const INTERVENCIONES_FILE = 'intervenciones.md';

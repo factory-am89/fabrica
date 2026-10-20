@@ -11,6 +11,7 @@ import { DATA_IDS, dataIndicators, makeCommands } from './lib/audit-data.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
 import { freeValues, humanFreeValues } from './lib/free-values.mjs';
+import { localInputs } from './lib/lesson-effect.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
 import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
@@ -154,11 +155,12 @@ export function audit(root, { logPath } = {}) {
   };
 }
 
-export function auditData(data, { root = null, now = Date.now(), messagesPath } = {}) {
+export function auditData(data, { root = null, now = Date.now(), messagesPath, golden = null } = {}) {
   const local = root !== null;
   return dataIndicators(data, {
     now,
     lessonsEscaped: local ? lessonsOf(root).escaped : null,
+    local: local ? localInputs(root, golden) : null,
     messageCounts: local ? contarMensajes(messagesPath === undefined ? undefined : { ruta: messagesPath }) : null,
   });
 }
