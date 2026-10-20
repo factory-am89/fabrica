@@ -8,10 +8,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENTITY, FIELDS_FILE, KEYS, TEXT, VALUE_KINDS, fieldId, readFields } from '../scripts/lib/fields.mjs';
 import {
-  MAX_ENUM_VALUES, MIN_REPEATS, MIN_VALUES, PLAN_NONE, VALUE_READERS, freeValues, humanFreeValues, summarize,
+  MAX_ENUM_VALUES, MIN_REPEATS, MIN_VALUES, VALUE_READERS, freeValues, humanFreeValues, summarize,
 } from '../scripts/lib/free-values.mjs';
 import { LESSONS_DIR, LESSON_NOTE, NO_LESSON_FILE, NO_LESSON_KEYS } from '../scripts/lib/lessons.mjs';
-import { PLAN_DIR, PLAN_FIELDS } from '../scripts/lib/plan.mjs';
+import { NONE_WORD, PLAN_DIR, PLAN_FIELDS } from '../scripts/lib/plan.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOTE = LESSON_NOTE;
@@ -75,17 +75,36 @@ test('freeValues stops when a source cannot be read: a lesson that is not JSON',
   assert.throws(() => freeValues(dir), SyntaxError);
 });
 
-test('the plan readers give the value of each field of every chunk, and an empty «Blocked by» is the word none', (t) => {
+test('the plan readers give the value of each field of every chunk; absent fields give no value and a .md file is the only plan', (t) => {
   const label = PLAN_FIELDS;
   const dir = root(t, []);
   const fence = '`'.repeat(3);
-  const chunk = (n, blocked) => `### ${n}. t\n${label.files}: \`a\`\n${label.dependsOn}: none\n${label.blockedBy}: ${blocked}\n${label.existing}: ex-${n}\n${label.notDone}: nd-${n}\n${label.done}:\n${fence}sh\ncmd-${n}\n${fence}\n`;
-  put(dir, `${PLAN_DIR}p.md`, `# Plan: x\n\n## Chunks\n\n${chunk(1, 'none')}\n${chunk(2, '1')}`);
+  const chunk = (n, blocked) => [
+    `### ${n}. t`, `${label.files}: \`a\``, `${label.dependsOn}: ${NONE_WORD}`, `${label.blockedBy}: ${blocked}`,
+    `${label.existing}: ex-${n}`, `${label.notDone}: nd-${n}`, `${label.done}:`, `${fence}sh`, `cmd-${n}`, fence, '',
+  ].join('\n');
+  const bare = `### 3. bare\n${label.files}: \`a\`\n`;
+  put(dir, `${PLAN_DIR}p.md`, `# Plan: x\n\n## Chunks\n\n${chunk(1, NONE_WORD)}\n${chunk(2, '1, 2')}\n${bare}`);
+  put(dir, `${PLAN_DIR}notes.txt`, `# Plan: y\n\n## Chunks\n\n${chunk(9, '7')}`);
   const read = (name) => VALUE_READERS[ENTITY.plan][name](dir);
-  assert.deepEqual(read(label.blockedBy), [PLAN_NONE, '1']);
+  assert.deepEqual(read(label.blockedBy), [NONE_WORD, '1, 2']);
   assert.deepEqual(read(label.existing), ['ex-1', 'ex-2']);
   assert.deepEqual(read(label.notDone), ['nd-1', 'nd-2']);
   assert.deepEqual(read(label.done), ['cmd-1', 'cmd-2']);
+});
+
+test('freeValues counts only the fields with a proposal and reports its own thresholds', (t) => {
+  const noteOfNoLesson = field(NO_LESSON_KEYS.note, TEXT, ENTITY.noLesson);
+  const dir = root(t, [field(NOTE), noteOfNoLesson], [...same(MIN_VALUES, 'a'), 'b']);
+  put(dir, NO_LESSON_FILE, JSON.stringify({ entries: [] }));
+  const r = freeValues(dir);
+  assert.equal(r.fields.length, 2);
+  assert.equal(r.count, 1);
+  assert.deepEqual([r.minValues, r.maxEnumValues], [MIN_VALUES, MAX_ENUM_VALUES]);
+});
+
+test('summarize orders repeated values of the same count by value, not by arrival', () => {
+  assert.deepEqual(summarize(['b', 'b', 'a', 'a']).repeated, [{ value: 'a', count: 2 }, { value: 'b', count: 2 }]);
 });
 
 test('the no-lesson reader gives the notes of the entries that have one', (t) => {

@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ENTITY, KEYS, TEXT, fieldId, readFields } from './fields.mjs';
 import { LESSON_NOTE, NO_LESSON_KEYS, readLessons, readNoLesson } from './lessons.mjs';
-import { PLAN_DIR, PLAN_FIELDS, parsePlan } from './plan.mjs';
+import { NONE_WORD, PLAN_DIR, PLAN_FIELDS, parsePlan } from './plan.mjs';
 
 // A value repeated at least MIN_REPEATS times is «repeated». An enum is proposed when there are at least MIN_VALUES values,
 // at most MAX_ENUM_VALUES different ones, and the different ones are at most MAX_DISTINCT_SHARE of the values (so they do repeat).
@@ -14,7 +14,6 @@ export const MIN_REPEATS = 2;
 export const MIN_VALUES = 5;
 export const MAX_ENUM_VALUES = 8;
 export const MAX_DISTINCT_SHARE = 0.5;
-export const PLAN_NONE = 'none';
 
 const clean = (v) => String(v).trim().replace(/\s+/g, ' ');
 const planChunks = (root) => {
@@ -22,7 +21,7 @@ const planChunks = (root) => {
   return readdirSync(dir).filter((f) => f.endsWith('.md')).sort().flatMap((f) => parsePlan(readFileSync(path.join(dir, f), 'utf8')).chunks);
 };
 // A chunk whose field is absent has no value; an empty list is the plan's own word for «none».
-const planField = (of) => (root) => planChunks(root).map(of).filter((v) => v !== null && v !== undefined).map((v) => (Array.isArray(v) ? (v.length === 0 ? PLAN_NONE : v.join(', ')) : v));
+const planField = (of) => (root) => planChunks(root).map(of).filter((v) => v !== null && v !== undefined).map((v) => (Array.isArray(v) ? (v.length === 0 ? NONE_WORD : v.join(', ')) : v));
 
 // owner id (entity of entities.json) -> field name -> reader of its values. the note of a no-lesson entry is its own entity's field (NO_LESSON_KEYS), not lesson's.
 export const VALUE_READERS = Object.freeze({
@@ -45,9 +44,9 @@ export function summarize(values) {
   return { total: values.length, distinct: counts.size, repeated, proposal: proposes ? [...counts.keys()].sort() : null };
 }
 
-export function freeValues(root, readers = VALUE_READERS) {
+export function freeValues(root) {
   const fields = readFields(root).fields.filter((f) => f[KEYS.values] === TEXT).map((f) => {
-    const read = readers[f[KEYS.owner]]?.[f[KEYS.name]];
+    const read = VALUE_READERS[f[KEYS.owner]]?.[f[KEYS.name]];
     if (read === undefined) throw new Error(`free-values: text field «${fieldId(f)}» has no reader of its values (add it to VALUE_READERS)`);
     return { field: fieldId(f), ...summarize(read(root)) };
   });
