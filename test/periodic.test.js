@@ -1,7 +1,6 @@
 // The step «periodico» of the startup (scripts/lib/periodic.mjs) and what it remembers (scripts/lib/periodic-state.mjs): the lines it says, the
 // limit of MANUAL_STALE_DAYS, what it keeps in ~/.fabrica, that a part that fails is said and the others still run, and that `audit --data`
-// leaves the judge debt the step reads. The run through the real entry (scripts/al-arrancar.mjs --solo) is in test/al-arrancar.test.js.
-// Every test uses a throwaway home (casaDeAudit): none writes in the real ~/.fabrica, touches the main folder or uses the network.
+// leaves the judge debt the step reads. The real entry (al-arrancar.mjs --solo) is in test/al-arrancar.test.js. Every test uses a throwaway home.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
@@ -40,7 +39,7 @@ test('indicatorLines: one entry per indicator with the text after its first «: 
 });
 
 test('changesOf: a changed text, a new indicator and one no longer measured, sorted by id; the same text is not a change', () => {
-  assert.deepEqual(changesOf({ a: '1', b: '2', c: '3' }, { a: '1', b: '9', d: '4' }), [
+  assert.deepEqual(changesOf({ c: '3', a: '1', b: '2' }, { d: '4', b: '9', a: '1' }), [
     { id: 'b', before: '2', now: '9' },
     { id: 'c', before: '3', now: null },
     { id: 'd', before: null, now: '4' },
@@ -54,7 +53,7 @@ test('staleManualReaders: more than MANUAL_STALE_DAYS (exactly that is not stale
   assert.deepEqual(staleManualReaders([manual('exacto')], passes, NOW), []);
   assert.deepEqual(staleManualReaders([manual('pasado', PASS_MODE.data)], passes, NOW), [{ ref: 'pasado', mode: PASS_MODE.data, last: NOW - limit - 1 }]);
   assert.deepEqual(staleManualReaders([manual('nunca', PASS_MODE.hitl)], passes, NOW), [{ ref: 'nunca', mode: PASS_MODE.hitl, last: null }]);
-  const items = [manual('viejo', PASS_MODE.data), manual('viejo', PASS_MODE.data), { ...manual('hueco'), kind: DEBT_KIND.hole }, { ...manual('falta'), kind: DEBT_KIND.inconclusive }];
+  const items = [manual('viejo', PASS_MODE.data), manual('viejo', PASS_MODE.data), { ...manual('hueco', PASS_MODE.data), kind: DEBT_KIND.hole }, { ...manual('falta', PASS_MODE.data), kind: DEBT_KIND.inconclusive }];
   assert.deepEqual(staleManualReaders(items, passes, NOW).map((s) => s.ref), ['viejo']);
 });
 
@@ -171,6 +170,7 @@ test('periodic-state: a file that is there and wrong throws with its reason, for
   bad(j, readJudgeDatum, { t: t0, judge: judge({ count: '2' }) }, /judge needs a count and a list of shas/);
   bad(j, readJudgeDatum, { t: t0, judge: judge({ shas: 'x' }) }, /judge needs a count and a list of shas/);
   bad(s, readSnapshot, { t: t0 }, /lines must be an object of texts/);
+  bad(s, readSnapshot, { t: t0, lines: null }, /lines must be an object of texts/);
   bad(s, readSnapshot, { t: t0, lines: [] }, /lines must be an object of texts/);
   bad(s, readSnapshot, { t: t0, lines: { a: 1 } }, /lines must be an object of texts/);
   writeSnapshot(s, NOW, { a: '1' });

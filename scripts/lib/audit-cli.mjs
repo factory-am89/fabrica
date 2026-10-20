@@ -57,7 +57,8 @@ export function makeCommands({ root: defaultRoot, audit, auditData, auditHitl, h
       if (passes === null) return result;
       const stamped = stampPass(result, modeOf(a), { registry: readGoals(a.root), root: a.root, file: passes.file, now: passes.now });
       // The last judge debt of `audit --data` is kept beside the passes for the startup step (scripts/lib/periodic-state.mjs).
-      if (a.data) recordJudgeDatum(judgeDatumPath(passes.file), stamped[DATA_IDS.judgeDebt], passes.now);
+      // Only --data measures it; a result without it (local, --hitl) or one that could not compute it is not kept.
+      recordJudgeDatum(judgeDatumPath(passes.file), stamped[DATA_IDS.judgeDebt], passes.now);
       return stamped;
     },
     human,
