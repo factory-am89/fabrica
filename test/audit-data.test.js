@@ -4,13 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, audit, auditData, cliAudit, mainAudit } from '../scripts/audit.mjs';
 import { BOUND, CAVEAT, DATA_INDICATORS, ESCAPE_DAYS, FIX_PREFIX, REWORK_HOURS } from '../scripts/lib/audit-data.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
+import { LESSONS_DIR } from '../scripts/lib/lessons.mjs';
 import { registrarMensaje, rutaDeMensajes } from '../scripts/lib/message-log.mjs';
 import { ANSWER } from '../scripts/lib/record.mjs';
 
@@ -107,6 +108,20 @@ test('escapes: a merged fix/ PR on files of a PR merged ESCAPE_DAYS before, plus
   assert.equal(e.count, e.fixPrs.length + e.lessonsEscaped);
   assert.equal(e.rate, e.count / e.mergedPrs);
   assert.equal(auditData(data(), { now: NOW })[INDICATORS.escapes].lessonsEscaped, null);
+});
+
+test('escapes: the lessons with escaped true are added, those with false are not', (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'fabrica-lessons-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, LESSONS_DIR));
+  for (const [name, escaped] of [['a', true], ['b', false], ['c', true]]) writeFileSync(path.join(root, LESSONS_DIR, `${name}.json`), JSON.stringify({ escaped }));
+  const e = auditData({ pulls: [pull(1, 'feat/x', 0, HOUR, ['f.js'])], checkRuns: [] }, { root, now: NOW, messagesPath: path.join(root, 'none.jsonl') })[INDICATORS.escapes];
+  assert.deepEqual([e.lessonsEscaped, e.fixPrs, e.count, e.rate], [2, [], 2, 2]);
+});
+
+test('project cost: a PR opened exactly when the first one merges is still counted; one opened after is not', () => {
+  const cost = (offset) => auditData({ pulls: [pull(1, 'feat/x', 0, HOUR, ['f.js']), pull(2, 'feat/y', HOUR + offset, null, ['g.js'])], checkRuns: [] }, { now: NOW })[INDICATORS.projectCost].prs;
+  assert.deepEqual([cost(0), cost(1)], [2, 1]);
 });
 
 test('project cost: PRs opened up to the first merge, their rounds and overrides', () => {
