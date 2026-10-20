@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENTITY, FIELDS_FILE, KEYS, TEXT, VALUE_KINDS, fieldId, readFields } from '../scripts/lib/fields.mjs';
+import { GOALS_FILE, KEY as GOAL_KEY, LIST as GOAL_LIST } from '../scripts/lib/goals-shape.mjs';
 import {
   MAX_ENUM_VALUES, MIN_REPEATS, MIN_VALUES, VALUE_READERS, freeValues, humanFreeValues, summarize,
 } from '../scripts/lib/free-values.mjs';
@@ -126,4 +127,13 @@ test('the real registry: every text field it declares has a reader, and the resu
 test('humanFreeValues names the indicator, how many fields have a proposal, and each proposal', () => {
   const lines = humanFreeValues('id-x', { count: 1, fields: [{ field: 'a.b', proposal: ['p'] }, { field: 'c.d', proposal: null }] });
   assert.deepEqual(lines, ['id-x: 1 of 2 text fields with a proposal of enum', '  a.b: ["p"]']);
+});
+
+test('the goals readers give the name and the hole note of each goal and the text of each invariant; a record without the key gives no value', (t) => {
+  const dir = root(t, []);
+  const goals = [{ [GOAL_KEY.name]: 'n1', [GOAL_KEY.holeNote]: 'h1' }, { [GOAL_KEY.name]: 'n2' }];
+  put(dir, GOALS_FILE, JSON.stringify({ [GOAL_LIST.goals]: goals, [GOAL_LIST.invariants]: [{ [GOAL_KEY.text]: 't1' }, {}] }));
+  assert.deepEqual(VALUE_READERS[ENTITY.goal][GOAL_KEY.name](dir), ['n1', 'n2']);
+  assert.deepEqual(VALUE_READERS[ENTITY.goal][GOAL_KEY.holeNote](dir), ['h1']);
+  assert.deepEqual(VALUE_READERS[ENTITY.invariant][GOAL_KEY.text](dir), ['t1']);
 });

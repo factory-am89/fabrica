@@ -1,5 +1,5 @@
 {
-  "$comment": "Registro de entidades de la Fábrica: clases de cosa con esquema en código. Los campos siguen ops/entidades.json de MenuPlan. Las reglas de cada campo están en scripts/lib/entities.mjs. Lo lee scripts/entities.mjs y lo vigila test/entities.test.js. Meta e invariante los añade el trozo 22 del plan.",
+  "$comment": "Registro de entidades de la Fábrica: clases de cosa con esquema en código. Los campos siguen ops/entidades.json de MenuPlan. Las reglas de cada campo están en scripts/lib/entities.mjs. Lo lee scripts/entities.mjs y lo vigila test/entities.test.js. Meta e invariante son del trozo 22 del plan.",
   "version": 1,
   "entities": [
     {
@@ -90,6 +90,19 @@
         { "kind": "principio", "where": "CLAUDE.md", "reader": "test/principles-and-roles.test.js", "reader_path": "test/principles-and-roles.test.js", "reader_note": "solo mira palabras clave, no juzga la regla" }
       ],
       "base": "hueco", "base_reason": "sin-forja"
+    },
+    {
+      "id": "goal", "name": "Meta", "scope": "horizontal", "term": "meta",
+      "source_of_truth": "goals.json",
+      "readers": ["scripts/lib/goals.mjs", "test/goals.test.js"],
+      "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (goalFaults) y falta escribir su base",
+      "forge": "scripts/lib/goals.mjs"
+    },
+    {
+      "id": "invariant", "name": "Invariante", "scope": "horizontal", "term": "invariante",
+      "source_of_truth": "goals.json",
+      "readers": ["scripts/lib/goals.mjs", "test/goals.test.js"],
+      "base": "hueco", "base_reason": "otro", "base_note": "su forja es goalFaults, en scripts/lib/goals.mjs, que ya es la forja de la entidad goal; no se repite aquí porque scripts/adopted.mjs cuenta cada ruta de forja y daría dos fallos por un mismo fichero. Falta escribir su base"
     }
   ]
 }

@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, audit, auditData, cliAudit, mainAudit } from '../scripts/audit.mjs';
+import { casaDeAudit } from './apoyo/audit-casa.mjs';
 import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { BOUND, CAVEAT, DATA_INDICATORS, ESCAPE_DAYS, FIX_PREFIX, REWORK_HOURS } from '../scripts/lib/audit-data.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
@@ -163,8 +164,8 @@ test('the command with --repo uses what was downloaded, with no local lessons or
   assert.equal((await mainAudit(['--data'], async () => assert.fail('no repo, no download'))).code, EXIT.USAGE);
 });
 
-test('the real entry point: --data --records prints one JSON object with every data indicator', () => {
-  const r = spawnSync(process.execPath, [SCRIPT, '--data', '--records', RECORDS, '--json'], { encoding: 'utf8', cwd: RAIZ });
+test('the real entry point: --data --records prints one JSON object with every data indicator', (t) => {
+  const r = spawnSync(process.execPath, [SCRIPT, '--data', '--records', RECORDS, '--json'], { encoding: 'utf8', cwd: RAIZ, env: casaDeAudit(t).env });
   assert.equal(r.status, EXIT.OK, r.stderr);
   const out = JSON.parse(r.stdout);
   for (const id of DATA_INDICATORS) assert.ok(Object.hasOwn(out, id), `missing ${id}`);

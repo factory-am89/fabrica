@@ -3,23 +3,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, humanLocal } from '../scripts/audit.mjs';
+import { casaDeAudit } from './apoyo/audit-casa.mjs';
+import { fixture, manyLines } from './apoyo/audit-raiz.mjs';
 import { exportedStrings } from '../scripts/lib/quoted-strings.mjs';
 import { DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
 import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
-import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../scripts/lib/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
-import { ENTITY, FIELDS_FILE, KEYS, TEXT, fieldId } from '../scripts/lib/fields.mjs';
+import { ENTITY, KEYS, fieldId } from '../scripts/lib/fields.mjs';
 import { CODES, NEEDS_RECORDS, NOT_COMPUTED } from '../scripts/lib/hygiene.mjs';
 import { MIN_VALUES } from '../scripts/lib/free-values.mjs';
 import { CLASES, FALTAS, ORIGENES, ORIGEN_AGENTE, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
-import { INTERVENCIONES_FILE, LESSONS_DIR, LESSON_NOTE, NO_QUESTION, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
-import { CHECKED_BY, FIELDS } from '../scripts/lib/questions.mjs';
-import { RULES_BUDGET_FILE } from '../scripts/lib/skills.mjs';
+import { LESSONS_DIR, LESSON_NOTE, NO_QUESTION, REASON_SINGLE, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { CHECKED_BY } from '../scripts/lib/questions.mjs';
 import { marcar } from '../scripts/hitl.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,36 +26,6 @@ const SCRIPT = path.join(RAIZ, 'scripts', 'audit.mjs');
 const NON_LOCAL = [...DATA_INDICATORS, ...HITL_INDICATORS]; // measured by audit --data and audit --hitl, not by the local audit
 const NO_LOG = 'no-such-log.jsonl';
 
-function put(root, rel, text) {
-  mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
-  writeFileSync(path.join(root, rel), text);
-}
-const question = (n, who) => `### Q${n} — text\n${FIELDS.checkedBy.label}: ${who}\n\n`;
-const manyLines = (n) => `${'// x\n'.repeat(n)}`;
-
-// A root with every source the audit reads, each in a known state; `over` replaces files by relative path.
-function fixture(t, over = {}) {
-  const root = mkdtempSync(path.join(tmpdir(), 'fabrica-audit-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const files = {
-    [STANDARDS[0]]: question(1, CHECKED_BY.machine) + question(2, CHECKED_BY.reviewer) + question(3, CHECKED_BY.reviewer),
-    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'test/uses.test.js' }),
-    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'scripts/con.mjs' }),
-    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/sin.mjs' }),
-    'package.json': JSON.stringify({ scripts: {} }),
-    [FIELDS_FILE]: JSON.stringify({ fields: [{ [KEYS.name]: LESSON_NOTE, [KEYS.owner]: ENTITY.lesson, [KEYS.values]: TEXT }] }),
-    [RULES_BUDGET_FILE]: JSON.stringify({ budget: { uno: 3, dos: 4 } }),
-    [INTERVENCIONES_FILE]: '# h\n2026-01-01 | clic | a | b | repetida: no\n2026-01-02 | clic | a | b | repetida: no\nsuelta\n',
-    [ENTITIES_FILE]: JSON.stringify({ entities: [{ id: 'e1', scope: HORIZONTAL, base: BASE_HOLE }, { id: 'e2', scope: HORIZONTAL, base: 'x.md' }] }),
-    'scripts/con.mjs': "console.log('--json');\n",
-    'scripts/sin.mjs': 'export const a = 1;\n',
-    'scripts/lib/vocab.mjs': 'export const WORDS = [\n  \'vocabulary-word\', \'tiny\',\n];\nconst PRIVATE = \'private-word-here\';\n',
-    'test/uses.test.js': "const a = 'vocabulary-word'; const b = 'tiny'; const c = 'private-word-here';\n",
-    ...over,
-  };
-  for (const [rel, text] of Object.entries(files)) put(root, rel, text);
-  return root;
-}
 // What hygiene needs of any lesson (a lesson without them stops the audit).
 const READABLE = { signal: SIGNAL_NONE, question: NO_QUESTION, mechanism: 'scripts/con.mjs' };
 const run = (root) => audit(root, { logPath: path.join(root, NO_LOG) });
@@ -184,8 +153,8 @@ test('signals, not gates: a root full of faults still exits OK, in text and in -
   assert.equal(JSON.parse(j.stdout).ok, true);
 });
 
-test('the real entry point: node scripts/audit.mjs --json prints one JSON object with every indicator', () => {
-  const r = spawnSync(process.execPath, [SCRIPT, '--json'], { encoding: 'utf8', cwd: RAIZ });
+test('the real entry point: node scripts/audit.mjs --json prints one JSON object with every indicator', (t) => {
+  const r = spawnSync(process.execPath, [SCRIPT, '--json'], { encoding: 'utf8', cwd: RAIZ, env: casaDeAudit(t).env });
   assert.equal(r.status, EXIT.OK, r.stderr);
   const out = JSON.parse(r.stdout);
   for (const id of Object.values(INDICATORS).filter((i) => !NON_LOCAL.includes(i))) assert.ok(Object.hasOwn(out, id), `missing ${id}`);

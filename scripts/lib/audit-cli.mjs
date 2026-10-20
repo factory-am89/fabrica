@@ -5,6 +5,8 @@ import path from 'node:path';
 import { DATA_INDICATORS, humanData } from './audit-data.mjs';
 import { HITL_INDICATORS, humanHitl } from './audit-hitl.mjs';
 import { ExitError, runCommand } from './exit.mjs';
+import { DEBT_ID, PASS_MODE, humanDebt, stampPass } from './goals-debt.mjs';
+import { readGoals } from './goals.mjs';
 
 const FLAG = { data: '--data', hitl: '--hitl', records: '--records', repo: '--repo', since: '--since', golden: '--golden', log: '--log', messages: '--messages' };
 const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since, FLAG.golden, FLAG.log, FLAG.messages];
@@ -32,25 +34,33 @@ export function parseAuditArgs(args, defaultRoot) {
   return out;
 }
 
+const modeOf = (a) => (a.hitl ? PASS_MODE.hitl : a.data ? PASS_MODE.data : PASS_MODE.local);
+
 // The entry points of scripts/audit.mjs. `download(repo, since)` is the async --repo download (runCommand is not async):
 // a repo the token cannot read, or any failed call, stops the command with its own class and prints nothing as data.
+// `passes` ({ file, now }) is given only by the real entry: it dates the goals debt, adds it to the three modes and records the pass.
 export function makeCommands({ root: defaultRoot, audit, auditData, auditHitl, humanLocal, download }) {
   const has = (ids, r) => ids.every((id) => Object.hasOwn(r, id));
-  const human = (r) => (has(DATA_INDICATORS, r) ? humanData(r) : has(HITL_INDICATORS, r) ? humanHitl(r) : humanLocal(r));
-  const cliAudit = (argv, { collected = null } = {}) => runCommand(argv, {
+  const body = (r) => (has(DATA_INDICATORS, r) ? humanData(r) : has(HITL_INDICATORS, r) ? humanHitl(r) : humanLocal(r));
+  const human = (r) => [body(r), ...(Object.hasOwn(r, DEBT_ID) ? humanDebt(r[DEBT_ID]) : [])].join('\n');
+  const measure = (a, collected) => {
+    if (a.hitl) return auditHitl(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, logPath: a.log ?? undefined, messagesPath: a.messages ?? undefined });
+    if (!a.data) return audit(a.root);
+    if (a.records === null) return auditData(collected, { now: Date.now() });
+    return auditData(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, golden: a.golden });
+  };
+  const cliAudit = (argv, { collected = null, passes = null } = {}) => runCommand(argv, {
     run: (args) => {
       const a = parseAuditArgs(args, defaultRoot);
-      if (a.hitl) return auditHitl(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, logPath: a.log ?? undefined, messagesPath: a.messages ?? undefined });
-      if (!a.data) return audit(a.root);
-      if (a.records === null) return auditData(collected, { now: Date.now() });
-      return auditData(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, golden: a.golden });
+      const result = measure(a, collected);
+      return passes === null ? result : stampPass(result, modeOf(a), { registry: readGoals(a.root), root: a.root, file: passes.file, now: passes.now });
     },
     human,
   });
-  const mainAudit = async (argv, downloadIt = download) => {
+  const mainAudit = async (argv, downloadIt = download, passes = null) => {
     try {
       const a = parseAuditArgs(argv.filter((x) => x !== '--json'), defaultRoot);
-      return cliAudit(argv, { collected: a.repo === null ? null : await downloadIt(a.repo, a.since) });
+      return cliAudit(argv, { collected: a.repo === null ? null : await downloadIt(a.repo, a.since), passes });
     } catch (e) {
       const failure = e instanceof ExitError ? e : new ExitError('GH_FAILED', e.message);
       return runCommand(argv, { run: () => { throw failure; }, human });
