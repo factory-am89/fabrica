@@ -8,10 +8,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, exportedStrings } from '../scripts/audit.mjs';
-import { BASE_HOLE, HORIZONTAL } from '../scripts/lib/entities.mjs';
+import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../scripts/lib/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
-import { CLASES, FALTAS } from '../scripts/lib/intervention-log.mjs';
-import { REASON_SINGLE, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { CLASES, FALTAS, ORIGENES, ORIGEN_AGENTE, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
+import { INTERVENCIONES_FILE, LESSONS_DIR, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { CHECKED_BY, FIELDS } from '../scripts/lib/questions.mjs';
 import { RULES_BUDGET_FILE } from '../scripts/lib/skills.mjs';
 import { marcar } from '../scripts/hitl.mjs';
@@ -32,13 +32,13 @@ function fixture(t, over = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-audit-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const files = {
-    'standards/code.md': question(1, CHECKED_BY.machine) + question(2, CHECKED_BY.reviewer) + question(3, CHECKED_BY.reviewer),
-    'lessons/a.json': JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE] }),
-    'lessons/b.json': JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE] }),
-    'lessons/c.json': JSON.stringify({ signal: SIGNAL_MACHINE }),
+    [STANDARDS[0]]: question(1, CHECKED_BY.machine) + question(2, CHECKED_BY.reviewer) + question(3, CHECKED_BY.reviewer),
+    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE] }),
+    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE] }),
+    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE }),
     [RULES_BUDGET_FILE]: JSON.stringify({ budget: { uno: 3, dos: 4 } }),
-    'intervenciones.md': '# h\n2026-01-01 | clic | a | b | repetida: no\n2026-01-02 | clic | a | b | repetida: no\nsuelta\n',
-    'entities.json': JSON.stringify({ entities: [{ id: 'e1', scope: HORIZONTAL, base: BASE_HOLE }, { id: 'e2', scope: HORIZONTAL, base: 'x.md' }] }),
+    [INTERVENCIONES_FILE]: '# h\n2026-01-01 | clic | a | b | repetida: no\n2026-01-02 | clic | a | b | repetida: no\nsuelta\n',
+    [ENTITIES_FILE]: JSON.stringify({ entities: [{ id: 'e1', scope: HORIZONTAL, base: BASE_HOLE }, { id: 'e2', scope: HORIZONTAL, base: 'x.md' }] }),
     'scripts/con.mjs': "console.log('--json');\n",
     'scripts/sin.mjs': 'export const a = 1;\n',
     'scripts/lib/vocab.mjs': 'export const WORDS = [\n  \'vocabulary-word\', \'tiny\',\n];\nconst PRIVATE = \'private-word-here\';\n',
@@ -76,12 +76,21 @@ test('rules without reader reads the budget of the ratchet, it does not recomput
 
 test('hitl: self-declared marks come from the log through marcar; table rows from intervenciones.md', (t) => {
   const root = fixture(t);
-  const log = path.join(root, 'log', 'intervenciones.jsonl');
+  const log = path.join(root, 'log', path.basename(rutaDeRegistroIntervenciones()));
   mkdirSync(path.dirname(log));
   marcar(CLASES[0], FALTAS[0], undefined, { ruta: log });
+  registrarIntervencion({ clase: CLASES[0], origen: ORIGENES.find((o) => o !== ORIGEN_AGENTE), falta: FALTAS[0], ruta: log });
   const h = audit(root, { logPath: log })[INDICATORS.hitlSelfDeclared];
-  assert.deepEqual(h, { selfDeclared: 1, total: 1, tableRows: 2 });
+  assert.deepEqual(h, { selfDeclared: 1, total: 2, corrupt: [], tableRows: 2 });
   assert.equal(run(root)[INDICATORS.hitlSelfDeclared].selfDeclared, 0);
+});
+
+test('hitl: an unreadable line of the log is shown, not lost', (t) => {
+  const root = fixture(t);
+  const log = path.join(root, NO_LOG);
+  writeFileSync(log, 'not json\n');
+  const h = audit(root, { logPath: log })[INDICATORS.hitlSelfDeclared];
+  assert.deepEqual([h.total, h.corrupt], [1, [1]]);
 });
 
 test('scripts without --json lists the root scripts that do not cite it', (t) => {

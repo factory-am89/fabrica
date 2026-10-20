@@ -38,7 +38,8 @@ export const FALTA_DE_CLASE = {
 // Where the event was seen: `bang` is a `!` command Pablo typed in the session; `permiso` is a PermissionRequest hook;
 // `bang-sin-hora` is a `!` whose transcript line has no readable time: it is logged with `t` null (never a made-up time).
 // `agente` is a mark an agent wrote itself (`node scripts/hitl.mjs marcar`): self-declared, nobody checks it.
-export const ORIGENES = ['bang', 'permiso', 'bang-sin-hora', 'agente'];
+export const ORIGEN_AGENTE = 'agente';
+export const ORIGENES = ['bang', 'permiso', 'bang-sin-hora', ORIGEN_AGENTE];
 export const SIN_HORA = 'bang-sin-hora';
 export const CAMPOS = ['t', 'clase', 'origen', 'falta'];
 export const MAX_MOTIVO = 200;

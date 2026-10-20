@@ -9,9 +9,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { runCommand, finish } from './lib/exit.mjs';
-import { contarIntervenciones, ORIGENES } from './lib/intervention-log.mjs';
-import { DATED_ROW, readLessons } from './lib/lessons.mjs';
-import { readQuestions } from './lib/questions.mjs';
+import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
+import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
+import { NoQuestionsError, readQuestions } from './lib/questions.mjs';
 import { RULES_BUDGET_FILE } from './lib/skills.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +36,6 @@ export const MIN_DUP_LENGTH = 8;
 // no-magic-numbers is run here and not in lint, where it would turn everything red.
 const MAGIC_ALLOWED = [-1, 0, 1];
 const SOURCE_EXT = /\.(mjs|js)$/;
-const SELF_DECLARED = ORIGENES.at(-1); // the origin `agente`: documented as the last one in intervention-log.mjs
 const JSON_FLAG = '--json';
 
 const readText = (root, rel) => readFileSync(path.join(root, rel), 'utf8');
@@ -60,7 +59,7 @@ function questionsOf(root) {
   const files = listFiles(root, 'standards', (f) => f.endsWith('.md'));
   const all = [];
   for (const f of files) {
-    try { all.push(...readQuestions(readText(root, f))); } catch (e) { if (!/no questions/.test(e.message)) throw e; }
+    try { all.push(...readQuestions(readText(root, f))); } catch (e) { if (!(e instanceof NoQuestionsError)) throw e; }
   }
   return { total: all.length, byCheckedBy: tally(all.map((q) => q.checkedBy)) };
 }
@@ -81,8 +80,8 @@ function rulesWithoutReader(root) {
 
 function hitlOf(root, logPath) {
   const c = contarIntervenciones(logPath === undefined ? undefined : { ruta: logPath });
-  const rows = readText(root, 'intervenciones.md').split('\n').filter((l) => DATED_ROW.test(l)).length;
-  return { selfDeclared: c.porOrigen[SELF_DECLARED], total: c.total, tableRows: rows };
+  const rows = readText(root, INTERVENCIONES_FILE).split('\n').filter((l) => DATED_ROW.test(l)).length;
+  return { selfDeclared: c.porOrigen[ORIGEN_AGENTE], total: c.total, corrupt: c.corruptas, tableRows: rows };
 }
 
 function longFiles(root) {
