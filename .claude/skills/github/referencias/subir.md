@@ -38,7 +38,17 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    If checks are slow to start or stay queued, look at https://www.githubstatus.com first (incident "Degraded availability
    for GitHub Actions, GitHub Pages and Webhooks", 19 Oct 2026, 15:49-16:56 UTC) and do not push or edit the body while
    Actions is degraded: an edit may restart runs (inferred).
-7. **Revisor says no with no reason.** Ask an independent revisor agent for the reason; do not argue with the verdict.
+7. **Revisor says no with no reason.** The reason is in the log of the `juzgar` job; do not argue with the verdict.
+   - `node scripts/token.mjs -- gh run list --workflow revisor.yml --limit 4 --json databaseId,headSha,conclusion`:
+     take the run whose `headSha` is the head of your PR. The run ends `success` even when the verdict is no, and one
+     SHA can have a `cancelled` run next to the real one: take the one that is not `cancelled`.
+   - `node scripts/token.mjs -- gh run view <id> --log | grep "SALIDA:"`: one line, a JSON `respuestas`
+     (`[{id, respuesta, prueba}]`); the reason is each entry with `respuesta: "no"` and its `prueba`.
+   - The verdict itself is the line `veredicto: no` plus the failed ids, printed by `scripts/veredicto.mjs` in the same log.
+   Observed in #120 (run 39382592608, head 91bb25a): `veredicto: no` / `C8: no`; the `prueba` of C8 names `PLAN_NONE`
+   in `scripts/lib/free-values.mjs`. An independent revisor agent is a second reading, not the way to get the reason.
+   Reported, not re-checked: in #120 an independent revisor answered C6 where the automatic one answered C8, both true.
+   Inferred: the automatic revisor does not see everything, so one `no` is not necessarily the whole list of faults.
    Do not rebase without a real conflict: check with `git merge-tree --write-tree HEAD origin/main` (exit 0 = none).
    A rebase changes the SHAs your body cites, so the body must be redone from step 2. Each entry of a lesson's `sources` follows
    `PR_SOURCE` in `scripts/lib/lessons.mjs`; do not restate it here.
