@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/goals.test.js"],
+  "ops": [
+    {
+      "replace": "goals.json",
+      "from": "\"invariants\": [\n",
+      "to": "\"invariants\": [\n    { \"id\": \"I9\", \"text\": \"Un invariante que no sirve a ninguna meta.\", \"goals\": [], \"principles\": [1], \"questions\": [] },\n"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/fields.test.js"],
+  "ops": [
+    {
+      "replace": "scripts/lib/lessons.mjs",
+      "from": "export const FIELDS = ['v',",
+      "to": "export const FIELDS = ['estado', 'v',"
+    }
+  ]
+}

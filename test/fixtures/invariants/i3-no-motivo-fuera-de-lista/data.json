@@ -1,0 +1,9 @@
+{
+  "run": ["--test", "test/lessons.test.js"],
+  "ops": [
+    {
+      "write": "no-lesson.json",
+      "json": { "version": 1, "entries": [{ "source": "#1", "question": "C1", "reason": "porque-si" }] }
+    }
+  ]
+}

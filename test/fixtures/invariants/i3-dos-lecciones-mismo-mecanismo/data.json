@@ -1,0 +1,4 @@
+{
+  "run": ["scripts/hygiene.mjs"],
+  "ops": [{ "copy": "lessons/evidence-exact-commit.json", "to": "lessons/evidence-exact-commit-copia.json" }]
+}

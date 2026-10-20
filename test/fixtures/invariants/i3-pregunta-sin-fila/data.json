@@ -1,0 +1,9 @@
+{
+  "run": ["--test", "test/goals.test.js"],
+  "ops": [
+    {
+      "append": "standards/code.md",
+      "text": "\n### C18 — ¿La pregunta nueva de prueba tiene su fila en goals.json?\nQuién: revisor.\nBien: la fila existe.\nMal: la fila falta.\n"
+    }
+  ]
+}

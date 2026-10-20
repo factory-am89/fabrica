@@ -1,0 +1,8 @@
+{
+  "run": ["scripts/check-plan.mjs", "--file", "plan.md"],
+  "ops": [
+    { "copy": "test/fixtures/plans/good.md", "to": "plan.md" },
+    { "replace": "plan.md", "from": "- principio 4 |", "to": "- principio 7 |" }
+  ],
+  "control": { "ops": [{ "copy": "test/fixtures/plans/good.md", "to": "plan.md" }] }
+}

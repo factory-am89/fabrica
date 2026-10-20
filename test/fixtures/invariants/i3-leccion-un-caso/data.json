@@ -1,0 +1,10 @@
+{
+  "run": ["scripts/lessons.mjs"],
+  "ops": [
+    {
+      "replace": "lessons/evidence-exact-commit.json",
+      "from": "\"pregunta-pendiente\",\n    \"caso-unico\"",
+      "to": "\"pregunta-pendiente\""
+    }
+  ]
+}

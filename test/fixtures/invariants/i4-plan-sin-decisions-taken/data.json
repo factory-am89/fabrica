@@ -1,0 +1,5 @@
+{
+  "run": ["scripts/check-plan.mjs", "--file", "plan.md"],
+  "ops": [{ "copy": "test/fixtures/plans/no-decisions-taken.md", "to": "plan.md" }],
+  "control": { "ops": [{ "copy": "test/fixtures/plans/good.md", "to": "plan.md" }] }
+}

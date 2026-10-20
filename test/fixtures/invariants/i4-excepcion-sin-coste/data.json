@@ -1,0 +1,12 @@
+{
+  "run": ["scripts/pr-body.mjs", "--body-file", "body.md", "--files-file", "test/fixtures/pr-body/no-files.txt"],
+  "ops": [
+    { "copy": "test/fixtures/pr-body/good.md", "to": "body.md" },
+    {
+      "replace": "body.md",
+      "from": "- principio 5 | eligió: una comprobación de máquina | descartó: una frase en la plantilla | motivo: decidido",
+      "to": "- excepción a principio 5 | motivo: lo pide el encargo | coste:"
+    }
+  ],
+  "control": { "ops": [{ "copy": "test/fixtures/pr-body/good.md", "to": "body.md" }] }
+}

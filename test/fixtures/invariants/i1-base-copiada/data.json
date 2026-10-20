@@ -1,0 +1,5 @@
+{
+  "run": ["scripts/adopted.mjs", "--dir", "proyecto"],
+  "ops": [{ "copy": "base/entity.md", "to": "proyecto/base/entity.md" }],
+  "control": { "ops": [{ "write": "proyecto/LEEME.md", "text": "Un proyecto adoptado que no tiene nada propio de lo que hereda.\n" }] }
+}

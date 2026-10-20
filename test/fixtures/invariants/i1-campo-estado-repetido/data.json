@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/fields.test.js"],
+  "ops": [
+    {
+      "replace": "fields.json",
+      "from": "\"fields\": [\n",
+      "to": "\"fields\": [\n    { \"campo\": \"Estado\", \"tipo\": \"atributo_de\", \"de\": \"lesson\", \"dueño\": \"lesson\", \"existente\": \"nueva\", \"nueva_motivo\": \"sin-equivalente\", \"valores\": \"enum\", \"cableado\": [\"scripts/lib/lessons.mjs\"] },\n    { \"campo\": \"estado\", \"tipo\": \"atributo_de\", \"de\": \"plan\", \"dueño\": \"plan\", \"existente\": \"nueva\", \"nueva_motivo\": \"sin-equivalente\", \"valores\": \"enum\", \"cableado\": [\"scripts/lib/plan.mjs\"] },\n"
+    }
+  ]
+}

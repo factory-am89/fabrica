@@ -1,0 +1,10 @@
+{
+  "run": ["scripts/lessons.mjs"],
+  "ops": [
+    {
+      "replace": "lessons/absent-field-read-as-default.json",
+      "from": "\"signal\": \"machine\"",
+      "to": "\"signal\": \"none\""
+    }
+  ]
+}

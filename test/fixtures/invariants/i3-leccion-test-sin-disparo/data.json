@@ -1,0 +1,9 @@
+{
+  "run": ["--test", "test/triggers.test.js"],
+  "ops": [
+    {
+      "write": "lessons/prueba-a-mano.json",
+      "json": { "v": 2, "question": "none", "sources": ["#1"], "mechanism": "test/lib-gh.prueba.ps1", "origin": "constructor", "signal": "machine", "reason": ["pregunta-pendiente", "caso-unico"], "escaped": false }
+    }
+  ]
+}
