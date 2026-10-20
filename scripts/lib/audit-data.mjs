@@ -76,7 +76,7 @@ export function clashes(prs, now) {
 export function minutes(prs) {
   const spans = prs.filter((p) => p.merged !== null).map((p) => (p.merged - p.created) / MS_MINUTE);
   const total = spans.reduce((a, m) => a + m, 0);
-  return { merged: spans.length, total, mean: spans.length === 0 ? null : Math.round(total / spans.length) };
+  return { merged: spans.length, total: Math.round(total), mean: spans.length === 0 ? null : Math.round(total / spans.length) };
 }
 
 // Rounds and "no" per question from the check-runs. An unreadable check-run stops the figure: counting around it would be false.
