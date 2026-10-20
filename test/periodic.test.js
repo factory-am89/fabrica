@@ -11,7 +11,9 @@ import { pathToFileURL } from 'node:url';
 import { arrancar } from '../scripts/al-arrancar.mjs';
 import { MANUAL_STALE_DAYS, changesOf, githubModes, indicatorLines, measureLocal, staleManualReaders } from '../scripts/lib/periodic.mjs';
 import { SNAPSHOT_FILE, STEP_NAME, judgeDatumPath, readSnapshot, recordJudgeDatum, snapshotPath } from '../scripts/lib/periodic-state.mjs';
-import { DEBT_KIND, PASS_MODE, recordPass } from '../scripts/lib/goals-debt.mjs';
+import { DEBT_KIND, PASS_MODE, recordPass, staticDebt } from '../scripts/lib/goals-debt.mjs';
+import { readGoals } from '../scripts/lib/goals.mjs';
+import { hygieneCounts } from '../scripts/lib/hygiene.mjs';
 import { MS_DAY } from '../scripts/lib/audit-data.mjs';
 import { casaDeAudit } from './apoyo/audit-casa.mjs';
 import { JUEZ, NOW, RAIZ, correr, fallo, judge, juez, manual, medida, paso } from './apoyo/periodico.mjs';
@@ -120,7 +122,9 @@ test('the step never records a pass of audit: the days cannot reset by opening a
 test('measureLocal: the real audit as a process (text, hygiene count, static debt), and it records no pass in the home it runs in', (t) => {
   const casa = casaDeAudit(t);
   const m = measureLocal(RAIZ, casa.env);
-  assert.ok(Number.isInteger(m.hygiene) && Array.isArray(m.items));
+  assert.equal(m.hygiene, hygieneCounts(RAIZ).total);
+  assert.deepEqual(m.items, staticDebt(readGoals(RAIZ), RAIZ));
+  assert.equal(indicatorLines(m.text).hygiene.startsWith(`${m.hygiene} {`), true, 'the audit text and the count agree');
   const lines = indicatorLines(m.text);
   assert.ok(Object.keys(lines).length > 1 && lines.hygiene !== undefined, m.text);
   assert.equal(existsSync(path.dirname(casa.file)), false, 'no ~/.fabrica was created');
