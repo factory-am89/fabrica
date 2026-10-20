@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { DATA_IDS, dataIndicators, makeCommands } from './lib/audit-data.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
+import { freeValues, humanFreeValues } from './lib/free-values.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
 import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
@@ -18,7 +19,6 @@ import { RULES_BUDGET_FILE } from './lib/skills.mjs';
 import { collect, getWithToken } from './collect-records.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-
 // The closed list of what this command measures: the key of each value in the result.
 export const INDICATORS = Object.freeze({
   questions: 'questions',
@@ -31,6 +31,7 @@ export const INDICATORS = Object.freeze({
   magicNumbers: 'magic-numbers',
   baseHoles: 'base-holes',
   testDuplication: 'test-duplication',
+  freeValues: 'free-values',
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
 });
 
@@ -162,6 +163,7 @@ export function audit(root, { logPath } = {}) {
     [INDICATORS.magicNumbers]: magicNumbers(root),
     [INDICATORS.baseHoles]: { holes: baseHoles(readEntities(root)) },
     [INDICATORS.testDuplication]: duplicationInTests(root),
+    [INDICATORS.freeValues]: freeValues(root),
   };
 }
 
@@ -188,6 +190,7 @@ export function humanLocal(r) {
     line(INDICATORS.baseHoles, String(r[INDICATORS.baseHoles].holes.length)),
     line(INDICATORS.testDuplication, `${r[INDICATORS.testDuplication].count} strings of >= ${r[INDICATORS.testDuplication].minLength} chars`),
     ...r[INDICATORS.testDuplication].values.map((v) => `  ${JSON.stringify(v.value)}: ${v.tests.join(', ')} <- ${v.lib.join(', ')}`),
+    ...humanFreeValues(INDICATORS.freeValues, r[INDICATORS.freeValues]),
   ].join('\n');
 }
 
