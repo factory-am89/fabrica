@@ -30,19 +30,19 @@
   "invariants": [
     {
       "id": "I1", "text": "Una cosa, un sitio, y un sitio, una cosa: lo demás la referencia.",
-      "goals": ["O1", "O4"], "principles": [4], "questions": ["C3", "C8", "C11", "C12", "P4", "P5", "P7"]
+      "goals": ["O1", "O4"], "principles": [4], "questions": ["C3", "C8", "C11", "C12", "P4", "P5", "P7", "P10"]
     },
     {
       "id": "I2", "text": "Lo que se repite (valores, reglas, recetas) es dato con vocabulario cerrado y válvula «otro» + motivo.",
-      "goals": ["O1", "O4"], "principles": [4], "questions": ["C8", "P1"]
+      "goals": ["O1", "O4"], "principles": [4], "questions": ["C8", "P1", "P10"]
     },
     {
       "id": "I3", "text": "Toda regla tiene un lector que falla y un disparador que lo ejecuta sin que nadie se acuerde, y todo fallo se pregunta por su clase; el arreglo es un mecanismo para la clase.",
-      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "P2", "P8"]
+      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "P2", "P8", "P12"]
     },
     {
       "id": "I4", "text": "Lo que el agente necesita está en datos del repo legibles de una vez, y lo que decide queda apuntado con su motivo.",
-      "goals": ["O2", "O4"], "principles": [6], "questions": ["P3", "P9"]
+      "goals": ["O2", "O4"], "principles": [6], "questions": ["P3", "P9", "P11"]
     },
     {
       "id": "I5", "text": "Todo lector es una hipótesis que se mide: cifra antes y después, tasa de «no» falsos, y «no concluyente» con menos de MIN_CASES_PER_CELL casos.",
@@ -71,6 +71,9 @@
     { "id": "P6", "goals": ["O2"] },
     { "id": "P7", "goals": ["O1"] },
     { "id": "P8", "goals": ["O2"] },
-    { "id": "P9", "goals": ["O2"] }
+    { "id": "P9", "goals": ["O2"] },
+    { "id": "P10", "goals": ["O1"] },
+    { "id": "P11", "goals": ["O2"] },
+    { "id": "P12", "goals": ["O3"] }
   ]
 }
