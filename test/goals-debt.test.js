@@ -12,6 +12,7 @@ import { HITL_IDS } from '../scripts/lib/audit-hitl.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { GOALS_FILE, HOLE, HOLE_REASONS, KEY, LIST, readGoals } from '../scripts/lib/goals.mjs';
 import { DEBT_ID, DEBT_KIND, NEVER, PASS_MODE, debtOf, humanDebt, inconclusiveDebt, passesPath, readPasses, recordPass, staticDebt, stampPass, withDays } from '../scripts/lib/goals-debt.mjs';
+import { rutaDeRegistro } from '../scripts/lib/op-log.mjs';
 import { FALTAS } from '../scripts/lib/intervention-log.mjs';
 import { WHY } from '../scripts/lib/lesson-effect.mjs';
 import { casaDeAudit } from './apoyo/audit-casa.mjs';
@@ -43,7 +44,7 @@ test('a goal with a hole and a reader that fires only by hand are the static deb
 test('an indicator with a case that cannot conclude is debt, by indicator id, with its count, its reasons and the goals that list it', () => {
   const registry = real();
   const result = {
-    [DATA_IDS.lessonEffect]: { conclusive: 1, lessons: [{ conclusive: false, why: [WHY.fewCases] }, { conclusive: false, why: [WHY.noDate, WHY.fewCases] }, { conclusive: true, why: [] }] },
+    [DATA_IDS.lessonEffect]: { conclusive: 1, lessons: [{ conclusive: false, why: [WHY.noDate] }, { conclusive: false, why: [WHY.fewCases, WHY.noDate] }, { conclusive: true, why: [] }] },
     [HITL_IDS.residue]: { events: { trend: { conclusive: false } }, messages: null },
     [DATA_IDS.rounds]: { conclusive: true, mean: 2 },
     [DATA_IDS.messages]: null,
@@ -71,6 +72,12 @@ test('the passes: the last time of each mode; no file is no pass; a line that is
   assert.throws(() => readPasses(casa.file), /line 1: a pass needs a time \(t\) and a mode/);
   writeFileSync(casa.file, `${JSON.stringify({ mode: PASS_MODE.local })}\n`);
   assert.throws(() => readPasses(casa.file), /line 1: a pass needs a time \(t\) and a mode/);
+});
+
+test('the passes go in the folder of the other logs of the Factory, under the home it is given', () => {
+  const home = () => path.join(RAIZ, 'casa');
+  assert.equal(path.dirname(passesPath(home)), path.dirname(rutaDeRegistro(home)));
+  assert.equal(path.dirname(path.dirname(passesPath(home))), home());
 });
 
 test('days are whole days since the last pass of the item\'s own mode, and null when that mode never passed', () => {
