@@ -9,6 +9,8 @@ import { limpiar, imprimir } from './clean.mjs';
 import { pasoAlDia } from './pull-main.mjs';
 import { pasoHora } from './madrid-time.mjs';
 import { pasoSesiones } from './sesiones.mjs';
+import { ExitError } from './lib/exit.mjs';
+import { pasoPeriodico } from './lib/periodic.mjs';
 
 export const pasoLimpiar = (limpiarFn = limpiar) => ({
   nombre: 'limpiar',
@@ -20,7 +22,20 @@ export const pasoLimpiar = (limpiarFn = limpiar) => ({
 });
 
 // al-dia primero: trae a la principal la ficha .fabrica.json (y lo nuevo) antes de que limpiar la lea.
-export const PASOS = [pasoAlDia(), pasoLimpiar(), pasoSesiones(), pasoHora()];
+// periodico (audit local, higiene y deuda; lib/periodic.mjs) corre solo al abrir sesión: lo autorizó Pablo (decisión A1 del plan trabajar-solos).
+export const PASOS = [pasoAlDia(), pasoLimpiar(), pasoSesiones(), pasoPeriodico(), pasoHora()];
+
+export const SOLO = '--solo';
+const SOLO_ARGS = 2; // --solo y el nombre del paso
+
+// argv (sin node ni el script) -> { solo: nombre de paso | null }. `--solo <paso>` corre ese paso y ningún otro (para probarlo por la
+// entrada real sin tocar la carpeta principal con al-dia ni limpiar). Un argumento que no es eso, o un paso que no existe, es un error de uso.
+export function leerArgumentos(argv, pasos = PASOS) {
+  if (argv.length === 0) return { solo: null };
+  if (argv[0] !== SOLO || argv.length !== SOLO_ARGS) throw new ExitError('USAGE', `uso: al-arrancar.mjs [${SOLO} <paso>]; recibí ${JSON.stringify(argv)}`);
+  if (!pasos.some((p) => p.nombre === argv[1])) throw new ExitError('USAGE', `${SOLO}: no existe el paso «${argv[1]}»; los pasos son ${pasos.map((p) => p.nombre).join(', ')}`);
+  return { solo: argv[1] };
+}
 
 // Devuelve cuántos pasos fallaron. Los titulares de fallo van primero y luego el informe de cada paso.
 // `entrada` es el JSON que Claude Code da al gancho (session_id, cwd...); cada paso lo recibe como 2.º argumento.
@@ -49,12 +64,21 @@ async function leerEntrada() {
   return crudo.trim() ? JSON.parse(crudo) : null;
 }
 
+const ARGV_START = 2; // node y el script van primero
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  let args;
+  try {
+    args = leerArgumentos(process.argv.slice(ARGV_START));
+  } catch (e) {
+    process.stderr.write(`${e.message}\n`);
+    process.exit(e.exit);
+  }
   let entrada = null;
   try {
     entrada = await leerEntrada();
   } catch (e) {
     console.log(`FÁBRICA AL ARRANCAR: FALLÓ la lectura de la entrada del gancho: ${e.message}. Díselo a Pablo y no sigas como si nada.`);
   }
-  arrancar(PASOS, console.log, entrada);
+  arrancar(args.solo === null ? PASOS : PASOS.filter((p) => p.nombre === args.solo), console.log, entrada);
 }
