@@ -2,6 +2,7 @@
 // PLAN_FIELDS and PLAN_FAULTS are the single definition of the plan shape; a future standards/plan.md cites them.
 import { COMPARE_LIMIT } from './pr-body.mjs';
 import { touchesClosedList } from './intervention.mjs';
+import { decisionFaults } from './decision.mjs';
 
 export const PLAN_FIELDS = Object.freeze({
   files: 'Files',
@@ -19,6 +20,8 @@ export const PLAN_FAULTS = Object.freeze(
     'MISSING_VERDICT',
     'MISSING_CHUNKS_SECTION',
     'MISSING_NOT_VERIFIED',
+    'MISSING_DECISIONS_TAKEN',
+    'BAD_DECISION_LINE',
     'NO_CHUNKS',
     'BAD_CHUNK_HEADER',
     'NUMBERING',
@@ -37,6 +40,9 @@ export const PLAN_FAULTS = Object.freeze(
     'CLOSED_WITHOUT_DECISION',
   ].map((c) => [c, c])),
 );
+
+// The section whose lines decision.mjs reads (the only reader of a decision line); None is valid there.
+export const DECISIONS_TAKEN_SECTION = 'Decisions taken';
 
 export const MAX_DECISIONS = 3;
 export const OPTIONS_PER_DECISION = 3;
@@ -150,6 +156,7 @@ export function parsePlan(text) {
     }
   }
 
+  const dt = section(DECISIONS_TAKEN_SECTION);
   const nv = section('Not verified');
   return {
     title,
@@ -159,6 +166,7 @@ export function parsePlan(text) {
     badChunkHeaders,
     decisions,
     badDecisionHeaders,
+    decisionsTaken: dt ? dt.lines.join('\n').trim() : null,
     notVerified: nv ? nv.lines.join('\n').trim() : null,
   };
 }
@@ -173,7 +181,7 @@ function requireList(name, value) {
 
 // Returns {faults, chunks}; chunks carry the derived data gate (Files meet gateFiles) and
 // needsPablo (the Files that meet closedPaths). The plan never writes these by hand.
-export function checkPlan(text, { gateFiles = [], closedPaths = [] } = {}) {
+export function checkPlan(text, { gateFiles = [], closedPaths = [], rules } = {}) {
   requireList('gateFiles', gateFiles);
   requireList('closedPaths', closedPaths);
   const faults = [];
@@ -189,6 +197,11 @@ export function checkPlan(text, { gateFiles = [], closedPaths = [] } = {}) {
   if (!plan.hasChunksSection) add(PLAN_FAULTS.MISSING_CHUNKS_SECTION, 'plan', 'missing "## Chunks" section');
   else if (plan.chunks.length === 0 && plan.badChunkHeaders.length === 0) add(PLAN_FAULTS.NO_CHUNKS, 'plan', 'the plan has zero chunks');
   if (plan.notVerified === null) add(PLAN_FAULTS.MISSING_NOT_VERIFIED, 'plan', 'missing "## Not verified" section');
+  if (plan.decisionsTaken === null || plan.decisionsTaken === '') {
+    add(PLAN_FAULTS.MISSING_DECISIONS_TAKEN, 'plan', `missing or empty "## ${DECISIONS_TAKEN_SECTION}" section (write None when there is nothing to record)`);
+  } else {
+    for (const f of decisionFaults(plan.decisionsTaken, rules)) add(PLAN_FAULTS.BAD_DECISION_LINE, `${DECISIONS_TAKEN_SECTION} line ${f.line}`, `${f.code}: ${f.message}`);
+  }
   for (const h of plan.badChunkHeaders) add(PLAN_FAULTS.BAD_CHUNK_HEADER, `chunk header "${h}"`, 'expected "### <n>. <title>"');
 
   plan.chunks.forEach((c, i) => {

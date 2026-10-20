@@ -4,7 +4,7 @@ Yes-or-no questions about an architect plan (the product «plan»; the product �
 
 ## Shape
 
-The machine-readable shape is defined once, in `PLAN_FIELDS` and `PLAN_FAULTS` of `scripts/lib/plan.mjs`; `node scripts/check-plan.mjs --file <plan>` is its reader. A plan has a title line, a verdict line, a `Chunks` section, optional decisions for Pablo and a `Not verified` section. Every chunk carries these fields, in this order:
+The machine-readable shape is defined once, in `PLAN_FIELDS` and `PLAN_FAULTS` of `scripts/lib/plan.mjs`; `node scripts/check-plan.mjs --file <plan>` is its reader. A plan has a title line, a verdict line, a `Chunks` section, a `Decisions taken` section, optional decisions for Pablo and a `Not verified` section. `Decisions taken` is required (`None` is valid) and its lines have the same form as the `Decisions` section of a PR body; they are read by `scripts/lib/decision.mjs`, the only reader of a decision line (the form is `FORMS` there), and a missing section or a line it rejects is `MISSING_DECISIONS_TAKEN` or `BAD_DECISION_LINE`. Plans written before this section existed (`plans/app-admin.md`) are not changed: the CI check only reads the plan a PR edits, so such a plan fails the first time someone edits it. Every chunk carries these fields, in this order:
 
 - `Files:` the paths the chunk touches, in backticks.
 - `Depends on:` chunk numbers, `#<n>` PRs, or `none`.
