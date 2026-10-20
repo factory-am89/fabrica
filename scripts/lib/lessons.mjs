@@ -57,9 +57,11 @@ const ID_RE = /^[a-z0-9-]+$/;
 export const PR_SOURCE = /^#[1-9]\d*$/;
 // A line number points at the wrong row as soon as main adds rows (merge=union hides the shift): refused.
 const LINE_SOURCE = /:[1-9]\d*$/;
-const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
+export const INTERVENCIONES_FILE = 'intervenciones.md';
+export const LESSONS_DIR = 'lessons';
+export const DATED_ROW = /^\d{4}-\d{2}-\d{2} \| /;
 const REPEATED = 'repetida: sí';
-const STANDARDS = ['standards/code.md', 'standards/plan.md'];
+export const STANDARDS = ['standards/code.md', 'standards/plan.md'];
 
 // What kind of mechanism a repo path is; null when the path is none of the known kinds (then it is a fault).
 // [kind, path pattern, whether a machine runs it]: the third column is the only place that says which kinds are machines.
@@ -85,14 +87,14 @@ export function lessonContext(root) {
   return {
     questions: [...questions, NO_QUESTION],
     origins: [...agents, HUMAN_ORIGIN],
-    intervenciones: readFileSync(path.join(root, 'intervenciones.md'), 'utf8'),
+    intervenciones: readFileSync(path.join(root, INTERVENCIONES_FILE), 'utf8'),
     fileText: (p) => (existsSync(path.join(root, p)) ? readFileSync(path.join(root, p), 'utf8') : null),
   };
 }
 
 // [{id, text}] for every entry of lessons/ (an entry that is not NAME.json is kept, so BAD_ID can name it).
 export function readLessons(root) {
-  const dir = path.join(root, 'lessons');
+  const dir = path.join(root, LESSONS_DIR);
   if (!existsSync(dir)) return [];
   return readdirSync(dir).sort().map((f) => ({ id: f.replace(/\.json$/, ''), file: f, text: readFileSync(path.join(dir, f), 'utf8') }));
 }
@@ -173,7 +175,7 @@ export function lessonFaults(lessons, ctx) {
   }
   ctx.intervenciones.split('\n').forEach((line, i) => {
     if (DATED_ROW.test(line) && line.split(' | ').at(-1).startsWith(REPEATED) && !ids.some((id) => line.includes(`lessons/${id}.json`))) {
-      faults.push({ code: LESSON_FAULTS.REPEATED_WITHOUT_LESSON, where: `intervenciones.md:${i + 1}`, message: `a row marked «${REPEATED}» cites no lessons/<id>.json of a lesson present` });
+      faults.push({ code: LESSON_FAULTS.REPEATED_WITHOUT_LESSON, where: `${INTERVENCIONES_FILE}:${i + 1}`, message: `a row marked «${REPEATED}» cites no lessons/<id>.json of a lesson present` });
     }
   });
   return faults;

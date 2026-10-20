@@ -5,13 +5,13 @@
 //   npm run hitl -- marcar <clase> <falta> [motivo]   an agent marks what the system lacked (origen agente; self-declared)
 // Exit 1 when the log has lines that cannot be read (they are in `corruptas` and in `total`): a count that skips them would be wrong.
 import { fileURLToPath } from 'node:url';
-import { CAMINOS, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/intervention-log.mjs';
+import { CAMINOS, ORIGEN_AGENTE, contarIntervenciones, registrarIntervencion, rutaDeRegistroIntervenciones } from './lib/intervention-log.mjs';
 
 export const NOTA = 'falta es autodeclarada: la escribe quien marca (origen agente) o la deduce la clase donde es univoca; nadie la comprueba. Las lineas viejas no tienen falta (sinFalta).';
 
 // `marcar <clase> <falta> [motivo]`: an agent says what the system lacked when Pablo had to step in. Throws outside the vocabulary.
 export function marcar(clase, falta, motivo, opciones = {}) {
-  registrarIntervencion({ clase, origen: 'agente', falta, motivo, ...opciones });
+  registrarIntervencion({ clase, origen: ORIGEN_AGENTE, falta, motivo, ...opciones });
 }
 
 export function informe({ json = false, ruta = rutaDeRegistroIntervenciones() } = {}) {

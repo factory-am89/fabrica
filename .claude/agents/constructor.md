@@ -23,3 +23,4 @@ Run these without a human; they never ask anything.
 - Read the exit code, not the text. Never copy the numbers or the field names into prose or into another file.
 - Before opening a PR, run `npm run done`: it runs lint and then the tests, exits 0 only if both pass, and its last stdout line is fixed (the words are `DONE_LINE` in `scripts/done.mjs`; never copy them). Its failure codes are in the same contract file.
 - Count the lessons registry and list its faults: `npm run lessons` (add `-- --json` for the machine form).
+- Measure the Factory from its local sources: `npm run audit` (add `-- --json`). The ids of what it measures are `INDICATORS` in `scripts/audit.mjs`; they are signals, not gates (the command exits OK whatever the numbers), so read the numbers and do not copy the ids.

@@ -2,6 +2,7 @@
 // A question is a block that starts with "### <P><n> — <text>" and has a "Quién: máquina|revisor" line.
 // One prefix (an uppercase letter) per file. It throws on anything malformed: a bad question is never skipped.
 // Who checks a question: the one place these two words are written.
+export class NoQuestionsError extends Error {}
 export const CHECKED_BY = { machine: 'máquina', reviewer: 'revisor' };
 export const FIELDS = {
   checkedBy: { label: 'Quién', values: Object.values(CHECKED_BY) },
@@ -19,7 +20,7 @@ const fieldRe = (label) => new RegExp(`^${label}: (.*)$`, 'm');
 // md -> [{id, prefix, n, text, checkedBy, good, bad}] (good/bad are null when the block has no such line)
 export function readQuestions(md) {
   const blocks = md.split(/^### /m).slice(1);
-  if (blocks.length === 0) throw new Error('the standard has no questions (no "### " block)');
+  if (blocks.length === 0) throw new NoQuestionsError('the standard has no questions (no "### " block)');
   const questions = [];
   const seen = new Set();
   for (const b of blocks) {
