@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/skills.test.js"],
+  "ops": [
+    {
+      "replace": ".claude/skills/tailscale/SKILL.md",
+      "from": "## Lo que falló\n\n",
+      "to": "## Lo que falló\n\n- **2026-10-20 · una viñeta nueva sin lección.** Causa: x. Arreglo: y.\n"
+    }
+  ]
+}

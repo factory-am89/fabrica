@@ -1,0 +1,10 @@
+{
+  "run": ["scripts/entities.mjs"],
+  "ops": [
+    {
+      "replace": "entities.json",
+      "from": "\"entities\": [\n",
+      "to": "\"entities\": [\n    { \"id\": \"nueva\", \"name\": \"Nueva\", \"scope\": \"horizontal\", \"term\": \"nueva\", \"source_of_truth\": \"none\", \"readers\": [\"entities.json\"] },\n"
+    }
+  ]
+}

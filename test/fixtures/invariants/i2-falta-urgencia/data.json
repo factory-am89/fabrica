@@ -1,0 +1,5 @@
+{
+  "run": ["scripts/hitl.mjs", "marcar", "revision-de-diff", "urgencia"],
+  "ops": [],
+  "control": { "run": ["scripts/hitl.mjs", "marcar", "revision-de-diff", "verificacion"] }
+}

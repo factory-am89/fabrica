@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/goals.test.js"],
+  "ops": [
+    {
+      "replace": "goals.json",
+      "from": "{ \"id\": \"C4\", \"base\": \"seguridad\" }",
+      "to": "{ \"id\": \"C4\", \"base\": \"porque-si\" }"
+    }
+  ]
+}

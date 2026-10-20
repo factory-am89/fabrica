@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/triggers.test.js"],
+  "ops": [
+    { "write": "scripts/x.check.mjs", "text": "// lesson: script-fuera-de-node-test\nconsole.log('un test nuevo que node --test no recoge');\n" },
+    {
+      "write": "lessons/script-fuera-de-node-test.json",
+      "json": { "v": 2, "question": "none", "sources": ["#1"], "mechanism": "scripts/x.check.mjs", "origin": "constructor", "signal": "machine", "reason": ["pregunta-pendiente", "caso-unico"], "escaped": false }
+    }
+  ]
+}

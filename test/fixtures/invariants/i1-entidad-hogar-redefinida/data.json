@@ -1,0 +1,21 @@
+{
+  "run": ["scripts/adopted.mjs", "--dir", "proyecto"],
+  "ops": [
+    {
+      "replace": "entities.json",
+      "from": "\"entities\": [\n",
+      "to": "\"entities\": [\n    { \"id\": \"hogar\", \"name\": \"Hogar\", \"scope\": \"horizontal\", \"term\": \"hogar\", \"source_of_truth\": \"none\", \"readers\": [] },\n"
+    },
+    { "write": "proyecto/entities.json", "json": { "entities": [{ "id": "household", "name": "Household", "term": "hogar" }] } }
+  ],
+  "control": {
+    "ops": [
+      {
+        "replace": "entities.json",
+        "from": "\"entities\": [\n",
+        "to": "\"entities\": [\n    { \"id\": \"hogar\", \"name\": \"Hogar\", \"scope\": \"horizontal\", \"term\": \"hogar\", \"source_of_truth\": \"none\", \"readers\": [] },\n"
+      },
+      { "write": "proyecto/entities.json", "json": { "entities": [{ "id": "mesa", "name": "Mesa", "term": "mesa" }] } }
+    ]
+  }
+}

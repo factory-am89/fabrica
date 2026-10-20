@@ -1,0 +1,5 @@
+{
+  "run": ["scripts/pr-body.mjs", "--body-file", "body.md", "--files-file", "test/fixtures/pr-body/no-files.txt"],
+  "ops": [{ "copy": "test/fixtures/pr-body/no-decisions.md", "to": "body.md" }],
+  "control": { "ops": [{ "copy": "test/fixtures/pr-body/good.md", "to": "body.md" }] }
+}

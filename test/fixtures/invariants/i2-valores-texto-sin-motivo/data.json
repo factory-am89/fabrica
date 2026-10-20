@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/fields.test.js"],
+  "ops": [
+    {
+      "replace": "fields.json",
+      "from": "\"campo\": \"v\", \"tipo\": \"atributo_de\", \"de\": \"lesson\", \"dueño\": \"lesson\", \"existente\": \"nueva\", \"nueva_motivo\": \"sin-equivalente\", \"valores\": \"número\"",
+      "to": "\"campo\": \"v\", \"tipo\": \"atributo_de\", \"de\": \"lesson\", \"dueño\": \"lesson\", \"existente\": \"nueva\", \"nueva_motivo\": \"sin-equivalente\", \"valores\": \"texto\""
+    }
+  ]
+}

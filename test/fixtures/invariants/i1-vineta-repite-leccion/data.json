@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/skills.test.js"],
+  "ops": [
+    {
+      "replace": ".claude/skills/tailscale/SKILL.md",
+      "from": "## Lo que falló\n\n",
+      "to": "## Lo que falló\n\n- **2026-10-20 · el cuerpo del PR llevaba la evidencia de otro commit.** Causa: x. Arreglo: y. Ver `lessons/evidence-exact-commit.json`.\n"
+    }
+  ]
+}

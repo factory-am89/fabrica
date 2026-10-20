@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/golden-workflow.test.js"],
+  "ops": [
+    {
+      "replace": ".github/workflows/golden.yml",
+      "from": "on:\n  workflow_dispatch:\n",
+      "to": "on:\n  schedule:\n    - cron: '0 6 * * 1'\n  workflow_dispatch:\n"
+    }
+  ]
+}

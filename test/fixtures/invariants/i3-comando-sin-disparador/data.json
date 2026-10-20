@@ -1,0 +1,15 @@
+{
+  "run": ["scripts/audit.mjs", "--json"],
+  "ops": [
+    {
+      "replace": "package.json",
+      "from": "\"audit\": \"node scripts/audit.mjs\",",
+      "to": "\"audit\": \"node scripts/audit.mjs\",\n    \"medir-algo\": \"node scripts/madrid-time.mjs\","
+    },
+    {
+      "replace": "goals.json",
+      "from": "\"readers\": [\"test/entities.test.js\", \"test/fields.test.js\", \"test/adopted.test.js\", \"C8\"],",
+      "to": "\"readers\": [\"test/entities.test.js\", \"test/fields.test.js\", \"test/adopted.test.js\", \"C8\", \"medir-algo\"],"
+    }
+  ]
+}

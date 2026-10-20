@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/triggers.test.js"],
+  "ops": [
+    {
+      "replace": "package.json",
+      "from": "\"test\": \"node --test\"",
+      "to": "\"test\": \"node --test test/a.test.js\""
+    }
+  ]
+}

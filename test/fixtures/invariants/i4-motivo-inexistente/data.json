@@ -1,0 +1,8 @@
+{
+  "run": ["scripts/pr-body.mjs", "--body-file", "body.md", "--files-file", "test/fixtures/pr-body/no-files.txt"],
+  "ops": [
+    { "copy": "test/fixtures/pr-body/good.md", "to": "body.md" },
+    { "replace": "body.md", "from": "motivo: decidido", "to": "motivo: porque sí" }
+  ],
+  "control": { "ops": [{ "copy": "test/fixtures/pr-body/good.md", "to": "body.md" }] }
+}

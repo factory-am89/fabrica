@@ -1,0 +1,33 @@
+{
+  "run": ["scripts/audit.mjs", "--json"],
+  "ops": [
+    {
+      "write": "no-lesson.json",
+      "json": {
+        "version": 1,
+        "entries": [
+          { "source": "#1", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#2", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#3", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#4", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#5", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#6", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#7", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#8", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#9", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#10", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#11", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#12", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#13", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#14", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#15", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#16", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#17", "question": "C1", "reason": "otro", "reason_note": "baja" },
+          { "source": "#18", "question": "C1", "reason": "otro", "reason_note": "media" },
+          { "source": "#19", "question": "C1", "reason": "otro", "reason_note": "alta" },
+          { "source": "#20", "question": "C1", "reason": "otro", "reason_note": "baja" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "run": ["--test", "test/contrato.test.js"],
+  "ops": [
+    {
+      "replace": "scripts/lib/exit.mjs",
+      "from": "  ADOPTED_FAULTS: 41,",
+      "to": "  ADOPTED_FAULTS: 41,\n  SALIDA_NUEVA: 42,"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "run": ["scripts/pr-body.mjs", "--body-file", "body.md", "--files-file", "test/fixtures/pr-body/no-files.txt"],
+  "ops": [
+    { "copy": "test/fixtures/pr-body/good.md", "to": "body.md" },
+    { "replace": "body.md", "from": "descartó: una frase en la plantilla |", "to": "descartó: |" },
+    { "replace": "body.md", "from": "motivo: decidido\n", "to": "motivo: decidido\n- principio 5 | eligió: lo mismo | descartó: lo mismo | motivo: decidido\n" }
+  ],
+  "control": { "ops": [{ "copy": "test/fixtures/pr-body/good.md", "to": "body.md" }] }
+}
