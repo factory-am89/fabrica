@@ -7,11 +7,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, humanLocal } from '../scripts/audit.mjs';
+import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, auditData, cliAudit, humanLocal } from '../scripts/audit.mjs';
 import { casaDeAudit } from './apoyo/audit-casa.mjs';
 import { fixture, manyLines } from './apoyo/audit-raiz.mjs';
 import { exportedStrings } from '../scripts/lib/quoted-strings.mjs';
-import { DATA_IDS, DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
+import { DATA_IDS, DATA_INDICATORS, MS_DAY } from '../scripts/lib/audit-data.mjs';
 import { JUDGE_NOT_COMPUTED, JUDGE_WHY } from '../scripts/lib/judge-debt.mjs';
 import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
@@ -166,6 +166,8 @@ test('audit --data: the judge debt of the fixture is counted from the last good 
   const records = path.join(RAIZ, 'test', 'fixtures', 'audit', 'records.json');
   const j = JSON.parse(cliAudit(['--json', '--data', '--records', records]).stdout)[DATA_IDS.judgeDebt];
   assert.deepEqual([j.computed, j.count, j.firstAt, j.lastPassedAt], [true, 2, '2026-02-02T10:00:00.000Z', '2026-01-20T08:00:00Z']);
+  const at = (now) => auditData(JSON.parse(readFileSync(records, 'utf8')), { now })[DATA_IDS.judgeDebt].days;
+  assert.deepEqual([at(Date.parse(j.firstAt) + MS_DAY - 1), at(Date.parse(j.firstAt) + 2 * MS_DAY)], [0, 2]);
   assert.ok(cliAudit(['--data', '--records', records]).stdout.split('\n').some((l) => l.startsWith(`${DATA_IDS.judgeDebt}: {"computed":true,"lastPassedSha":`)));
 });
 
