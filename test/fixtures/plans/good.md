@@ -24,6 +24,9 @@ Done:
 node --test test/command.test.js
 ```
 
+## Decisions taken
+- principio 4 | eligió: one parser for both formats | descartó: a second parser | motivo: decidido
+
 ## Decisions for Pablo
 ### A. Should the parser accept tabs as separators?
 1. Yes, accept tabs (recommended)

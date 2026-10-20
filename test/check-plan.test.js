@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadClosedPaths } from '../scripts/lib/intervention.mjs';
-import { PLAN_FIELDS, PLAN_FAULTS, parsePlan, planFaults, checkPlan } from '../scripts/lib/plan.mjs';
+import { FORMS } from '../scripts/lib/decision.mjs';
+import { PLAN_FIELDS, DECISIONS_TAKEN_SECTION, PLAN_FAULTS, parsePlan, planFaults, checkPlan } from '../scripts/lib/plan.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GOOD_PATH = path.join(HERE, 'fixtures', 'plans', 'good.md');
@@ -29,6 +30,15 @@ const cut = (startMark, endMark) => (text) => {
 };
 const compose = (...fns) => (text) => fns.reduce((t, f) => f(t), text);
 
+// Replace the whole body of the Decisions taken section (up to the next heading), whatever it holds.
+const section = `## ${DECISIONS_TAKEN_SECTION}\n`;
+const withTaken = (body) => (text) => {
+  const a = text.indexOf(section);
+  const b = text.indexOf('\n## ', a + section.length);
+  assert.ok(a >= 0 && b > a, 'decisions taken anchors not found');
+  return text.slice(0, a + section.length) + body + text.slice(b);
+};
+
 const EXTRA_DECISIONS = ['B', 'C', 'D'].map((id) => `### ${id}. Another question?\n1. One (recommended)\n2. Two\n3. Three\n\n`).join('');
 const CLOSED = { closedPaths: ['apps/**'] };
 const TOUCH_APPS = swap('Files: `src/parser.js`, `test/parser.test.js`', 'Files: `apps/web/x.js`');
@@ -48,6 +58,15 @@ const MUTATIONS = {
   MISSING_VERDICT: [['no verdict line', drop('Verdict: Two small chunks, the second builds on the first; one decision is open.\n')]],
   MISSING_CHUNKS_SECTION: [['chunks heading renamed', swap('## Chunks', '## Pieces')]],
   MISSING_NOT_VERIFIED: [['not verified heading renamed', swap('## Not verified', '## Other')]],
+  MISSING_DECISIONS_TAKEN: [
+    ['heading renamed', swap(section, '## Taken\n')],
+    ['section removed', cut(section, '## Decisions for Pablo')],
+    ['section empty', withTaken('')],
+  ],
+  BAD_DECISION_LINE: [
+    ['a line that is not a decision', withTaken('not a decision line\n')],
+    ['the form itself, with placeholders', withTaken(`${FORMS.decision}\n`)],
+  ],
   NO_CHUNKS: [['heading with zero chunks', cut('### 1.', '## Decisions')]],
   BAD_CHUNK_HEADER: [['header without number', swap('### 2. Wire', '### Two: Wire')]],
   NUMBERING: [['chunk 2 renumbered 3', swap('### 2. Wire', '### 3. Wire')]],
@@ -102,6 +121,16 @@ for (const [code, rows] of Object.entries(MUTATIONS)) {
   }
 }
 
+test('Decisions taken: None is valid', () => {
+  assert.deepEqual(planFaults(withTaken('None\n')(GOOD)), []);
+});
+
+test('Decisions taken: the faults of the shared reader come through with their code and line', () => {
+  const faults = planFaults(withTaken(`${FORMS.decision}\n`)(GOOD));
+  assert.deepEqual(faults.map((f) => f.code), [PLAN_FAULTS.BAD_DECISION_LINE, PLAN_FAULTS.BAD_DECISION_LINE]);
+  assert.match(faults[0].where, /line 1/);
+});
+
 test('a #25 PR reference in Depends on is valid', () => {
   assert.deepEqual(planFaults(swap('Depends on: none', 'Depends on: #25')(GOOD)), []);
   assert.deepEqual(parsePlan(swap('Depends on: none', 'Depends on: #25, 2')(GOOD)).chunks[0].dependsOn, ['#25', 2]);
@@ -115,7 +144,7 @@ test('two chunks sharing a file: fault without a dependency path, green with one
 });
 
 test('a transitive dependency path also makes a shared file legal', () => {
-  const three = swap('## Decisions for Pablo', '### 3. Third\nFiles: `src/parser.js`\nDepends on: 2\nBlocked by: none\nExisting: `x` -> y\nNot done: z\nDone:\n```sh\ntrue\n```\n\n## Decisions for Pablo');
+  const three = swap(section, `### 3. Third\nFiles: \`src/parser.js\`\nDepends on: 2\nBlocked by: none\nExisting: \`x\` -> y\nNot done: z\nDone:\n\`\`\`sh\ntrue\n\`\`\`\n\n${section}`);
   assert.deepEqual(planFaults(three(GOOD)), []);
 });
 
@@ -165,6 +194,12 @@ test('parsePlan returns the documented shape', () => {
   assert.match(p.notVerified, /10 MB/);
 });
 
+const NO_TAKEN_PATH = path.join(HERE, 'fixtures', 'plans', 'no-decisions-taken.md');
+
+test('the no-decisions-taken fixture is the green one without the section', () => {
+  assert.equal(readFileSync(NO_TAKEN_PATH, 'utf8'), cut(section, '## Decisions for Pablo')(GOOD));
+});
+
 function run(args) {
   return spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
 }
@@ -189,6 +224,12 @@ test('CLI: good plan exits 0 and prints check-plan: ok', () => {
   const r = run(['--file', GOOD_PATH]);
   assert.equal(r.status, 0);
   assert.match(r.stdout, /^check-plan: ok\n/);
+});
+
+test('CLI: the plan without Decisions taken exits 1 with MISSING_DECISIONS_TAKEN', () => {
+  const r = run(['--file', NO_TAKEN_PATH]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /MISSING_DECISIONS_TAKEN/);
 });
 
 test('CLI: bad plan exits 1 with faults on stderr', () => {
