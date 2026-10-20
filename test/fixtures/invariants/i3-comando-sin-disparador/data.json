@@ -8,8 +8,8 @@
     },
     {
       "replace": "goals.json",
-      "from": "\"readers\": [\"test/entities.test.js\", \"test/fields.test.js\", \"test/adopted.test.js\", \"C8\"],",
-      "to": "\"readers\": [\"test/entities.test.js\", \"test/fields.test.js\", \"test/adopted.test.js\", \"C8\", \"medir-algo\"],"
+      "from": "\"test/adopted.test.js\", \"C8\",",
+      "to": "\"test/adopted.test.js\", \"C8\", \"medir-algo\","
     }
   ]
 }
