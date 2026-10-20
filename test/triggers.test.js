@@ -1,7 +1,8 @@
 // Computed triggers (scripts/lib/triggers.mjs): the closed list, one case per answer of triggerOf, one bad case per code of
 // TRIGGER_FAULTS, and the real repo with no fault. Roots are temp folders built here and removed in t.after; the vocabulary is
 // imported. Not covered: the workflows are read, never run (an `if:` that skips a step is C13's), and the real `node --test`
-// is test/node-test.test.js. The "reviewer question of plan.md without C16" fault belongs to chunk 12.
+// is test/node-test.test.js. The fault of a reviewer question of plan.md
+// with no C16 in code.md (TRIGGER_PLAN_NO_BRIDGE) has its own case; that the judge then answers C16 is for the pass of the corpus, not here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,13 +21,13 @@ const [CODE, PLAN] = STANDARDS;
 const workflow = (events, runs = [], env = {}) => yaml.dump({ on: events, jobs: { j: { steps: [{ uses: 'some/action' }, ...runs.map((run) => ({ run })), { env, run: 'true' }] } } });
 const question = (id, who) => `### ${id} — a question\nQuién: ${who}\n\n`;
 const lesson = (mechanism, signal = SIGNAL_MACHINE) => JSON.stringify({ signal, mechanism });
-// A repo where everything is wired: C1 and P1 are machine questions, C2 and P2 reviewer ones.
+// A repo where everything is wired: C1 and P1 are machine questions, C2 and P2 reviewer ones, and C16 (the bridge) is in code.md.
 const wired = () => ({
   'package.json': JSON.stringify({ scripts: { test: NODE_TEST_SCRIPT, hora: 'x', hitl: 'x', nightly: 'x', 'nightly-all': 'x' } }),
   [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: workflow({ [PR_EVENT]: null, push: null }, [`npm ci\n${NPM_TEST}`]),
   [`${WORKFLOWS_DIR}/${JUDGE_WORKFLOW}`]: workflow({ [JUDGE_EVENT]: null }, [], { [STANDARD_VARIABLE]: `.fabrica/${CODE}` }),
   [`${WORKFLOWS_DIR}/${CORPUS_WORKFLOW}`]: 'on: workflow_dispatch\n', // a string for `on:` and no jobs at all
-  [CODE]: question('C1', CHECKED_BY.machine) + question('C2', CHECKED_BY.reviewer),
+  [CODE]: question('C1', CHECKED_BY.machine) + question('C2', CHECKED_BY.reviewer) + question(PLAN_BRIDGE_QUESTION, CHECKED_BY.reviewer),
   [PLAN]: question('P1', CHECKED_BY.machine) + question('P2', CHECKED_BY.reviewer),
 });
 function repo(t, changes = {}) {
@@ -45,13 +46,14 @@ const at = (root, code) => triggerFaults(root).filter((f) => f.code === code).ma
 test('TRIGGERS is the closed list, and every fault code carries the TRIGGER_ prefix', () => {
   // The six names of the plan (ci-test, ci-judge, corpus, manual, arranque, cron) are not retyped here: that would be a copy
   // of the vocabulary. The test fixes their number, their shape (lowercase words) and that each one is used by a case below.
-  const COUNT = 6; // the plan lists six triggers and this chunk six faults
+  const COUNT = 6; // the plan lists six triggers
+  const FAULT_COUNT = 7; // the six of chunk 20 and TRIGGER_PLAN_NO_BRIDGE of chunk 12
   assert.equal(TRIGGERS.length, COUNT);
   assert.equal(new Set(TRIGGERS).size, COUNT);
   assert.ok(TRIGGERS.every((name) => /^[a-z]+(-[a-z]+)?$/.test(name)), TRIGGERS.join());
   assert.deepEqual(Object.keys(TRIGGER).sort(), ['ARRANQUE', 'CI_JUDGE', 'CI_TEST', 'CORPUS', 'CRON', 'MANUAL']);
   assert.equal(Object.isFrozen(TRIGGERS), true);
-  assert.equal(Object.keys(TRIGGER_FAULTS).length, COUNT);
+  assert.equal(Object.keys(TRIGGER_FAULTS).length, FAULT_COUNT);
   for (const [key, code] of Object.entries(TRIGGER_FAULTS)) assert.ok(key === code && code.startsWith('TRIGGER_'), key);
 });
 
@@ -61,10 +63,22 @@ test('a wired repo has no fault, and each question resolves to the trigger of wh
   assert.equal(triggerOf('C1', root), TRIGGER.CI_TEST);
   assert.equal(triggerOf('P1', root), TRIGGER.CI_TEST);
   assert.equal(triggerOf('C2', root), TRIGGER.CI_JUDGE);
-  assert.equal(triggerOf('P2', root), null, 'a reviewer question of plan.md is not judged without C16');
-  const bridged = repo(t, { [CODE]: question('C2', CHECKED_BY.reviewer) + question(PLAN_BRIDGE_QUESTION, CHECKED_BY.reviewer) });
-  assert.equal(triggerOf('P2', bridged), TRIGGER.CI_JUDGE, 'with C16 in code.md the judge reaches plan.md');
-  assert.equal(triggerOf('P1', bridged), TRIGGER.CI_TEST);
+  assert.equal(triggerOf('P2', root), TRIGGER.CI_JUDGE, 'with C16 in code.md the judge reaches plan.md');
+  const unbridged = repo(t, { [CODE]: question('C1', CHECKED_BY.machine) + question('C2', CHECKED_BY.reviewer) });
+  assert.equal(triggerOf('P2', unbridged), null, 'a reviewer question of plan.md is not judged without C16');
+  assert.equal(triggerOf('P1', unbridged), TRIGGER.CI_TEST);
+});
+
+test('TRIGGER_PLAN_NO_BRIDGE: a reviewer question of plan.md with no C16 in code.md, one per question, and never for a machine question', (t) => {
+  const NO_BRIDGE = TRIGGER_FAULTS.TRIGGER_PLAN_NO_BRIDGE;
+  const without = repo(t, { [CODE]: question('C1', CHECKED_BY.machine) + question('C2', CHECKED_BY.reviewer) });
+  assert.deepEqual(codes(without), [NO_BRIDGE], 'P2 only: P1 is a machine question');
+  assert.deepEqual(at(without, NO_BRIDGE), ['P2']);
+  const two = repo(t, { [CODE]: question('C1', CHECKED_BY.machine), [PLAN]: question('P1', CHECKED_BY.machine) + question('P2', CHECKED_BY.reviewer) + question('P3', CHECKED_BY.reviewer) });
+  assert.deepEqual(at(two, NO_BRIDGE), ['P2', 'P3']);
+  assert.deepEqual(triggerFaults(repo(t)), [], 'with C16 it is not a fault');
+  const allMachine = repo(t, { [CODE]: question('C1', CHECKED_BY.machine), [PLAN]: question('P1', CHECKED_BY.machine) });
+  assert.deepEqual(triggerFaults(allMachine), [], 'no reviewer question in plan.md, nothing to bridge');
 });
 
 test('a path is ci-test when node --test collects it, and null when it does not', (t) => {
@@ -168,7 +182,7 @@ test('TRIGGER_WORKFLOW_SILENT: tests.yml or revisor.yml stops firing on a PR, or
   const otherStandard = judge({ [JUDGE_EVENT]: null }, { [STANDARD_VARIABLE]: `.fabrica/${PLAN}` });
   assert.deepEqual(at(otherStandard, SILENT), [JUDGE_WORKFLOW]);
   assert.deepEqual(at(judge({ [JUDGE_EVENT]: null }, {}), SILENT), [JUDGE_WORKFLOW], 'no STANDARD at all');
-  for (const root of [noEvent, otherStandard]) assert.deepEqual(at(root, TRIGGER_FAULTS.TRIGGER_READER_UNFIRED), ['C2'], 'the reviewer question of code.md, not the machine ones');
+  for (const root of [noEvent, otherStandard]) assert.deepEqual(at(root, TRIGGER_FAULTS.TRIGGER_READER_UNFIRED).sort(), ['C2', PLAN_BRIDGE_QUESTION].sort(), 'the reviewer questions of code.md, not the machine ones');
   assert.deepEqual(codes(noPr), [SILENT, TRIGGER_FAULTS.TRIGGER_READER_UNFIRED, TRIGGER_FAULTS.TRIGGER_READER_UNFIRED].sort());
 });
 
@@ -195,6 +209,8 @@ test('the real repo: every reader fires, and the known readers resolve as expect
   assert.equal(triggerOf('test/triggers.test.js', REPO), TRIGGER.CI_TEST);
   assert.equal(triggerOf('C1', REPO), TRIGGER.CI_TEST);
   assert.equal(triggerOf('C5', REPO), TRIGGER.CI_JUDGE);
+  assert.equal(triggerOf(PLAN_BRIDGE_QUESTION, REPO), TRIGGER.CI_JUDGE);
+  assert.equal(triggerOf('P2', REPO), TRIGGER.CI_JUDGE, 'through C16');
   assert.equal(triggerOf('hora', REPO), TRIGGER.ARRANQUE);
   assert.equal(triggerOf('audit', REPO), TRIGGER.MANUAL);
 });

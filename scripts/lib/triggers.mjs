@@ -2,7 +2,7 @@
 // trigger would be a copy of the wiring (principle 4). `triggerOf` answers one reader; `triggerFaults` checks the wiring.
 // It only reads the workflows (scripts/lib/wiring.mjs); nothing here edits them.
 // What it does not see: an `if:` that skips a step for some PRs (C13 stays the judge of that).
-// The fault "a reviewer question of plan.md without C16" is added by chunk 12 of plans/trabajar-solos.md.
+// A reviewer question of plan.md is judged only through C16 (the bridge in code.md): without it that question is a fault.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { PASOS } from '../al-arrancar.mjs';
@@ -22,11 +22,12 @@ export const TRIGGER_FAULTS = Object.freeze(
     'TRIGGER_NO_NODE_TEST', // package.json `test` is not `node --test`
     'TRIGGER_NO_NPM_TEST', // tests.yml does not run `npm test`
     'TRIGGER_WORKFLOW_SILENT', // tests.yml or revisor.yml no longer fires on a PR, or the judge no longer reads code.md
+    'TRIGGER_PLAN_NO_BRIDGE', // a reviewer question of plan.md while code.md has no C16: no judge reaches it
   ].map((c) => [c, c])),
 );
 
 const [CODE_STANDARD] = STANDARDS;
-export const PLAN_BRIDGE_QUESTION = 'C16'; // chunk 12 adds it: the judge's way into the questions of plan.md
+export const PLAN_BRIDGE_QUESTION = 'C16'; // the judge's way into the questions of plan.md (code.md, chunk 12)
 const QUESTION_ID = new RegExp(`^${ID_SOURCE}$`);
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -100,6 +101,8 @@ export function triggerFaults(root) {
   for (const q of ctx.questions.values()) {
     const walked = q.standard === CODE_STANDARD || q.checkedBy === CHECKED_BY.machine;
     if (walked && ofQuestion(q.id, ctx) === null) out.push(fault(TRIGGER_FAULTS.TRIGGER_READER_UNFIRED, q.id, `nothing fires ${q.id} (${q.checkedBy}, ${q.standard})`));
+    const unbridged = q.standard !== CODE_STANDARD && q.checkedBy === CHECKED_BY.reviewer && !ctx.questions.has(PLAN_BRIDGE_QUESTION);
+    if (unbridged) out.push(fault(TRIGGER_FAULTS.TRIGGER_PLAN_NO_BRIDGE, q.id, `${q.id} is a reviewer question of ${q.standard} and ${CODE_STANDARD} has no ${PLAN_BRIDGE_QUESTION}`));
   }
   return [...out, ...lessonFaults(root, ctx)];
 }

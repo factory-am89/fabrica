@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { GATE_FILES, ADMIN_GATE_FILES } from '../scripts/lib/gate.mjs';
+import { GATE_FILES, ADMIN_GATE_FILES, PLAN_GATE_FILES } from '../scripts/lib/gate.mjs';
+import { STANDARDS } from '../scripts/lib/lessons.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORKFLOWS = ['.github/workflows/revisor.yml', '.github/workflows/tests.yml', '.github/workflows/anulacion.yml', '.github/workflows/senal-review.yml'];
@@ -65,9 +66,19 @@ test('every GATE_FILES path exists and there are no duplicates', () => {
 
 test('GATE_FILES is exactly what the workflows use, with imports', () => {
   const needed = expected();
-  for (const f of ADMIN_GATE_FILES) needed.add(f); // not derivable from the two workflows
+  for (const f of [...ADMIN_GATE_FILES, ...PLAN_GATE_FILES]) needed.add(f); // not derivable from the two workflows
   for (const f of needed) assert.ok(GATE_FILES.includes(f), `${f} is used by the gate but not in GATE_FILES`);
   for (const f of GATE_FILES) assert.ok(needed.has(f), `${f} is in GATE_FILES but nothing in the gate uses it`);
+});
+
+// The plan standard is read by the judge through C16, not named by any workflow: it has its own list, required by name and in GATE_FILES.
+test('PLAN_GATE_FILES is exactly the plan standard, no workflow derives it, and GATE_FILES keeps it and the admin files', () => {
+  const [, planStandard] = STANDARDS;
+  assert.deepEqual(PLAN_GATE_FILES, [planStandard]);
+  assert.equal(existsSync(path.join(ROOT, planStandard)), true);
+  assert.equal(expected().has(planStandard), false, 'a workflow now names it: it no longer needs its own list');
+  for (const f of [...ADMIN_GATE_FILES, ...PLAN_GATE_FILES]) assert.ok(GATE_FILES.includes(f), `${f} left GATE_FILES`);
+  assert.equal(GATE_FILES.length, expected().size + ADMIN_GATE_FILES.length + PLAN_GATE_FILES.length);
 });
 
 test('fabricaPaths: finds paths in run, env, with and claude_args (good), nothing in a plain workflow (bad)', () => {

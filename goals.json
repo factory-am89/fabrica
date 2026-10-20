@@ -5,25 +5,25 @@
     {
       "id": "O1", "name": "escalabilidad", "invariants": ["I1", "I2"], "principles": [4],
       "indicators": ["project-cost", "base-holes"],
-      "readers": ["test/entities.test.js", "test/fields.test.js", "test/adopted.test.js", "C8"],
+      "readers": ["test/entities.test.js", "test/fields.test.js", "test/adopted.test.js", "C8", "C14", "C16"],
       "check": "juez"
     },
     {
       "id": "O2", "name": "HITL como residuo", "invariants": ["I4", "I5"], "principles": [6, 2],
       "indicators": ["hitl-residue", "hitl-balance", "escapes"],
-      "readers": ["test/pr-body.test.js", "test/check-plan.test.js", "P9"],
+      "readers": ["test/pr-body.test.js", "test/check-plan.test.js", "P9", "C15", "C16"],
       "check": "máquina"
     },
     {
       "id": "O3", "name": "self-learning", "invariants": ["I3", "I5"], "principles": [5, 2],
       "indicators": ["lesson-effect", "rules-without-reader", "hygiene"],
-      "readers": ["test/lessons.test.js", "test/skills.test.js", "C6"],
+      "readers": ["test/lessons.test.js", "test/skills.test.js", "C6", "C16", "C17"],
       "check": "juez"
     },
     {
       "id": "O4", "name": "por y para agentes", "invariants": ["I1", "I2", "I4"], "principles": [4, 5],
       "indicators": ["scripts-without-json", "long-files", "magic-numbers", "free-values", "test-duplication"],
-      "readers": ["test/contrato.test.js", "C1", "C3", "C11"],
+      "readers": ["test/contrato.test.js", "C1", "C3", "C11", "C14", "C17"],
       "check": "máquina"
     }
   ],
@@ -34,15 +34,15 @@
     },
     {
       "id": "I2", "text": "Lo que se repite (valores, reglas, recetas) es dato con vocabulario cerrado y válvula «otro» + motivo.",
-      "goals": ["O1", "O4"], "principles": [4], "questions": ["C8", "P1", "P10"]
+      "goals": ["O1", "O4"], "principles": [4], "questions": ["C8", "C14", "P1", "P10"]
     },
     {
       "id": "I3", "text": "Toda regla tiene un lector que falla y un disparador que lo ejecuta sin que nadie se acuerde, y todo fallo se pregunta por su clase; el arreglo es un mecanismo para la clase.",
-      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "P2", "P8", "P12"]
+      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "C16", "C17", "P2", "P8", "P12"]
     },
     {
       "id": "I4", "text": "Lo que el agente necesita está en datos del repo legibles de una vez, y lo que decide queda apuntado con su motivo.",
-      "goals": ["O2", "O4"], "principles": [6], "questions": ["P3", "P9", "P11"]
+      "goals": ["O2", "O4"], "principles": [6], "questions": ["C15", "P3", "P9", "P11"]
     },
     {
       "id": "I5", "text": "Todo lector es una hipótesis que se mide: cifra antes y después, tasa de «no» falsos, y «no concluyente» con menos de MIN_CASES_PER_CELL casos.",
@@ -63,6 +63,10 @@
     { "id": "C11", "goals": ["O1", "O4"] },
     { "id": "C12", "goals": ["O3"] },
     { "id": "C13", "goals": ["O2"] },
+    { "id": "C14", "goals": ["O1", "O4"] },
+    { "id": "C15", "goals": ["O2"] },
+    { "id": "C16", "goals": ["O1", "O2", "O3", "O4"] },
+    { "id": "C17", "goals": ["O3", "O4"] },
     { "id": "P1", "goals": ["O4"] },
     { "id": "P2", "goals": ["O3"] },
     { "id": "P3", "goals": ["O2"] },

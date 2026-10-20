@@ -1,7 +1,7 @@
 // What this list covers: the gate workflows (revisor.yml, tests.yml, anulacion.yml and its trigger senal-review.yml), everything they take from
 // .fabrica/ (scripts, the standard, the reviewer role, the lint config, package files; run, env, with,
 // claude_args and prompt), and the relative imports of those scripts. test/gate-files.test.js derives
-// that set from the workflows and requires this list to equal it plus ADMIN_GATE_FILES below.
+// that set from the workflows and requires this list to equal it plus ADMIN_GATE_FILES and PLAN_GATE_FILES below.
 // What it does NOT cover: the test files that `npm test` runs in this repo (only test/workflows.test.js,
 // which tests.yml runs from .fabrica/, is listed), nor paths built at run time or under a relative
 // `working-directory`. Paths are relative to the repo root.
@@ -47,4 +47,11 @@ export const ADMIN_GATE_FILES = [
   'test/administrador.test.js', // the machine guard on the two above
 ];
 
-export const GATE_FILES = [...BASE, ...ADMIN_GATE_FILES];
+// The plan standard: question C16 of standards/code.md sends the judge to read it, but the workflows never name it (revisor.yml
+// only sets the standard of the verdict), so test/gate-files.test.js cannot derive it and requires it here by name. Whoever can change
+// it can change what a plan has to meet, so it is a gate file.
+export const PLAN_GATE_FILES = [
+  'standards/plan.md', // the questions C16 asks of a plan
+];
+
+export const GATE_FILES = [...BASE, ...ADMIN_GATE_FILES, ...PLAN_GATE_FILES];
