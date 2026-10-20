@@ -27,7 +27,7 @@ export function readSkills(root) {
   });
 }
 
-export const citedPaths = (text) => [...new Set([...text.matchAll(WORD)].map((m) => m[0].replace(TRAILING_DOTS, '')).filter((t) => mechanismKind(t) !== null))].sort();
+export const citedPaths = (text) => [...new Set([...text.matchAll(WORD)].map((m) => m[0].replace(TRAILING_DOTS, '')).filter((t) => mechanismKind(t) !== null))];
 
 // docs: [{kind, name, cited: [path], text: string | null}] (a lesson cites its mechanism and has no text). Returns [{a, b, files}] with a < b.
 // Not listed: two lessons (they share a mechanism: MERGE says it) and a skill that links the lesson (lessons/<id>.json): that link is wanted.

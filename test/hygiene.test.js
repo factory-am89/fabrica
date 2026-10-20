@@ -63,11 +63,11 @@ test('MERGE: the same question or the same mechanism; «none» is no class; a lo
 });
 
 test('PROMOTE: a «none»-signal lesson whose question already has a machine lesson with a test; its bullets are named', () => {
-  const rows = rowsOf(lesson('prose', 'C1', S, SIGNAL_NONE), lesson('alpha-prose', 'C1', S, SIGNAL_NONE), lesson('zz', 'C1', T), lesson('aa', 'C1', 'test/b.test.js'), lesson('other', 'C2', S, SIGNAL_NONE), lesson('script', 'C3', S), lesson('c3', 'C3', S, SIGNAL_NONE), lesson('nq', NO_QUESTION, S, SIGNAL_NONE));
-  const skills = [{ name: 'sk', bullets: [bullet(`see ${LESSONS_DIR}/prose.json`)] }, { name: 'ot', bullets: [bullet('no link')] }];
+  const rows = rowsOf(lesson('prose', 'C1', S, SIGNAL_NONE), lesson('alpha-prose', 'C1', S, SIGNAL_NONE), lesson('zz', 'C1', T), lesson('aa', 'C1', 'test/b.test.js'), lesson('other', 'C2', S, SIGNAL_NONE), lesson('script', 'C3', S), lesson('c3', 'C3', S, SIGNAL_NONE), lesson('nq', NO_QUESTION, S, SIGNAL_NONE), lesson('nq-test', NO_QUESTION, T));
+  const skills = [{ name: 'sk', bullets: [bullet(`see ${LESSONS_DIR}/prose.json`)] }, { name: 'ab', bullets: [bullet(`also ${LESSONS_DIR}/prose.json`)] }, { name: 'ot', bullets: [bullet('no link')] }];
   assert.deepEqual(promoteCandidates(rows, skills), [
     { code: CODES.PROMOTE, key: 'alpha-prose', items: ['alpha-prose'], question: 'C1', test: 'test/b.test.js', bullets: [] },
-    { code: CODES.PROMOTE, key: 'prose', items: ['prose'], question: 'C1', test: 'test/b.test.js', bullets: ['sk'] },
+    { code: CODES.PROMOTE, key: 'prose', items: ['prose'], question: 'C1', test: 'test/b.test.js', bullets: ['ab', 'sk'] },
   ]);
 });
 
@@ -117,15 +117,15 @@ test('overlaps: the pairs come sorted whatever the order of the docs, and each p
 test('DEAD_REF: a missing path (SKILL.md or referencias, trailing dot included) or an npm command that does not exist; existing ones and non-paths are not listed', (t) => {
   const r = hygiene(root(t, {
     lessons: [lesson('gone', 'C1', 'scripts/gone.mjs'), lesson('odd', 'C2', 'nowhere/odd.txt'), lesson('live', 'C3', 'scripts/lib/live.mjs'), lesson('live2', 'C4', S)],
-    missing: ['scripts/gone.mjs'],
-    skills: { sk: { skill: skillText(bullet(`see ${S}, run npm run known and npm run absent, edit scripts/nope.mjs.`)), refs: { 'r.md': 'also test/nope.test.js and scripts/lib/ and scripts/<x>.mjs' } } },
+    missing: ['scripts/gone.mjs', 'nowhere/odd.txt'],
+    skills: { sk: { skill: skillText(bullet(`see ${S}, run npm run known and npm run zabsent, edit scripts/nope.mjs.`)), refs: { 'r.md': 'also scripts/aaa.mjs and scripts/lib/ and scripts/<x>.mjs' } } },
   }));
   const dead = only(r, CODES.DEAD_REF).map((c) => [c.items[0], c.file, c.ref, c.kind]);
   assert.deepEqual(dead, [
     ['lesson:gone', `${LESSONS_DIR}/gone.json`, 'scripts/gone.mjs', REF.path],
-    ['skill:sk', '.claude/skills/sk/SKILL.md', 'absent', REF.command],
+    ['skill:sk', '.claude/skills/sk/SKILL.md', 'zabsent', REF.command],
     ['skill:sk', '.claude/skills/sk/SKILL.md', 'scripts/nope.mjs', REF.path],
-    ['skill:sk', '.claude/skills/sk/referencias/r.md', 'test/nope.test.js', REF.path],
+    ['skill:sk', '.claude/skills/sk/referencias/r.md', 'scripts/aaa.mjs', REF.path],
   ]);
 });
 
