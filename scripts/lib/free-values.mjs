@@ -4,8 +4,8 @@
 // A text field with no reader here throws: a field whose values are not read would be a silent hole (principle 3).
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { KEYS, TEXT, fieldId, readFields } from './fields.mjs';
-import { NO_LESSON_KEYS, readLessons, readNoLesson } from './lessons.mjs';
+import { ENTITY, KEYS, TEXT, fieldId, readFields } from './fields.mjs';
+import { LESSON_NOTE, NO_LESSON_KEYS, readLessons, readNoLesson } from './lessons.mjs';
 import { PLAN_DIR, PLAN_FIELDS, parsePlan } from './plan.mjs';
 
 // A value repeated at least MIN_REPEATS times is «repeated». An enum is proposed when there are at least MIN_VALUES values,
@@ -22,17 +22,17 @@ const planChunks = (root) => {
   return readdirSync(dir).filter((f) => f.endsWith('.md')).sort().flatMap((f) => parsePlan(readFileSync(path.join(dir, f), 'utf8')).chunks);
 };
 // A chunk whose field is absent has no value; an empty list is the plan's own word for «none».
-const planField = (key, of) => (root) => planChunks(root).map(of).filter((v) => v !== null && v !== undefined).map((v) => (Array.isArray(v) ? (v.length === 0 ? PLAN_NONE : v.join(', ')) : v));
+const planField = (of) => (root) => planChunks(root).map(of).filter((v) => v !== null && v !== undefined).map((v) => (Array.isArray(v) ? (v.length === 0 ? PLAN_NONE : v.join(', ')) : v));
 
-// owner id (entity of entities.json) -> field name -> reader of its values. lesson and no-lesson share the name (`existente` in fields.json).
+// owner id (entity of entities.json) -> field name -> reader of its values. the note of a no-lesson entry is its own entity's field (NO_LESSON_KEYS), not lesson's.
 export const VALUE_READERS = Object.freeze({
-  lesson: { [NO_LESSON_KEYS.note]: (root) => readLessons(root).map((l) => JSON.parse(l.text)[NO_LESSON_KEYS.note]).filter((v) => v !== undefined) },
-  'no-lesson': { [NO_LESSON_KEYS.note]: (root) => JSON.parse(readNoLesson(root)).entries.map((e) => e[NO_LESSON_KEYS.note]).filter((v) => v !== undefined) },
-  plan: {
-    [PLAN_FIELDS.blockedBy]: planField(PLAN_FIELDS.blockedBy, (c) => c.blockedBy),
-    [PLAN_FIELDS.existing]: planField(PLAN_FIELDS.existing, (c) => c.existing),
-    [PLAN_FIELDS.notDone]: planField(PLAN_FIELDS.notDone, (c) => c.notDone),
-    [PLAN_FIELDS.done]: planField(PLAN_FIELDS.done, (c) => c.done?.code),
+  [ENTITY.lesson]: { [LESSON_NOTE]: (root) => readLessons(root).map((l) => JSON.parse(l.text)[LESSON_NOTE]).filter((v) => v !== undefined) },
+  [ENTITY.noLesson]: { [NO_LESSON_KEYS.note]: (root) => JSON.parse(readNoLesson(root)).entries.map((e) => e[NO_LESSON_KEYS.note]).filter((v) => v !== undefined) },
+  [ENTITY.plan]: {
+    [PLAN_FIELDS.blockedBy]: planField((c) => c.blockedBy),
+    [PLAN_FIELDS.existing]: planField((c) => c.existing),
+    [PLAN_FIELDS.notDone]: planField((c) => c.notDone),
+    [PLAN_FIELDS.done]: planField((c) => c.done?.code),
   },
 });
 

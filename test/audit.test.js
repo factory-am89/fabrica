@@ -7,14 +7,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, exportedStrings } from '../scripts/audit.mjs';
+import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, humanLocal } from '../scripts/audit.mjs';
+import { exportedStrings } from '../scripts/lib/quoted-strings.mjs';
 import { DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
 import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../scripts/lib/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
-import { FIELDS_FILE, KEYS, TEXT } from '../scripts/lib/fields.mjs';
+import { ENTITY, FIELDS_FILE, KEYS, TEXT, fieldId } from '../scripts/lib/fields.mjs';
 import { MIN_VALUES } from '../scripts/lib/free-values.mjs';
 import { CLASES, FALTAS, ORIGENES, ORIGEN_AGENTE, registrarIntervencion, rutaDeRegistroIntervenciones } from '../scripts/lib/intervention-log.mjs';
-import { INTERVENCIONES_FILE, LESSONS_DIR, NO_LESSON_KEYS, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { INTERVENCIONES_FILE, LESSONS_DIR, LESSON_NOTE, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { CHECKED_BY, FIELDS } from '../scripts/lib/questions.mjs';
 import { RULES_BUDGET_FILE } from '../scripts/lib/skills.mjs';
 import { marcar } from '../scripts/hitl.mjs';
@@ -39,7 +40,7 @@ function fixture(t, over = {}) {
     [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE] }),
     [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE] }),
     [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE }),
-    [FIELDS_FILE]: JSON.stringify({ fields: [{ [KEYS.name]: NO_LESSON_KEYS.note, [KEYS.owner]: 'lesson', [KEYS.values]: TEXT }] }),
+    [FIELDS_FILE]: JSON.stringify({ fields: [{ [KEYS.name]: LESSON_NOTE, [KEYS.owner]: ENTITY.lesson, [KEYS.values]: TEXT }] }),
     [RULES_BUDGET_FILE]: JSON.stringify({ budget: { uno: 3, dos: 4 } }),
     [INTERVENCIONES_FILE]: '# h\n2026-01-01 | clic | a | b | repetida: no\n2026-01-02 | clic | a | b | repetida: no\nsuelta\n',
     [ENTITIES_FILE]: JSON.stringify({ entities: [{ id: 'e1', scope: HORIZONTAL, base: BASE_HOLE }, { id: 'e2', scope: HORIZONTAL, base: 'x.md' }] }),
@@ -141,10 +142,17 @@ test('test duplication: a string shorter than the minimum, or not in an export c
 });
 
 test('free values: the text fields of the registry come with their repeated values and a proposal of enum', (t) => {
-  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ [NO_LESSON_KEYS.note]: 'same' })]));
+  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ [LESSON_NOTE]: 'same' })]));
   const f = run(fixture(t, notes))[INDICATORS.freeValues];
   assert.equal(f.count, 1);
-  assert.deepEqual(f.fields.map((x) => [x.field, x.total, x.repeated, x.proposal]), [['lesson.' + NO_LESSON_KEYS.note, MIN_VALUES, [{ value: 'same', count: MIN_VALUES }], ['same']]]);
+  assert.deepEqual(f.fields.map((x) => [x.field, x.total, x.repeated, x.proposal]), [[fieldId({ [KEYS.owner]: ENTITY.lesson, [KEYS.name]: LESSON_NOTE }), MIN_VALUES, [{ value: 'same', count: MIN_VALUES }], ['same']]]);
+});
+
+test('free values: the text output has the indicator line and each proposal', (t) => {
+  const notes = Object.fromEntries(Array.from({ length: MIN_VALUES }, (_, i) => [`${LESSONS_DIR}/n${i}.json`, JSON.stringify({ [LESSON_NOTE]: 'same' })]));
+  const lines = humanLocal(run(fixture(t, notes))).split('\n');
+  assert.ok(lines.includes(`${INDICATORS.freeValues}: 1 of 1 text fields with a proposal of enum`));
+  assert.ok(lines.some((l) => l.endsWith('["same"]')));
 });
 
 test('signals, not gates: a root full of faults still exits OK, in text and in --json', (t) => {

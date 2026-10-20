@@ -36,8 +36,9 @@ export const LESSON_FAULTS = Object.freeze(
 // v2 (chunk 5 of plans/trabajar-solos.md): `question` replaces v1 `class` (the same id, now mandatory), `sources`
 // replaces `source` (a list), and `signal`, `reason`, `reason_note` and `escaped` are new. All but `reason` and
 // `reason_note` are always present (an absent field is never read as a default); those two depend on the rules below.
-export const FIELDS = ['v', 'question', 'sources', 'mechanism', 'origin', 'signal', 'reason', 'reason_note', 'escaped'];
-export const OPTIONAL_FIELDS = ['reason', 'reason_note'];
+export const LESSON_NOTE = 'reason_note';
+export const FIELDS = ['v', 'question', 'sources', 'mechanism', 'origin', 'signal', 'reason', LESSON_NOTE, 'escaped'];
+export const OPTIONAL_FIELDS = ['reason', LESSON_NOTE];
 export const VERSION = 2;
 export const NO_QUESTION = 'none';
 // `signal`: a machine (the mechanism is a test, hook or script carrying the mark) or none (then `reason` says why).

@@ -1,21 +1,21 @@
 // scripts/lib/free-values.mjs: the values of the fields that fields.json marks as text, which repeat, and when an enum is
-// proposed. Each rule has a case that turns it red; the real registry must have a reader for every text field it declares.
+// proposed. Each rule, each reader (by the values it returns) and the text line have a case that turns it red; the real registry must have a reader for every text field it declares.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIELDS_FILE, KEYS, TEXT, VALUE_KINDS, fieldId, readFields } from '../scripts/lib/fields.mjs';
+import { ENTITY, FIELDS_FILE, KEYS, TEXT, VALUE_KINDS, fieldId, readFields } from '../scripts/lib/fields.mjs';
 import {
   MAX_ENUM_VALUES, MIN_REPEATS, MIN_VALUES, PLAN_NONE, VALUE_READERS, freeValues, humanFreeValues, summarize,
 } from '../scripts/lib/free-values.mjs';
-import { LESSONS_DIR, NO_LESSON_KEYS } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, LESSON_NOTE, NO_LESSON_FILE, NO_LESSON_KEYS } from '../scripts/lib/lessons.mjs';
 import { PLAN_DIR, PLAN_FIELDS } from '../scripts/lib/plan.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NOTE = NO_LESSON_KEYS.note;
-const OWNER = 'lesson';
+const NOTE = LESSON_NOTE;
+const OWNER = ENTITY.lesson;
 const NOT_TEXT = VALUE_KINDS.find((k) => k !== TEXT);
 const same = (n, v = 'same') => Array.from({ length: n }, () => v);
 const distinct = (n) => Array.from({ length: n }, (_, i) => `v${i}`);
@@ -78,9 +78,24 @@ test('freeValues stops when a source cannot be read: a lesson that is not JSON',
 test('the plan readers give the value of each field of every chunk, and an empty «Blocked by» is the word none', (t) => {
   const label = PLAN_FIELDS;
   const dir = root(t, []);
-  const chunk = (n) => `### ${n}. t\n${label.files}: \`a\`\n${label.dependsOn}: none\n${label.blockedBy}: none\n`;
-  put(dir, `${PLAN_DIR}p.md`, `# Plan: x\n\n## Chunks\n\n${chunk(1)}\n${chunk(2)}`);
-  assert.deepEqual(VALUE_READERS.plan[label.blockedBy](dir), [PLAN_NONE, PLAN_NONE]);
+  const fence = '`'.repeat(3);
+  const chunk = (n, blocked) => `### ${n}. t\n${label.files}: \`a\`\n${label.dependsOn}: none\n${label.blockedBy}: ${blocked}\n${label.existing}: ex-${n}\n${label.notDone}: nd-${n}\n${label.done}:\n${fence}sh\ncmd-${n}\n${fence}\n`;
+  put(dir, `${PLAN_DIR}p.md`, `# Plan: x\n\n## Chunks\n\n${chunk(1, 'none')}\n${chunk(2, '1')}`);
+  const read = (name) => VALUE_READERS[ENTITY.plan][name](dir);
+  assert.deepEqual(read(label.blockedBy), [PLAN_NONE, '1']);
+  assert.deepEqual(read(label.existing), ['ex-1', 'ex-2']);
+  assert.deepEqual(read(label.notDone), ['nd-1', 'nd-2']);
+  assert.deepEqual(read(label.done), ['cmd-1', 'cmd-2']);
+});
+
+test('the no-lesson reader gives the notes of the entries that have one', (t) => {
+  const dir = root(t, []);
+  put(dir, NO_LESSON_FILE, JSON.stringify({ entries: [{ [NO_LESSON_KEYS.note]: 'n1' }, {}, { [NO_LESSON_KEYS.note]: 'n2' }] }));
+  assert.deepEqual(VALUE_READERS[ENTITY.noLesson][NO_LESSON_KEYS.note](dir), ['n1', 'n2']);
+});
+
+test('summarize returns the proposal sorted, whatever the order the values came in', () => {
+  assert.deepEqual(summarize(['b', 'b', 'a', 'a', 'c', 'c']).proposal, ['a', 'b', 'c']);
 });
 
 test('the real registry: every text field it declares has a reader, and the result lists exactly those fields', () => {

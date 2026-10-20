@@ -60,12 +60,15 @@ export const VALUE_KINDS = ['enum', 'booleano', 'número', 'id', 'fecha', 'texto
 export const TEXT = 'texto';
 export const TEXT_REASONS = ['prosa-juzgada', OTHER];
 
+// The entity ids of entities.json that have fields in code, written once.
+export const ENTITY = Object.freeze({ lesson: 'lesson', noLesson: 'no-lesson', intervention: 'intervention', plan: 'plan' });
+
 // Where each entity's fields are listed in code. Keys are entity ids of entities.json; values return the field names.
 export const FIELD_SOURCES = Object.freeze({
-  lesson: () => LESSON_FIELDS,
-  'no-lesson': () => NO_LESSON_FIELDS,
-  intervention: () => CAMPOS,
-  plan: () => Object.values(PLAN_FIELDS),
+  [ENTITY.lesson]: () => LESSON_FIELDS,
+  [ENTITY.noLesson]: () => NO_LESSON_FIELDS,
+  [ENTITY.intervention]: () => CAMPOS,
+  [ENTITY.plan]: () => Object.values(PLAN_FIELDS),
 });
 
 const isText = (v) => typeof v === 'string' && v.trim() !== '';

@@ -12,6 +12,7 @@ import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
 import { freeValues, humanFreeValues } from './lib/free-values.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
+import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
 import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
 import { NoQuestionsError, readQuestions } from './lib/questions.mjs';
@@ -19,6 +20,7 @@ import { RULES_BUDGET_FILE } from './lib/skills.mjs';
 import { collect, getWithToken } from './collect-records.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 // The closed list of what this command measures: the key of each value in the result.
 export const INDICATORS = Object.freeze({
   questions: 'questions',
@@ -117,21 +119,6 @@ function scriptsWithoutJson(root) {
   const files = listFiles(root, 'scripts', (f) => f.split('/').length === 2 && f.endsWith('.mjs'));
   const without = files.filter((f) => !readText(root, f).includes(JSON_FLAG));
   return { total: files.length, count: without.length, files: without };
-}
-
-// The quoted strings of a source, without line comments (a `//` after a space or at the start of a line).
-const QUOTED = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1/g;
-const stringsOf = (text) => [...text.replace(/(^|\s)\/\/.*$/gm, '$1').matchAll(QUOTED)].map((m) => m[2]);
-
-// The `export const` statements of a lib file: from each such line to the next line that starts a new top-level statement.
-export function exportedStrings(text) {
-  const out = [];
-  let inExport = false;
-  for (const line of text.split('\n')) {
-    if (/^\S/.test(line) && !/^[})\]]/.test(line)) inExport = line.startsWith('export const');
-    if (inExport) out.push(...stringsOf(line));
-  }
-  return out;
 }
 
 // Vocabulary copied into tests: strings of length >= minLength found in a test/ file and in an `export const` of scripts/lib/.
