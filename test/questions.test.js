@@ -77,7 +77,11 @@ test('C14 to C17 are in code.md, judged by the reviewer, with Bien and Mal, and 
 test('goals.json: C14 to C17 each have a row, and C16 is a reader of the goal of every reviewer question of plan.md', () => {
   const registry = readGoals(ROOT);
   const rows = new Map(registry[LIST.questions].map((r) => [r[KEY.id], r]));
-  for (const id of Object.keys(CHUNK_12)) assert.ok(rows.has(id), `${id} has no row in goals.json`);
+  const listed = new Set(registry[LIST.invariants].flatMap((i) => i[KEY.questions]));
+  for (const id of Object.keys(CHUNK_12)) {
+    assert.ok(rows.has(id), `${id} has no row in goals.json`);
+    assert.ok(listed.has(id), `${id} is in no invariant of goals.json`);
+  }
   const [, PLAN] = STANDARDS;
   const planReviewer = [...readAllQuestions(ROOT).values()].filter((q) => q.standard === PLAN && q.checkedBy === CHECKED_BY.reviewer);
   assert.ok(planReviewer.length > 0);
