@@ -5,6 +5,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { readQuestions, CHECKED_BY, FIELDS, ID_PARTS } from '../scripts/lib/questions.mjs';
 import { PLAN_FIELDS } from '../scripts/lib/plan.mjs';
 import { KEY, LIST, readGoals } from '../scripts/lib/goals.mjs';
+import { ENTITIES_FILE } from '../scripts/lib/entities.mjs';
+import { FIELDS_FILE } from '../scripts/lib/fields.mjs';
 
 const read = (f) => readFileSync(f, 'utf8');
 const md = () => read('standards/plan.md');
@@ -50,7 +52,7 @@ test('arquitecto.md links the plan standard and no longer carries its own list',
 });
 
 const block = (id) => md().split(/^### /m).find((b) => b.startsWith(`${id} — `));
-const NAMES = { P10: ['entities.json', 'fields.json'], P11: ['scripts/lib/decision.mjs'], P12: ['scripts/lib/triggers.mjs'] };
+const NAMES = { P10: [ENTITIES_FILE, FIELDS_FILE], P11: ['scripts/lib/decision.mjs'], P12: ['scripts/lib/triggers.mjs'] };
 
 test('P10 to P12 each have a row in goals.json for their goal, and only their invariants list them', () => {
   const registry = readGoals('.');
