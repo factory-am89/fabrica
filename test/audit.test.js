@@ -3,14 +3,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, humanLocal } from '../scripts/audit.mjs';
 import { casaDeAudit } from './apoyo/audit-casa.mjs';
 import { fixture, manyLines } from './apoyo/audit-raiz.mjs';
 import { exportedStrings } from '../scripts/lib/quoted-strings.mjs';
-import { DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
+import { DATA_IDS, DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
+import { JUDGE_NOT_COMPUTED, JUDGE_WHY } from '../scripts/lib/judge-debt.mjs';
 import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { ENTITY, KEYS, fieldId } from '../scripts/lib/fields.mjs';
@@ -158,4 +160,26 @@ test('the real entry point: node scripts/audit.mjs --json prints one JSON object
   assert.equal(r.status, EXIT.OK, r.stderr);
   const out = JSON.parse(r.stdout);
   for (const id of Object.values(INDICATORS).filter((i) => !NON_LOCAL.includes(i))) assert.ok(Object.hasOwn(out, id), `missing ${id}`);
+});
+
+test('audit --data: the judge debt of the fixture is counted from the last good pass, in JSON and in text', () => {
+  const records = path.join(RAIZ, 'test', 'fixtures', 'audit', 'records.json');
+  const j = JSON.parse(cliAudit(['--json', '--data', '--records', records]).stdout)[DATA_IDS.judgeDebt];
+  assert.deepEqual([j.computed, j.count, j.firstAt, j.lastPassedAt], [true, 2, '2026-02-02T10:00:00.000Z', '2026-01-20T08:00:00Z']);
+  assert.ok(cliAudit(['--data', '--records', records]).stdout.split('\n').some((l) => l.startsWith(`${DATA_IDS.judgeDebt}: {"computed":true,"lastPassedSha":`)));
+});
+
+test('audit --data: records without the judge say «no calculado» in both outputs, never a zero, and the command still exits OK', (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'audit-judge-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { judge, ...without } = JSON.parse(readFileSync(path.join(RAIZ, 'test', 'fixtures', 'audit', 'records.json'), 'utf8'));
+  assert.ok(judge);
+  writeFileSync(path.join(dir, 'records.json'), JSON.stringify(without));
+  const args = ['--data', '--records', path.join(dir, 'records.json')];
+  const json = cliAudit(['--json', ...args]);
+  assert.equal(json.code, EXIT.OK);
+  assert.deepEqual(JSON.parse(json.stdout)[DATA_IDS.judgeDebt], { computed: false, state: JUDGE_NOT_COMPUTED, conclusive: false, why: [JUDGE_WHY.noJudgeData] });
+  const text = cliAudit(args);
+  assert.equal(text.code, EXIT.OK);
+  assert.ok(text.stdout.includes(`${DATA_IDS.judgeDebt}: {"computed":false,"state":"${JUDGE_NOT_COMPUTED}"`));
 });

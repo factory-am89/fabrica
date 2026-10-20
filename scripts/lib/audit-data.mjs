@@ -2,6 +2,7 @@
 // scripts/collect-records.mjs downloads ({pulls, checkRuns}). Pure functions: no network, no clock unless `now` is given.
 // Every figure that cannot be exact says which way it errs (BOUND) and the mix it hides (CAVEAT). Signals, not gates.
 import { lessonIndicators } from './lesson-effect.mjs';
+import { judgeDebt } from './judge-debt.mjs';
 import { aggregate, readCheckRuns } from './record.mjs';
 
 export const BOUND = Object.freeze({ lower: 'lower', upper: 'upper' });
@@ -124,6 +125,7 @@ export const DATA_IDS = Object.freeze({
   lessonEffect: 'lesson-effect',
   unsortedNo: 'unsorted-no',
   falseNo: 'false-no',
+  judgeDebt: 'judge-debt', // commits of main on the judge after the last good pass of the corpus (scripts/lib/judge-debt.mjs)
 });
 export const DATA_INDICATORS = Object.freeze(Object.values(DATA_IDS));
 
@@ -146,6 +148,7 @@ export function dataIndicators(data, { now, lessonsEscaped, messageCounts, local
     [DATA_IDS.lessonEffect]: lesson.lessonEffect,
     [DATA_IDS.unsortedNo]: lesson.unsortedNo,
     [DATA_IDS.falseNo]: lesson.falseNo,
+    [DATA_IDS.judgeDebt]: judgeDebt(data.judge, now),
   };
 }
 
