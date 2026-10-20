@@ -36,6 +36,7 @@ const cli = (...args) => spawnSync(process.execPath, [SCRIPT, ...args], { encodi
 // Casos malos por pregunta (trozo 24): C5, C9, C14, C15 y C16 llegan al mínimo de una celda conclusiva; las otras cuatro tienen uno.
 const MALOS = { C5: 5, C6: 1, C8: 1, C9: 5, C12: 1, C13: 1, C14: 5, C15: 5, C16: 5 };
 const PREGUNTAS_MALAS = Object.keys(MALOS);
+const CONCLUYENTES = ['C5', 'C9', 'C14', 'C15', 'C16'];
 const LIMPIOS = 3;
 
 test('corpus: 29 malos con su pregunta y 3 limpios, nueve preguntas distintas y todas del revisor', () => {
@@ -53,8 +54,9 @@ test('corpus: un revisor perfecto detecta las 29 y no da ningún no falso; la ce
   for (const id of PREGUNTAS_MALAS) {
     assert.equal(informe.deteccion[id].tasa, 1, id);
     assert.equal(informe.deteccion[id].malos, MALOS[id], id);
-    assert.equal(informe.deteccion[id].concluyente, MALOS[id] >= MIN_CASES_PER_CELL, id);
+    assert.equal(informe.deteccion[id].concluyente, CONCLUYENTES.includes(id), id);
   }
+  for (const id of CONCLUYENTES) assert.ok(MALOS[id] >= MIN_CASES_PER_CELL, `${id} tiene ${MALOS[id]} casos y el mínimo es ${MIN_CASES_PER_CELL}`);
   assert.deepEqual(informe.falsosNo, { limpios: LIMPIOS, falsos: 0, tasa: 0 });
 });
 
