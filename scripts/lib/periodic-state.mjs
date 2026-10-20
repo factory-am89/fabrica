@@ -7,6 +7,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+// The name of the step (a leaf module on purpose: scripts/al-arrancar.mjs reads it while periodic.mjs may still be loading, see there).
+export const STEP_NAME = 'periodico';
 export const JUDGE_FILE = 'judge-debt.json';
 export const SNAPSHOT_FILE = 'periodic-last.json';
 const DIR_MODE = 0o700;

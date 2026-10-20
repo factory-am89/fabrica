@@ -9,8 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { arrancar, leerArgumentos, pasoLimpiar, PASOS, SOLO } from '../scripts/al-arrancar.mjs';
 import { ExitError, EXIT } from '../scripts/lib/exit.mjs';
-import { STEP_NAME } from '../scripts/lib/periodic.mjs';
-import { SNAPSHOT_FILE } from '../scripts/lib/periodic-state.mjs';
+import { SNAPSHOT_FILE, STEP_NAME } from '../scripts/lib/periodic-state.mjs';
 import { casaDeAudit } from './apoyo/audit-casa.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'al-arrancar.mjs');

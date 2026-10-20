@@ -9,16 +9,19 @@ import { DEBT_ID, PASS_MODE, humanDebt, stampPass } from './goals-debt.mjs';
 import { readGoals } from './goals.mjs';
 import { judgeDatumPath, recordJudgeDatum } from './periodic-state.mjs';
 
-const FLAG = { data: '--data', hitl: '--hitl', records: '--records', repo: '--repo', since: '--since', golden: '--golden', log: '--log', messages: '--messages' };
+const FLAG = { noPass: '--no-pass', data: '--data', hitl: '--hitl', records: '--records', repo: '--repo', since: '--since', golden: '--golden', log: '--log', messages: '--messages' };
 const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since, FLAG.golden, FLAG.log, FLAG.messages];
+// `--no-pass`: measure without recording a pass or the judge datum (what the startup step runs, scripts/lib/periodic.mjs).
+export const NO_PASS_FLAG = FLAG.noPass;
 const FLAG_PREFIX = '--';
 const key = (flag) => flag.slice(FLAG_PREFIX.length);
 
-// argv without --json -> { data, hitl, root, records, repo, since, golden, log, messages }; a flag that needs a value without one, or a flag in the wrong mode, is a USAGE error.
+// argv without --json -> { noPass, data, hitl, root, records, repo, since, golden, log, messages }; a flag that needs a value without one, or a flag in the wrong mode, is a USAGE error.
 export function parseAuditArgs(args, defaultRoot) {
-  const out = { data: false, hitl: false, root: defaultRoot, records: null, repo: null, since: null, golden: null, log: null, messages: null };
+  const out = { noPass: false, data: false, hitl: false, root: defaultRoot, records: null, repo: null, since: null, golden: null, log: null, messages: null };
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === FLAG.data) out.data = true;
+    if (args[i] === FLAG.noPass) out.noPass = true;
+    else if (args[i] === FLAG.data) out.data = true;
     else if (args[i] === FLAG.hitl) out.hitl = true;
     else if (VALUE_FLAGS.includes(args[i])) {
       if (args[i + 1] === undefined) throw new ExitError('USAGE', `${args[i]} needs a value`);
@@ -54,7 +57,7 @@ export function makeCommands({ root: defaultRoot, audit, auditData, auditHitl, h
     run: (args) => {
       const a = parseAuditArgs(args, defaultRoot);
       const result = measure(a, collected);
-      if (passes === null) return result;
+      if (passes === null || a.noPass) return result;
       const stamped = stampPass(result, modeOf(a), { registry: readGoals(a.root), root: a.root, file: passes.file, now: passes.now });
       // The last judge debt of `audit --data` is kept beside the passes for the startup step (scripts/lib/periodic-state.mjs).
       // Only --data measures it; a result without it (local, --hitl) or one that could not compute it is not kept.
