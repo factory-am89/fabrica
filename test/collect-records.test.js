@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { collect, getWithToken, listPulls, parseArgs, writeOut } from '../scripts/collect-records.mjs';
 import { REPO as FABRICA } from '../scripts/lib/repo.mjs';
+import { judgeAnswer } from './apoyo/judge-falso.mjs';
 import { aggregate, formatBlock, readCheckRuns, buildRecord } from '../scripts/lib/record.mjs';
 
 const REPO = 'o/r';
@@ -27,7 +28,7 @@ function fakeGet(calls = []) {
     if (m) return commits[m[1]].map((s) => ({ sha: s }));
     const c = route.match(/commits\/([0-9a-f]{40})\/check-runs\?check_name=revisor/);
     if (c) return { total_count: runs[c[1]].length, check_runs: runs[c[1]] };
-    throw new Error(`unexpected route ${route}`);
+    return judgeAnswer(REPO, route) ?? Promise.reject(new Error(`unexpected route ${route}`));
   };
 }
 
@@ -80,6 +81,8 @@ test('--since leaves out the PRs created before it', async () => {
 
 test('a check-run seen twice is kept once', async () => {
   const get = async (route) => {
+    const judge = judgeAnswer(REPO, route);
+    if (judge !== undefined) return judge;
     if (route.includes('/pulls?')) return [pull(1, '2026-10-15T10:00:00Z')];
     if (route.includes('/files?')) return [];
     if (route.includes('/commits?')) return [{ sha: sha(1) }, { sha: sha(2) }];

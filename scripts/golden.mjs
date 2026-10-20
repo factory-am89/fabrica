@@ -22,6 +22,9 @@ export const STANDARD = 'standards/code.md';
 export const AUTHORS = ['sonnet', 'opus', 'human'];
 export { CLEAN };
 export const MIN_CASES_PER_CELL = 5;
+// The paths of the judge: a change of any of them makes the last pass of the corpus out of date. They were the `paths` of the `push` of
+// golden.yml until chunk 25 removed it (git show 4f388e1:.github/workflows/golden.yml); audit --data counts the commits that touched them since the last good pass.
+export const JUDGE_PATHS = Object.freeze(['.claude/agents/revisor.md', 'standards/**', '.github/workflows/revisor.yml', 'scripts/veredicto.mjs']);
 // decidir also checks that the judged commit is the PR head; here there is no PR, so both are the same fixed value.
 const CTX = { sha: 'corpus', cabeza: 'corpus' };
 
