@@ -2,11 +2,12 @@
 // audit-data.mjs, which was at the 200-line limit; the figures of each mode live in audit-data.mjs and audit-hitl.mjs.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { DATA_INDICATORS, humanData } from './audit-data.mjs';
+import { DATA_IDS, DATA_INDICATORS, humanData } from './audit-data.mjs';
 import { HITL_INDICATORS, humanHitl } from './audit-hitl.mjs';
 import { ExitError, runCommand } from './exit.mjs';
 import { DEBT_ID, PASS_MODE, humanDebt, stampPass } from './goals-debt.mjs';
 import { readGoals } from './goals.mjs';
+import { judgeDatumPath, recordJudgeDatum } from './periodic-state.mjs';
 
 const FLAG = { data: '--data', hitl: '--hitl', records: '--records', repo: '--repo', since: '--since', golden: '--golden', log: '--log', messages: '--messages' };
 const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since, FLAG.golden, FLAG.log, FLAG.messages];
@@ -53,7 +54,11 @@ export function makeCommands({ root: defaultRoot, audit, auditData, auditHitl, h
     run: (args) => {
       const a = parseAuditArgs(args, defaultRoot);
       const result = measure(a, collected);
-      return passes === null ? result : stampPass(result, modeOf(a), { registry: readGoals(a.root), root: a.root, file: passes.file, now: passes.now });
+      if (passes === null) return result;
+      const stamped = stampPass(result, modeOf(a), { registry: readGoals(a.root), root: a.root, file: passes.file, now: passes.now });
+      // The last judge debt of `audit --data` is kept beside the passes for the startup step (scripts/lib/periodic-state.mjs).
+      if (a.data) recordJudgeDatum(judgeDatumPath(passes.file), stamped[DATA_IDS.judgeDebt], passes.now);
+      return stamped;
     },
     human,
   });
