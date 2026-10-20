@@ -13,6 +13,7 @@ import { HITL_IDS, hitlIndicators, readHitlInputs } from './lib/audit-hitl.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
 import { freeValues, humanFreeValues } from './lib/free-values.mjs';
+import { hygieneCounts } from './lib/hygiene.mjs';
 import { localInputs } from './lib/lesson-effect.mjs';
 import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
 import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
@@ -37,6 +38,7 @@ export const INDICATORS = Object.freeze({
   baseHoles: 'base-holes',
   testDuplication: 'test-duplication',
   freeValues: 'free-values',
+  hygiene: 'hygiene', // candidates by code (npm run hygiene lists them)
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
   ...HITL_IDS, // the indicators of audit --hitl, listed in scripts/lib/audit-hitl.mjs
 });
@@ -155,6 +157,7 @@ export function audit(root, { logPath } = {}) {
     [INDICATORS.baseHoles]: { holes: baseHoles(readEntities(root)) },
     [INDICATORS.testDuplication]: duplicationInTests(root),
     [INDICATORS.freeValues]: freeValues(root),
+    [INDICATORS.hygiene]: hygieneCounts(root),
   };
 }
 
@@ -186,6 +189,7 @@ export function humanLocal(r) {
     line(INDICATORS.testDuplication, `${r[INDICATORS.testDuplication].count} strings of >= ${r[INDICATORS.testDuplication].minLength} chars`),
     ...r[INDICATORS.testDuplication].values.map((v) => `  ${JSON.stringify(v.value)}: ${v.tests.join(', ')} <- ${v.lib.join(', ')}`),
     ...humanFreeValues(INDICATORS.freeValues, r[INDICATORS.freeValues]),
+    line(INDICATORS.hygiene, `${r[INDICATORS.hygiene].total} ${JSON.stringify(r[INDICATORS.hygiene].byCode)}`),
   ].join('\n');
 }
 
