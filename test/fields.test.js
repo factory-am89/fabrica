@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER, readEntities } from '../scripts/lib/entities.mjs';
+import { GOAL_FIELDS, INVARIANT_FIELDS } from '../scripts/lib/goals-shape.mjs';
 import { CAMPOS } from '../scripts/lib/intervention-log.mjs';
 import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FIELDS } from '../scripts/lib/plan.mjs';
@@ -28,13 +29,15 @@ test('the real registry has no fault: every field the sources list is declared, 
   assert.deepEqual(fieldFaults(real(), entities(), RAIZ), []);
 });
 
-test('the sources are the real exports: lesson, no-lesson, intervention and plan names are all discovered', () => {
+test('the sources are the real exports: lesson, no-lesson, intervention, plan, goal and invariant names are all discovered', () => {
   const found = discoveredFields(entities()).map((d) => `${d.owner}.${d.name}`);
   const expected = [
     ...LESSON_FIELDS.map((n) => `lesson.${n}`),
     ...NO_LESSON_FIELDS.map((n) => `no-lesson.${n}`),
     ...CAMPOS.map((n) => `intervention.${n}`),
     ...Object.values(PLAN_FIELDS).map((n) => `plan.${n}`),
+    ...GOAL_FIELDS.map((n) => `${ENTITY.goal}.${n}`),
+    ...INVARIANT_FIELDS.map((n) => `${ENTITY.invariant}.${n}`),
   ];
   assert.deepEqual([...found].sort(), expected.sort());
   assert.deepEqual(Object.keys(FIELD_SOURCES).sort(), Object.values(ENTITY).sort());

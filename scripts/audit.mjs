@@ -3,24 +3,22 @@
 // plans/trabajar-solos.md add their own ids to INDICATORS; the readers (chunks 20 and 22) take the list from here.
 //   node scripts/audit.mjs [--json] [root]   (output rule and exit codes: scripts/lib/exit.mjs)
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeCommands } from './lib/audit-cli.mjs';
+import { hitlOf, lessonsOf, lineCount, listFiles, questionsOf, readText, rulesWithoutReader } from './lib/audit-local.mjs';
 import { DATA_IDS, dataIndicators } from './lib/audit-data.mjs';
 import { HITL_IDS, hitlIndicators, readHitlInputs } from './lib/audit-hitl.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
 import { freeValues, humanFreeValues } from './lib/free-values.mjs';
+import { DEBT_ID, passesPath, debtOf, staticDebt } from './lib/goals-debt.mjs';
+import { readGoals } from './lib/goals.mjs';
 import { hygieneCounts } from './lib/hygiene.mjs';
 import { localInputs } from './lib/lesson-effect.mjs';
-import { contarIntervenciones, ORIGEN_AGENTE } from './lib/intervention-log.mjs';
 import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
-import { DATED_ROW, INTERVENCIONES_FILE, readLessons } from './lib/lessons.mjs';
-import { NoQuestionsError, readQuestions } from './lib/questions.mjs';
-import { RULES_BUDGET_FILE } from './lib/skills.mjs';
 import { collect, getWithToken } from './collect-records.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,6 +37,7 @@ export const INDICATORS = Object.freeze({
   testDuplication: 'test-duplication',
   freeValues: 'free-values',
   hygiene: 'hygiene', // candidates by code (npm run hygiene lists them)
+  goalsDebt: DEBT_ID, // what the goals owe: holes, readers that fire by hand (scripts/lib/goals-debt.mjs); a pass of audit --data or --hitl adds its indicators that cannot conclude
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
   ...HITL_IDS, // the indicators of audit --hitl, listed in scripts/lib/audit-hitl.mjs
 });
@@ -51,53 +50,6 @@ const MAGIC_RULE = 'no-magic-numbers';
 const MAGIC_ALLOWED = [-1, 0, 1];
 const SOURCE_EXT = /\.(mjs|js)$/;
 const JSON_FLAG = '--json';
-
-const readText = (root, rel) => readFileSync(path.join(root, rel), 'utf8');
-const listFiles = (root, dir, filter = () => true) => {
-  const abs = path.join(root, dir);
-  if (!existsSync(abs)) return [];
-  return readdirSync(abs, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile())
-    .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-    .filter(filter)
-    .sort();
-};
-const tally = (values) => {
-  const out = {};
-  for (const v of values) out[v] = Object.hasOwn(out, v) ? out[v] + 1 : 1;
-  return out;
-};
-const lineCount = (text) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
-
-function questionsOf(root) {
-  const files = listFiles(root, 'standards', (f) => f.endsWith('.md'));
-  const all = [];
-  for (const f of files) {
-    try { all.push(...readQuestions(readText(root, f))); } catch (e) { if (!(e instanceof NoQuestionsError)) throw e; }
-  }
-  return { total: all.length, byCheckedBy: tally(all.map((q) => q.checkedBy)) };
-}
-
-function lessonsOf(root) {
-  const lessons = readLessons(root).map((l) => JSON.parse(l.text));
-  return {
-    signal: { total: lessons.length, bySignal: tally(lessons.map((d) => d.signal)) },
-    reason: tally(lessons.flatMap((d) => d.reason ?? [])),
-    escaped: lessons.filter((d) => d.escaped === true).length,
-  };
-}
-
-// Reads the budget of chunk 6 (rules-without-reader.json), never recomputes the bullets without lesson.
-function rulesWithoutReader(root) {
-  const budget = JSON.parse(readText(root, RULES_BUDGET_FILE)).budget;
-  return { total: Object.values(budget).reduce((a, n) => a + n, 0), bySkill: budget };
-}
-
-function hitlOf(root, logPath) {
-  const c = contarIntervenciones(logPath === undefined ? undefined : { ruta: logPath });
-  const rows = readText(root, INTERVENCIONES_FILE).split('\n').filter((l) => DATED_ROW.test(l)).length;
-  return { selfDeclared: c.porOrigen[ORIGEN_AGENTE], total: c.total, corrupt: c.corruptas, tableRows: rows };
-}
 
 function longFiles(root) {
   const files = ['scripts', 'test'].flatMap((d) => listFiles(root, d, (f) => SOURCE_EXT.test(f)));
@@ -158,6 +110,7 @@ export function audit(root, { logPath } = {}) {
     [INDICATORS.testDuplication]: duplicationInTests(root),
     [INDICATORS.freeValues]: freeValues(root),
     [INDICATORS.hygiene]: hygieneCounts(root),
+    [INDICATORS.goalsDebt]: debtOf(staticDebt(readGoals(root), root)),
   };
 }
 
@@ -196,4 +149,4 @@ export function humanLocal(r) {
 const downloadWithToken = (repo, since) => collect({ get: async (route) => getWithToken(route), repo, since });
 export const { cliAudit, mainAudit } = makeCommands({ root: REPO, audit, auditData, auditHitl, humanLocal, download: downloadWithToken });
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) finish(await mainAudit(process.argv.slice(2)));
+if (process.argv[1] === fileURLToPath(import.meta.url)) finish(await mainAudit(process.argv.slice(2), undefined, { file: passesPath(), now: Date.now() }));

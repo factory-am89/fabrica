@@ -7,6 +7,7 @@
 // Faults are returned, never swallowed (principle 3); a source that cannot be read throws.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { GOAL_FIELDS, INVARIANT_FIELDS } from './goals-shape.mjs';
 import { CAMPOS } from './intervention-log.mjs';
 import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from './lessons.mjs';
 import { PLAN_FIELDS } from './plan.mjs';
@@ -61,7 +62,7 @@ export const TEXT = 'texto';
 export const TEXT_REASONS = ['prosa-juzgada', OTHER];
 
 // The entity ids of entities.json that have fields in code, written once.
-export const ENTITY = Object.freeze({ lesson: 'lesson', noLesson: 'no-lesson', intervention: 'intervention', plan: 'plan' });
+export const ENTITY = Object.freeze({ lesson: 'lesson', noLesson: 'no-lesson', intervention: 'intervention', plan: 'plan', goal: 'goal', invariant: 'invariant' });
 
 // Where each entity's fields are listed in code. Keys are entity ids of entities.json; values return the field names.
 export const FIELD_SOURCES = Object.freeze({
@@ -69,6 +70,8 @@ export const FIELD_SOURCES = Object.freeze({
   [ENTITY.noLesson]: () => NO_LESSON_FIELDS,
   [ENTITY.intervention]: () => CAMPOS,
   [ENTITY.plan]: () => Object.values(PLAN_FIELDS),
+  [ENTITY.goal]: () => GOAL_FIELDS,
+  [ENTITY.invariant]: () => INVARIANT_FIELDS,
 });
 
 const isText = (v) => typeof v === 'string' && v.trim() !== '';

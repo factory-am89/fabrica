@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INDICATORS, auditData, auditHitl, cliAudit } from '../scripts/audit.mjs';
+import { casaDeAudit } from './apoyo/audit-casa.mjs';
 import { HITL_IDS, HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CLASES, FALTAS, ORIGENES, registrarIntervencion } from '../scripts/lib/intervention-log.mjs';
@@ -61,7 +62,7 @@ test('the command: --hitl needs --records and no --repo; it is not --data; --log
 
 test('the real entry point: --hitl --records prints one JSON object with every hitl indicator', (t) => {
   const { logPath, messagesPath } = logs(t);
-  const r = spawnSync(process.execPath, [SCRIPT, '--hitl', '--records', RECORDS, '--log', logPath, '--messages', messagesPath, '--json'], { encoding: 'utf8', cwd: RAIZ });
+  const r = spawnSync(process.execPath, [SCRIPT, '--hitl', '--records', RECORDS, '--log', logPath, '--messages', messagesPath, '--json'], { encoding: 'utf8', cwd: RAIZ, env: casaDeAudit(t).env });
   assert.equal(r.status, EXIT.OK, r.stderr);
   const out = JSON.parse(r.stdout);
   for (const id of HITL_INDICATORS) assert.ok(Object.hasOwn(out, id), `missing ${id}`);

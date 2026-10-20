@@ -1,0 +1,76 @@
+{
+  "$comment": "Metas e invariantes de la Fábrica como datos, y la fila de cada pregunta. La fuente de esto era la matriz de plans/trabajar-solos.md. Las reglas están en scripts/lib/goals.mjs y las vigila test/goals.test.js; audit (scripts/audit.mjs) lista como deuda las metas con hueco y los lectores manual. No se guarda el disparador (lo calcula triggerOf) ni «no concluyente» (lo calcula audit), ni los trozos del plan.",
+  "version": 1,
+  "goals": [
+    {
+      "id": "O1", "name": "escalabilidad", "invariants": ["I1", "I2"], "principles": [4],
+      "indicators": ["project-cost", "base-holes"],
+      "readers": ["test/entities.test.js", "test/fields.test.js", "test/adopted.test.js", "C8"],
+      "check": "juez"
+    },
+    {
+      "id": "O2", "name": "HITL como residuo", "invariants": ["I4", "I5"], "principles": [6, 2],
+      "indicators": ["hitl-residue", "hitl-balance", "escapes"],
+      "readers": ["test/pr-body.test.js", "test/check-plan.test.js", "P9"],
+      "check": "máquina"
+    },
+    {
+      "id": "O3", "name": "self-learning", "invariants": ["I3", "I5"], "principles": [5, 2],
+      "indicators": ["lesson-effect", "rules-without-reader", "hygiene"],
+      "readers": ["test/lessons.test.js", "test/skills.test.js", "C6"],
+      "check": "juez"
+    },
+    {
+      "id": "O4", "name": "por y para agentes", "invariants": ["I1", "I2", "I4"], "principles": [4, 5],
+      "indicators": ["scripts-without-json", "long-files", "magic-numbers", "free-values", "test-duplication"],
+      "readers": ["test/contrato.test.js", "C1", "C3", "C11"],
+      "check": "máquina"
+    }
+  ],
+  "invariants": [
+    {
+      "id": "I1", "text": "Una cosa, un sitio, y un sitio, una cosa: lo demás la referencia.",
+      "goals": ["O1", "O4"], "principles": [4], "questions": ["C3", "C8", "C11", "C12", "P4", "P5", "P7"]
+    },
+    {
+      "id": "I2", "text": "Lo que se repite (valores, reglas, recetas) es dato con vocabulario cerrado y válvula «otro» + motivo.",
+      "goals": ["O1", "O4"], "principles": [], "questions": ["C8", "P1"]
+    },
+    {
+      "id": "I3", "text": "Toda regla tiene un lector que falla y un disparador que lo ejecuta sin que nadie se acuerde, y todo fallo se pregunta por su clase; el arreglo es un mecanismo para la clase.",
+      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "P2", "P8"]
+    },
+    {
+      "id": "I4", "text": "Lo que el agente necesita está en datos del repo legibles de una vez, y lo que decide queda apuntado con su motivo.",
+      "goals": ["O2", "O4"], "principles": [6], "questions": ["P3", "P9"]
+    },
+    {
+      "id": "I5", "text": "Todo lector es una hipótesis que se mide: cifra antes y después, tasa de «no» falsos, y «no concluyente» con menos de MIN_CASES_PER_CELL casos.",
+      "goals": ["O2", "O3"], "principles": [2], "questions": ["C7", "C9", "P6"]
+    }
+  ],
+  "questions": [
+    { "id": "C1", "goals": ["O4"] },
+    { "id": "C2", "goals": ["O3"] },
+    { "id": "C3", "goals": ["O4"] },
+    { "id": "C4", "base": "seguridad" },
+    { "id": "C5", "base": "fallo-visible" },
+    { "id": "C6", "goals": ["O3"] },
+    { "id": "C7", "base": "tests-fiables" },
+    { "id": "C8", "goals": ["O1"] },
+    { "id": "C9", "goals": ["O2"] },
+    { "id": "C10", "base": "seguridad" },
+    { "id": "C11", "goals": ["O1", "O4"] },
+    { "id": "C12", "goals": ["O3"] },
+    { "id": "C13", "goals": ["O2"] },
+    { "id": "P1", "goals": ["O4"] },
+    { "id": "P2", "goals": ["O3"] },
+    { "id": "P3", "goals": ["O2"] },
+    { "id": "P4", "goals": ["O1"] },
+    { "id": "P5", "goals": ["O1"] },
+    { "id": "P6", "goals": ["O2"] },
+    { "id": "P7", "goals": ["O1"] },
+    { "id": "P8", "goals": ["O2"] },
+    { "id": "P9", "goals": ["O2"] }
+  ]
+}

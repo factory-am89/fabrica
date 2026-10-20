@@ -5,6 +5,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ENTITY, KEYS, TEXT, fieldId, readFields } from './fields.mjs';
+import { KEY as GOAL_KEY, LIST as GOAL_LIST, readGoals } from './goals-shape.mjs';
 import { LESSON_NOTE, NO_LESSON_KEYS, readLessons, readNoLesson } from './lessons.mjs';
 import { NONE_WORD, PLAN_DIR, PLAN_FIELDS, parsePlan } from './plan.mjs';
 
@@ -23,10 +24,15 @@ const planChunks = (root) => {
 // A chunk whose field is absent has no value; an empty list is the plan's own word for «none».
 const planField = (of) => (root) => planChunks(root).map(of).filter((v) => v !== null && v !== undefined).map((v) => (Array.isArray(v) ? (v.length === 0 ? NONE_WORD : v.join(', ')) : v));
 
+// The values of one key in one list of goals.json; a record without it has no value.
+const goalValues = (list, key) => (root) => readGoals(root)[list].map((r) => r[key]).filter((v) => v !== undefined);
+
 // owner id (entity of entities.json) -> field name -> reader of its values. the note of a no-lesson entry is its own entity's field (NO_LESSON_KEYS), not lesson's.
 export const VALUE_READERS = Object.freeze({
   [ENTITY.lesson]: { [LESSON_NOTE]: (root) => readLessons(root).map((l) => JSON.parse(l.text)[LESSON_NOTE]).filter((v) => v !== undefined) },
   [ENTITY.noLesson]: { [NO_LESSON_KEYS.note]: (root) => JSON.parse(readNoLesson(root)).entries.map((e) => e[NO_LESSON_KEYS.note]).filter((v) => v !== undefined) },
+  [ENTITY.goal]: { [GOAL_KEY.name]: goalValues(GOAL_LIST.goals, GOAL_KEY.name), [GOAL_KEY.holeNote]: goalValues(GOAL_LIST.goals, GOAL_KEY.holeNote) },
+  [ENTITY.invariant]: { [GOAL_KEY.text]: goalValues(GOAL_LIST.invariants, GOAL_KEY.text) },
   [ENTITY.plan]: {
     [PLAN_FIELDS.blockedBy]: planField((c) => c.blockedBy),
     [PLAN_FIELDS.existing]: planField((c) => c.existing),
