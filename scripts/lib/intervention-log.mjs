@@ -62,7 +62,8 @@ const vacio = (lista) => Object.fromEntries(lista.map((x) => [x, 0]));
 // Events per class, origin and falta: { total, porClase, porOrigen, porFalta, sinFalta, corruptas }. `sinFalta` counts the old lines (no falta, not migrated). Every class is listed, also with 0.
 // No file means no events. A line that cannot be read (not JSON, a field outside the vocabulary, no valid time) is NOT
 // skipped: it counts in `total` and its line number goes in `corruptas`, so the caller can say it. Any other disk error throws.
-export function contarIntervenciones({ ruta = rutaDeRegistroIntervenciones(), fs = fsReal } = {}) {
+// `alLeer(evento)`, if given, is called once for each readable line ({t, clase, origen, falta (undefined in an old line)}), so a caller can place events in time without a second reader.
+export function contarIntervenciones({ ruta = rutaDeRegistroIntervenciones(), fs = fsReal, alLeer = () => {} } = {}) {
   const cuentas = { total: 0, porClase: vacio(CLASES), porOrigen: vacio(ORIGENES), porFalta: vacio(FALTAS), sinFalta: 0, corruptas: [] };
   let crudo;
   try {
@@ -86,6 +87,7 @@ export function contarIntervenciones({ ruta = rutaDeRegistroIntervenciones(), fs
       cuentas.corruptas.push(i + 1);
       return;
     }
+    alLeer({ t: d.t, clase: d.clase, origen: d.origen, falta: d.falta });
     cuentas.porClase[d.clase]++;
     cuentas.porOrigen[d.origen]++;
     if (d.falta === undefined) cuentas.sinFalta++;

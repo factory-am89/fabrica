@@ -7,7 +7,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DATA_IDS, dataIndicators, makeCommands } from './lib/audit-data.mjs';
+import { makeCommands } from './lib/audit-cli.mjs';
+import { DATA_IDS, dataIndicators } from './lib/audit-data.mjs';
+import { HITL_IDS, hitlIndicators, readHitlInputs } from './lib/audit-hitl.mjs';
 import { baseHoles, readEntities } from './lib/entities.mjs';
 import { finish } from './lib/exit.mjs';
 import { freeValues, humanFreeValues } from './lib/free-values.mjs';
@@ -36,6 +38,7 @@ export const INDICATORS = Object.freeze({
   testDuplication: 'test-duplication',
   freeValues: 'free-values',
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
+  ...HITL_IDS, // the indicators of audit --hitl, listed in scripts/lib/audit-hitl.mjs
 });
 
 // Parameters of the signals (none is a gate). MIN_DUP_LENGTH was fixed with the counts of the PR that created it.
@@ -165,6 +168,9 @@ export function auditData(data, { root = null, now = Date.now(), messagesPath, g
   });
 }
 
+// audit --hitl: the intervention and message logs (or the ones at logPath / messagesPath) beside the escapes of `data`.
+export const auditHitl = (data, { root, logPath, messagesPath }) => hitlIndicators(data, { lessonsEscaped: lessonsOf(root).escaped, inputs: readHitlInputs({ logPath, messagesPath }) });
+
 export function humanLocal(r) {
   const line = (id, text) => `${id}: ${text}`;
   return [
@@ -184,6 +190,6 @@ export function humanLocal(r) {
 }
 
 const downloadWithToken = (repo, since) => collect({ get: async (route) => getWithToken(route), repo, since });
-export const { cliAudit, mainAudit } = makeCommands({ root: REPO, audit, auditData, humanLocal, download: downloadWithToken });
+export const { cliAudit, mainAudit } = makeCommands({ root: REPO, audit, auditData, auditHitl, humanLocal, download: downloadWithToken });
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) finish(await mainAudit(process.argv.slice(2)));

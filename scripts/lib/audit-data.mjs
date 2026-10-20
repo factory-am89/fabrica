@@ -1,9 +1,6 @@
 // The data indicators of `audit --data`: figures about the PRs and their `revisor` rounds, computed from what
 // scripts/collect-records.mjs downloads ({pulls, checkRuns}). Pure functions: no network, no clock unless `now` is given.
 // Every figure that cannot be exact says which way it errs (BOUND) and the mix it hides (CAVEAT). Signals, not gates.
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { ExitError, runCommand } from './exit.mjs';
 import { lessonIndicators } from './lesson-effect.mjs';
 import { aggregate, readCheckRuns } from './record.mjs';
 
@@ -20,7 +17,7 @@ export const ESCAPE_DAYS = 14;
 export const FIX_PREFIX = 'fix/';
 const MS_MINUTE = 60000;
 const MS_HOUR = 3600000;
-const MS_DAY = 86400000;
+export const MS_DAY = 86400000;
 const PR_OPEN = 'open';
 
 const time = (pr, field) => {
@@ -152,49 +149,4 @@ export function dataIndicators(data, { now, lessonsEscaped, messageCounts, local
   };
 }
 
-const FLAG = { data: '--data', records: '--records', repo: '--repo', since: '--since', golden: '--golden' };
-const VALUE_FLAGS = [FLAG.records, FLAG.repo, FLAG.since, FLAG.golden];
-const FLAG_PREFIX = '--';
-// argv without --json -> { data, root, records, repo, since, golden }; a flag that needs a value without one is a USAGE error.
-export function parseAuditArgs(args, defaultRoot) {
-  const out = { data: false, root: defaultRoot, records: null, repo: null, since: null, golden: null };
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === FLAG.data) out.data = true;
-    else if (VALUE_FLAGS.includes(args[i])) {
-      if (args[i + 1] === undefined) throw new ExitError('USAGE', `${args[i]} needs a value`);
-      out[args[i].slice(FLAG_PREFIX.length)] = args[++i];
-    } else out.root = path.resolve(args[i]);
-  }
-  const extras = [FLAG.records, FLAG.repo, FLAG.since].filter((f) => out[f.slice(FLAG_PREFIX.length)] !== null);
-  if (!out.data && extras.length > 0) throw new ExitError('USAGE', `${VALUE_FLAGS.join(', ')} go with ${FLAG.data}`);
-  if (out.data && (out.records === null) === (out.repo === null)) throw new ExitError('USAGE', `${FLAG.data} needs exactly one of ${FLAG.records} <file> or ${FLAG.repo} <owner/name>`);
-  if (out.golden !== null && out.records === null) throw new ExitError('USAGE', `${FLAG.golden} reads the Fábrica's own files: it goes with ${FLAG.records}, not ${FLAG.repo}`);
-  return out;
-}
-
 export const humanData = (r) => DATA_INDICATORS.map((id) => `${id}: ${JSON.stringify(r[id])}`).join('\n');
-
-// The entry points of scripts/audit.mjs. `download(repo, since)` is the async --repo download (runCommand is not async):
-// a repo the token cannot read, or any failed call, stops the command with its own class and prints nothing as data.
-export function makeCommands({ root: defaultRoot, audit, auditData, humanLocal, download }) {
-  const human = (r) => (DATA_INDICATORS.every((id) => Object.hasOwn(r, id)) ? humanData(r) : humanLocal(r));
-  const cliAudit = (argv, { collected = null } = {}) => runCommand(argv, {
-    run: (args) => {
-      const a = parseAuditArgs(args, defaultRoot);
-      if (!a.data) return audit(a.root);
-      if (a.records === null) return auditData(collected, { now: Date.now() });
-      return auditData(JSON.parse(readFileSync(a.records, 'utf8')), { root: a.root, golden: a.golden });
-    },
-    human,
-  });
-  const mainAudit = async (argv, downloadIt = download) => {
-    try {
-      const a = parseAuditArgs(argv.filter((x) => x !== '--json'), defaultRoot);
-      return cliAudit(argv, { collected: a.repo === null ? null : await downloadIt(a.repo, a.since) });
-    } catch (e) {
-      const failure = e instanceof ExitError ? e : new ExitError('GH_FAILED', e.message);
-      return runCommand(argv, { run: () => { throw failure; }, human });
-    }
-  };
-  return { cliAudit, mainAudit };
-}

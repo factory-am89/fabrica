@@ -19,7 +19,8 @@ export function registrarMensaje({ sesion, ruta = rutaDeMensajes(), fs = fsReal,
 
 // Messages: { total, porSesion, corruptas }. No file means no messages. A line that cannot be read (not JSON, wrong
 // fields, no valid time) is NOT skipped: it counts in `total` and its line number goes in `corruptas`.
-export function contarMensajes({ ruta = rutaDeMensajes(), fs = fsReal } = {}) {
+// `alLeer({t, sesion})`, if given, is called once for each readable line, so a caller can place messages in time.
+export function contarMensajes({ ruta = rutaDeMensajes(), fs = fsReal, alLeer = () => {} } = {}) {
   const cuentas = { total: 0, porSesion: {}, corruptas: [] };
   let crudo;
   try {
@@ -43,6 +44,7 @@ export function contarMensajes({ ruta = rutaDeMensajes(), fs = fsReal } = {}) {
       cuentas.corruptas.push(i + 1);
       return;
     }
+    alLeer({ t: d.t, sesion: d.sesion });
     cuentas.porSesion[d.sesion] = (cuentas.porSesion[d.sesion] ?? 0) + 1;
   });
   return cuentas;

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { INDICATORS, LONG_FILE_LINES, MIN_DUP_LENGTH, audit, cliAudit, humanLocal } from '../scripts/audit.mjs';
 import { exportedStrings } from '../scripts/lib/quoted-strings.mjs';
 import { DATA_INDICATORS } from '../scripts/lib/audit-data.mjs';
+import { HITL_INDICATORS } from '../scripts/lib/audit-hitl.mjs';
 import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../scripts/lib/entities.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { ENTITY, FIELDS_FILE, KEYS, TEXT, fieldId } from '../scripts/lib/fields.mjs';
@@ -22,6 +23,7 @@ import { marcar } from '../scripts/hitl.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(RAIZ, 'scripts', 'audit.mjs');
+const NON_LOCAL = [...DATA_INDICATORS, ...HITL_INDICATORS]; // measured by audit --data and audit --hitl, not by the local audit
 const NO_LOG = 'no-such-log.jsonl';
 
 function put(root, rel, text) {
@@ -56,7 +58,7 @@ function fixture(t, over = {}) {
 const run = (root) => audit(root, { logPath: path.join(root, NO_LOG) });
 
 test('INDICATORS is the closed list: the local audit returns exactly one value per non-data id', (t) => {
-  const ids = Object.values(INDICATORS).filter((id) => !DATA_INDICATORS.includes(id));
+  const ids = Object.values(INDICATORS).filter((id) => !NON_LOCAL.includes(id));
   assert.equal(new Set(ids).size, ids.length);
   assert.deepEqual(Object.keys(run(fixture(t))).sort(), [...ids].sort());
 });
@@ -167,5 +169,5 @@ test('the real entry point: node scripts/audit.mjs --json prints one JSON object
   const r = spawnSync(process.execPath, [SCRIPT, '--json'], { encoding: 'utf8', cwd: RAIZ });
   assert.equal(r.status, EXIT.OK, r.stderr);
   const out = JSON.parse(r.stdout);
-  for (const id of Object.values(INDICATORS).filter((i) => !DATA_INDICATORS.includes(i))) assert.ok(Object.hasOwn(out, id), `missing ${id}`);
+  for (const id of Object.values(INDICATORS).filter((i) => !NON_LOCAL.includes(i))) assert.ok(Object.hasOwn(out, id), `missing ${id}`);
 });
