@@ -81,6 +81,18 @@ test('a workflow without `on:` throws', (t) => {
   const root = repo(t, { [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: yaml.dump({ jobs: {} }) });
   assert.throws(() => triggerFaults(root), new RegExp(`${TESTS_WORKFLOW} has no .on:`));
   assert.throws(() => triggerFaults(repo(t, { [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: 'on:\n' })), /has no .on:/);
+  assert.throws(() => triggerFaults(repo(t, { [`${WORKFLOWS_DIR}/${TESTS_WORKFLOW}`]: '' })), /has no .on:/, 'an empty file');
+});
+
+test('the other files of the workflows folder do not matter, and a scheduled workflow may have no steps or no jobs', (t) => {
+  const schedule = { [SCHEDULE_EVENT]: [{ cron: '0 5 * * 1' }] };
+  const root = repo(t, {
+    [`${WORKFLOWS_DIR}/README.md`]: 'not a workflow\n',
+    [`${WORKFLOWS_DIR}/llama.yml`]: yaml.dump({ on: schedule, jobs: { j: { uses: 'some/repo/.github/workflows/x.yml@main' } } }),
+    [`${WORKFLOWS_DIR}/vacio.yml`]: yaml.dump({ on: schedule }),
+  });
+  assert.deepEqual(triggerFaults(root), []);
+  assert.equal(triggerOf('hitl', root), TRIGGER.MANUAL);
 });
 
 test('a collected test is not ci-test if the wiring is broken (script, npm test step, PR event)', (t) => {

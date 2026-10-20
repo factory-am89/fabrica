@@ -79,7 +79,7 @@ function lessonFaults(root, ctx) {
     const lesson = JSON.parse(text);
     if (lesson.signal !== SIGNAL_MACHINE) continue;
     const mechanism = lesson.mechanism;
-    if (typeof mechanism !== 'string' || !MACHINE_KINDS.includes(mechanismKind(mechanism))) throw new Error(`lessons/${file}: a machine lesson needs a mechanism of a machine kind`);
+    if (!MACHINE_KINDS.includes(mechanismKind(mechanism))) throw new Error(`lessons/${file}: a machine lesson needs a mechanism of a machine kind`);
     if (mechanismKind(mechanism) === 'test' && !collectedByNodeTest(mechanism)) out.push(fault(TRIGGER_FAULTS.TRIGGER_TEST_UNCOLLECTED, mechanism, `lessons/${file}: node --test does not run this test`));
     else if (resolve(mechanism, ctx) === null) out.push(fault(TRIGGER_FAULTS.TRIGGER_LESSON_UNFIRED, mechanism, `lessons/${file}: nothing fires this mechanism`));
   }
@@ -88,8 +88,8 @@ function lessonFaults(root, ctx) {
 
 // Every fault of the wiring of `root`: [{code, where, message}], empty when every reader fires. The readers it walks are the
 // questions of standards/code.md, the machine questions of standards/plan.md and the mechanism of every machine lesson.
-export function triggerFaults(root, { pasos = PASOS } = {}) {
-  const ctx = readContext(root, pasos);
+export function triggerFaults(root) {
+  const ctx = readContext(root, PASOS);
   const { w } = ctx;
   const out = [];
   if (w.testScript !== NODE_TEST_SCRIPT) out.push(fault(TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST, 'package.json', `the test script is ${JSON.stringify(w.testScript)}, not ${JSON.stringify(NODE_TEST_SCRIPT)}`));

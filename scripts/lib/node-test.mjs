@@ -13,17 +13,15 @@ export const NODE_TEST_PATTERNS = Object.freeze([
   `**/test.${EXTENSION}`,
   `**/test/**/*.${EXTENSION}`,
 ]);
-// The runner never descends into these (what the documentation says about node_modules; the dot folders and files were
-// checked on the real runner by the same test).
+// The runner never descends into node_modules. Hidden folders and files (a name starting with a dot) are skipped by the glob
+// itself: test/node-test.test.js checks both on the real runner.
 export const SKIPPED_FOLDER = 'node_modules';
-export const HIDDEN_PREFIX = '.';
 
 // `rel`: a path relative to the folder where `node --test` runs, with `/` (a Windows path is refused, not converted).
 export function collectedByNodeTest(rel) {
   if (typeof rel !== 'string' || rel === '' || rel.includes('\\') || path.posix.isAbsolute(rel)) {
     throw new Error(`collectedByNodeTest: ${JSON.stringify(rel)} must be a relative path with "/"`);
   }
-  const parts = rel.split('/');
-  if (parts.some((p) => p === SKIPPED_FOLDER || p.startsWith(HIDDEN_PREFIX))) return false;
+  if (rel.split('/').includes(SKIPPED_FOLDER)) return false;
   return NODE_TEST_PATTERNS.some((pattern) => path.posix.matchesGlob(rel, pattern));
 }
