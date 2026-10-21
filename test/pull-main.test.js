@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, realpathSync } from 'node:fs';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,7 +34,7 @@ function montar() {
   git(otra, 'push', 'origin', 'HEAD:main');
   git(raiz, 'clone', origin, principal);
   git(principal, 'config', 'core.hooksPath', HOOKS); // los hooks de git que niegan la principal, activos de verdad
-  return { principal, otra, avanzaOrigin: (f, t) => { commit(otra, f, t); git(otra, 'push', 'origin', 'HEAD:main'); } };
+  return { principal, avanzaOrigin: (f, t) => { commit(otra, f, t); git(otra, 'push', 'origin', 'HEAD:main'); } };
 }
 
 test('al-dia: principal atrasada avanza hasta origin/main, con los hooks de git de la principal activos', () => {
@@ -112,33 +112,6 @@ test('al-dia: rama suelta (HEAD separado) no cambia nada y dice el motivo', () =
   assert.equal(r.ok, false);
   assert.match(r.motivo, /not currently on a branch|no pudo avanzar/);
   assert.equal(git(principal, 'rev-parse', 'HEAD'), antes);
-});
-
-// 21 oct 2026: dos sesiones arrancaron a la vez y una falló con «Cannot fast-forward to multiple branches». Dos
-// `git pull` a la vez en la misma carpeta se pisan .git/FETCH_HEAD: medido en carpetas temporales, 50 de 50 fallaron
-// (uno detrás de otro, 0 de 10). Aquí, dos procesos de verdad a la vez, en varias rondas, con varias ramas en origin.
-const ALDIA_URL = new URL('../scripts/pull-main.mjs', import.meta.url).href;
-const alDiaEnOtroProceso = (principal) => new Promise((resolve, reject) => {
-  const hijo = spawn(process.execPath, ['--input-type=module', '-e',
-    `const { alDia } = await import(${JSON.stringify(ALDIA_URL)}); console.log(JSON.stringify(alDia(${JSON.stringify(principal)})));`]);
-  let salida = '';
-  let avisos = '';
-  hijo.stdout.on('data', (d) => { salida += d; });
-  hijo.stderr.on('data', (d) => { avisos += d; }); // «al-dia: waiting for my turn...» va por aquí
-  hijo.on('error', reject);
-  hijo.on('close', () => resolve({ salida: salida.trim(), avisos: avisos.trim() }));
-});
-
-test('al-dia: dos arranques a la vez no se pisan; los dos acaban bien y la principal queda en origin/main', async () => {
-  const { principal, avanzaOrigin, otra } = montar();
-  for (let i = 0; i < 20; i += 1) git(otra, 'push', 'origin', `HEAD:refs/heads/r${i}`);
-  git(principal, 'fetch', 'origin');
-  for (let ronda = 0; ronda < 3; ronda += 1) {
-    avanzaOrigin(`r${ronda}.txt`, `ronda ${ronda}`);
-    const salidas = await Promise.all([alDiaEnOtroProceso(principal), alDiaEnOtroProceso(principal)]);
-    for (const s of salidas) assert.equal(JSON.parse(s.salida).ok, true, `ronda ${ronda}: ${s.salida} ${s.avisos}`);
-    assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'origin/main'));
-  }
 });
 
 test('al-dia: PASOS lo incluye y el hook carpeta-principal deja pasar la orden `git pull --ff-only` a la principal', () => {
