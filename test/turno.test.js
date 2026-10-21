@@ -176,7 +176,7 @@ test('turno: the constants have the measured/derived values and make sense toget
   assert.equal(MIN_LIBRE_BYTES, Math.ceil(PICO_SUITE_BYTES * MARGEN_UMBRAL), 'the floor is the measured peak times the margin');
   assert.ok(MARGEN_UMBRAL > 1, 'the margin leaves room over the peak');
   assert.ok(MIN_LIBRE_BYTES > 2.02 * GIB, 'the floor is above the highest working set measured for one suite');
-  assert.ok(MIN_LIBRE_BYTES < 2.4 * GIB, 'the floor lets through the 2.4-2.6 GiB free that the machine usually has');
+  assert.ok(MIN_LIBRE_BYTES < 2.4 * GIB, 'the floor is under 2.4 GiB free, which the previous floor of 3 GiB refused');
   assert.ok(CANDADO_MAX_EDAD_MS > SONDEO_MS && ESPERA_MAX_MS > SONDEO_MS);
 });
 
