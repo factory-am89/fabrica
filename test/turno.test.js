@@ -106,6 +106,15 @@ test('done: the real turn is wired to the end of the process (exit and signals),
   proc.emit('SIGINT');
   assert.equal(existsSync(m.ruta), false);
   assert.deepEqual(proc.salidas, [SENALES.SIGINT]);
+  assert.deepEqual(m.dichos, [], 'with the default floor nothing is said about it');
+});
+
+test('done: a floor set from the environment is said on screen, with its value', () => {
+  const m = mundo();
+  const proc = Object.assign(new EventEmitter(), { exit() {} });
+  turnoReal({ [VAR_MIN_LIBRE_MB]: '512' }, m.opciones, proc).soltar();
+  assert.equal(m.dichos.length, 1);
+  assert.match(m.dichos[0], new RegExp(`${VAR_MIN_LIBRE_MB}: 512 MB \\(default 3072 MB\\)`));
 });
 
 test('turno: the wait runs out -> fails loud with DONE_TURN_TIMEOUT, leaves the other lock, never takes the turn', () => {

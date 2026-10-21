@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EXIT, ExitError, finish } from './lib/exit.mjs';
-import { liberarAlTerminar, tomarTurno, umbralDeEntorno } from './lib/turno.mjs';
+import { liberarAlTerminar, MIN_LIBRE_BYTES, tomarTurno, umbralDeEntorno, VAR_MIN_LIBRE_MB } from './lib/turno.mjs';
 
 export const DONE_LINE = Object.freeze({ ok: 'done: ok', lint: 'done: fail lint', test: 'done: fail test', turn: 'done: fail turn' });
 const STEPS = [
@@ -52,7 +52,9 @@ export function cliDone(run = npmStep, turno = null) {
 
 // The real turn: it is given back on any end, including a signal.
 export function turnoReal(env = process.env, opciones = {}, proc = process) {
-  const handle = tomarTurno({ minLibre: umbralDeEntorno(env), ...opciones });
+  const minLibre = umbralDeEntorno(env);
+  if (minLibre !== MIN_LIBRE_BYTES) (opciones.decir ?? console.error)(`done: free-memory floor set by ${VAR_MIN_LIBRE_MB}: ${minLibre / 1024 ** 2} MB (default ${MIN_LIBRE_BYTES / 1024 ** 2} MB)`);
+  const handle = tomarTurno({ minLibre, ...opciones });
   liberarAlTerminar(handle, proc);
   return handle;
 }
