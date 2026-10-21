@@ -11,8 +11,9 @@ import { GOALS_FILE, KEY as GOAL_KEY, LIST as GOAL_LIST } from '../scripts/lib/g
 import {
   MAX_ENUM_VALUES, MIN_REPEATS, MIN_VALUES, VALUE_READERS, freeValues, humanFreeValues, summarize,
 } from '../scripts/lib/free-values.mjs';
-import { LESSONS_DIR, LESSON_NOTE, NO_LESSON_FILE, NO_LESSON_KEYS } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, LESSON_NOTE } from '../scripts/lib/lessons.mjs';
 import { NONE_WORD, PLAN_DIR, PLAN_FIELDS } from '../scripts/lib/plan.mjs';
+import { REVIEWER_NO_FILE, REVIEWER_NO_KEYS } from '../scripts/lib/reviewer-no.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOTE = LESSON_NOTE;
@@ -95,9 +96,9 @@ test('the plan readers give the value of each field of every chunk; absent field
 });
 
 test('freeValues counts only the fields with a proposal and reports its own thresholds', (t) => {
-  const noteOfNoLesson = field(NO_LESSON_KEYS.note, TEXT, ENTITY.noLesson);
-  const dir = root(t, [field(NOTE), noteOfNoLesson], [...same(MIN_VALUES, 'a'), 'b']);
-  put(dir, NO_LESSON_FILE, JSON.stringify({ entries: [] }));
+  const noteOfReviewerNo = field(REVIEWER_NO_KEYS.kindNote, TEXT, ENTITY.reviewerNo);
+  const dir = root(t, [field(NOTE), noteOfReviewerNo], [...same(MIN_VALUES, 'a'), 'b']);
+  put(dir, REVIEWER_NO_FILE, JSON.stringify({ rows: [] }));
   const r = freeValues(dir);
   assert.equal(r.fields.length, 2);
   assert.equal(r.count, 1);
@@ -108,10 +109,12 @@ test('summarize orders repeated values of the same count by value, not by arriva
   assert.deepEqual(summarize(['b', 'b', 'a', 'a']).repeated, [{ value: 'a', count: 2 }, { value: 'b', count: 2 }]);
 });
 
-test('the no-lesson reader gives the notes of the entries that have one', (t) => {
+test('the reviewer-no readers give the notes of the rows that have one, each from its own field', (t) => {
   const dir = root(t, []);
-  put(dir, NO_LESSON_FILE, JSON.stringify({ entries: [{ [NO_LESSON_KEYS.note]: 'n1' }, {}, { [NO_LESSON_KEYS.note]: 'n2' }] }));
-  assert.deepEqual(VALUE_READERS[ENTITY.noLesson][NO_LESSON_KEYS.note](dir), ['n1', 'n2']);
+  const { kindNote, outcomeNote } = REVIEWER_NO_KEYS;
+  put(dir, REVIEWER_NO_FILE, JSON.stringify({ rows: [{ [kindNote]: 'k1', [outcomeNote]: 'o1' }, {}, { [kindNote]: 'k2' }, { [outcomeNote]: 'o2' }] }));
+  assert.deepEqual(VALUE_READERS[ENTITY.reviewerNo][kindNote](dir), ['k1', 'k2']);
+  assert.deepEqual(VALUE_READERS[ENTITY.reviewerNo][outcomeNote](dir), ['o1', 'o2']);
 });
 
 test('summarize returns the proposal sorted, whatever the order the values came in', () => {

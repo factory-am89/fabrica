@@ -1,0 +1,5 @@
+{
+  "$comment": "Una fila por cada «no» del revisor: PR, pregunta, clase del fallo y desenlace. Esquema y vocabulario: REVIEWER_NO_FIELDS, KINDS y OUTCOME_REASONS en scripts/lib/reviewer-no.mjs. Está en la raíz y no en lessons/, que se lee entera como lecciones.",
+  "version": 1,
+  "rows": []
+}

@@ -1,5 +1,0 @@
-{
-  "$comment": "«No» del revisor triados sin lección. Esquema y motivos: NO_LESSON_FIELDS y NO_LESSON_REASONS en scripts/lib/lessons.mjs. Está en la raíz y no en lessons/, que se lee entera como lecciones.",
-  "version": 1,
-  "entries": []
-}

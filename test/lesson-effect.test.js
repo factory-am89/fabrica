@@ -11,8 +11,13 @@ import { INDICATORS, auditData, cliAudit } from '../scripts/audit.mjs';
 import { MIN_CASES_PER_CELL, STANDARD } from '../scripts/golden.mjs';
 import { DATA_IDS, humanData } from '../scripts/lib/audit-data.mjs';
 import { WHY, lessonIndicators, readTriagedNo } from '../scripts/lib/lesson-effect.mjs';
-import { LESSONS_DIR, NO_LESSON_FILE, NO_LESSON_KEYS, NO_QUESTION, REASON_COVERED, REASON_NOISE } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, NO_QUESTION } from '../scripts/lib/lessons.mjs';
 import { ANSWER, ERROR, OVERRIDE_TITLE, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
+import { KINDS, OUTCOME_NOISE, REVIEWER_NO_FILE, REVIEWER_NO_KEYS } from '../scripts/lib/reviewer-no.mjs';
+
+// A «no» that ended in a lesson (outcome = the id of a lesson) and one that ended as noise of the judge.
+const COVERED = 'some-lesson';
+const NOISE = OUTCOME_NOISE;
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RECORDS = path.join(RAIZ, 'test', 'fixtures', 'audit', 'records.json');
@@ -33,13 +38,13 @@ const round = (pr, answers, { error = null, shaOf = sha(pr) } = {}) => ({
 });
 const override = (shaOf) => ({ head_sha: shaOf, output: { title: OVERRIDE_TITLE, summary: 'x', text: '' } });
 
-// A root with the lessons ([{id, question, sources: ['#n']}]) and the triaged «no» ([{source, question, reason}]) the indicators read.
+// A root with the lessons ([{id, question, sources: ['#n']}]) and the triaged «no» ([{source, question, outcome}]) the indicators read.
 function root(t, { lessons = [], entries = [] } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'fabrica-effect-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(path.join(dir, LESSONS_DIR));
   for (const l of lessons) writeFileSync(path.join(dir, LESSONS_DIR, `${l.id}.json`), JSON.stringify({ question: l.question, sources: l.sources }));
-  writeFileSync(path.join(dir, NO_LESSON_FILE), JSON.stringify({ version: 1, entries: entries.map((e) => ({ [NO_LESSON_KEYS.source]: e.source, [NO_LESSON_KEYS.question]: e.question, [NO_LESSON_KEYS.reason]: e.reason })) }));
+  writeFileSync(path.join(dir, REVIEWER_NO_FILE), JSON.stringify({ version: 1, rows: entries.map((e) => ({ [REVIEWER_NO_KEYS.source]: e.source, [REVIEWER_NO_KEYS.question]: e.question, [REVIEWER_NO_KEYS.kind]: e.kind ?? KINDS[0], [REVIEWER_NO_KEYS.outcome]: e.outcome })) }));
   return dir;
 }
 const measure = (t, setup, pulls, checkRuns, extra = {}) => auditData({ pulls, checkRuns }, { root: root(t, setup), now: T0, messagesPath: ELSEWHERE, ...extra });
@@ -120,7 +125,7 @@ test('unsorted «no»: a (PR, question) with a «no» that no lesson of that PR 
     round(6, { [Q]: ANSWER.yes }, { shaOf: sha(66) }),
   ];
   const lessons = [{ id: 'covers-1', question: Q, sources: ['#1'] }, { id: 'no-question', question: NO_QUESTION, sources: ['#4'] }, { id: 'other-pr', question: Q, sources: ['#9'] }];
-  const entries = [{ source: '#2', question: Q, reason: REASON_COVERED }, { source: '#5', question: OTHER_Q, reason: REASON_NOISE }];
+  const entries = [{ source: '#2', question: Q, outcome: COVERED }, { source: '#5', question: OTHER_Q, outcome: NOISE }];
   const u = measure(t, { lessons, entries }, pulls, runs)[DATA_IDS.unsortedNo];
   assert.deepEqual(u.items, [{ pr: 1, question: OTHER_Q, rounds: 1 }, { pr: 3, question: OTHER_Q, rounds: 1 }, { pr: 3, question: Q, rounds: 2 }, { pr: 4, question: Q, rounds: 1 }, { pr: 5, question: Q, rounds: 1 }, { pr: 7, question: OTHER_Q, rounds: 1 }]);
   assert.deepEqual([u.total, u.count], [8, 6]);
@@ -139,8 +144,8 @@ test('false «no»: (noise entries + overrides) over the «no» of each question
     override(sha(2)), override(sha(22)), override(sha(5)), override(sha(404)),
   ];
   const entries = [
-    { source: '#1', question: Q, reason: REASON_NOISE }, { source: '#2', question: Q, reason: REASON_NOISE }, { source: '#3', question: Q, reason: REASON_COVERED },
-    { source: '#3', question: 'C9', reason: REASON_NOISE },
+    { source: '#1', question: Q, outcome: NOISE }, { source: '#2', question: Q, outcome: NOISE }, { source: '#3', question: Q, outcome: COVERED },
+    { source: '#3', question: 'C9', outcome: NOISE },
   ];
   const f = measure(t, { entries }, pulls, runs)[DATA_IDS.falseNo];
   assert.deepEqual(f.byQuestion[Q], { no: 5, noise: 2, overrides: 2, falseNo: 4, rate: 0.8, unstable: null });
@@ -153,7 +158,7 @@ test('false «no»: (noise entries + overrides) over the «no» of each question
 test('false «no»: a rate below one, and noise of another question or of another reason does not count', (t) => {
   const pulls = [1, 2, 3, 4].map((n) => pull(n, T0));
   const runs = pulls.map((p) => round(p.number, { [Q]: ANSWER.no }));
-  const entries = [{ source: '#1', question: Q, reason: REASON_NOISE }, { source: '#2', question: Q, reason: REASON_COVERED }, { source: '#3', question: OTHER_Q, reason: REASON_NOISE }];
+  const entries = [{ source: '#1', question: Q, outcome: NOISE }, { source: '#2', question: Q, outcome: COVERED }, { source: '#3', question: OTHER_Q, outcome: NOISE }];
   assert.deepEqual(measure(t, { entries }, pulls, runs)[DATA_IDS.falseNo].byQuestion[Q], { no: 4, noise: 1, overrides: 0, falseNo: 1, rate: 0.25, unstable: null });
 });
 
@@ -173,20 +178,23 @@ test('the text output has one line per indicator, with the figures', (t) => {
 });
 
 test('the triaged «no» are read in one place and come out normalised; broken inputs stop the figure', (t) => {
-  const entries = [{ source: '#12', question: Q, reason: REASON_NOISE }, { source: '#3', question: OTHER_Q, reason: REASON_COVERED }];
+  const entries = [{ source: '#12', question: Q, outcome: NOISE }, { source: '#3', question: OTHER_Q, outcome: COVERED }];
   assert.deepEqual(readTriagedNo(root(t, { entries })), [{ source: 12, question: Q, noise: true }, { source: 3, question: OTHER_Q, noise: false }]);
+  // Two classes of failure on one PR and one question are two items, each read on its own.
+  const twoKinds = [{ source: '#4', question: Q, kind: KINDS[0], outcome: NOISE }, { source: '#4', question: Q, kind: KINDS[1], outcome: COVERED }];
+  assert.deepEqual(readTriagedNo(root(t, { entries: twoKinds })), [{ source: 4, question: Q, noise: true }, { source: 4, question: Q, noise: false }]);
   const fresh = mkdtempSync(path.join(tmpdir(), 'fabrica-effect-'));
   t.after(() => rmSync(fresh, { recursive: true, force: true }));
   assert.throws(() => measure(t, {}, [], [], { root: fresh }), /not found/);
-  writeFileSync(path.join(fresh, NO_LESSON_FILE), JSON.stringify({ entries: {} }));
-  assert.throws(() => measure(t, {}, [], [], { root: fresh }), /entries must be a list/);
+  writeFileSync(path.join(fresh, REVIEWER_NO_FILE), JSON.stringify({ rows: {} }));
+  assert.throws(() => measure(t, {}, [], [], { root: fresh }), /rows must be a list/);
   const noSources = root(t);
   writeFileSync(path.join(noSources, LESSONS_DIR, 'x.json'), JSON.stringify({ question: Q }));
   assert.throws(() => measure(t, {}, [], [], { root: noSources }), /lesson x: no list of sources/);
   for (const bad of ['4', '#0', '#x', 4]) {
     const lesson = root(t, { lessons: [{ id: 'bad', question: Q, sources: [bad] }] });
     assert.throws(() => measure(t, {}, [], [], { root: lesson }), /must be #<n>/, String(bad));
-    const entry = root(t, { entries: [{ source: bad, question: Q, reason: REASON_NOISE }] });
+    const entry = root(t, { entries: [{ source: bad, question: Q, outcome: NOISE }] });
     assert.throws(() => measure(t, {}, [], [], { root: entry }), /must be #<n>/, String(bad));
   }
   assert.throws(() => measure(t, {}, [pull(1, T0)], [round(2, { [Q]: ANSWER.yes })]), /PR #2 has no PR/);

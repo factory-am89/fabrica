@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { OTHER, readEntities } from '../scripts/lib/entities.mjs';
 import { GOAL_FIELDS, INVARIANT_FIELDS } from '../scripts/lib/goals-shape.mjs';
 import { CAMPOS } from '../scripts/lib/intervention-log.mjs';
-import { FIELDS as LESSON_FIELDS, NO_LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
+import { FIELDS as LESSON_FIELDS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FIELDS } from '../scripts/lib/plan.mjs';
+import { REVIEWER_NO_FIELDS } from '../scripts/lib/reviewer-no.mjs';
 import {
   ATTRIBUTE_KIND, ENTITY, FIELD_FAULTS, FIELD_SOURCES, KEYS, NEW, TEXT, discoveredFields, fieldFaults, fieldId, normalizeName, readFields,
 } from '../scripts/lib/fields.mjs';
@@ -29,11 +30,11 @@ test('the real registry has no fault: every field the sources list is declared, 
   assert.deepEqual(fieldFaults(real(), entities(), RAIZ), []);
 });
 
-test('the sources are the real exports: lesson, no-lesson, intervention, plan, goal and invariant names are all discovered', () => {
+test('the sources are the real exports: lesson, reviewer-no, intervention, plan, goal and invariant names are all discovered', () => {
   const found = discoveredFields(entities()).map((d) => `${d.owner}.${d.name}`);
   const expected = [
     ...LESSON_FIELDS.map((n) => `lesson.${n}`),
-    ...NO_LESSON_FIELDS.map((n) => `no-lesson.${n}`),
+    ...REVIEWER_NO_FIELDS.map((n) => `${ENTITY.reviewerNo}.${n}`),
     ...CAMPOS.map((n) => `intervention.${n}`),
     ...Object.values(PLAN_FIELDS).map((n) => `plan.${n}`),
     ...GOAL_FIELDS.map((n) => `${ENTITY.goal}.${n}`),
