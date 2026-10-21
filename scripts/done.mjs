@@ -3,9 +3,10 @@
 // Exit 0 only if both pass. The last line of stdout is fixed and machine-readable (DONE_LINE below).
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { EXIT, finish } from './lib/exit.mjs';
+import { EXIT, ExitError, finish } from './lib/exit.mjs';
+import { liberarAlTerminar, MIN_LIBRE_BYTES, tomarTurno, umbralDeEntorno, VAR_MIN_LIBRE_MB } from './lib/turno.mjs';
 
-export const DONE_LINE = Object.freeze({ ok: 'done: ok', lint: 'done: fail lint', test: 'done: fail test' });
+export const DONE_LINE = Object.freeze({ ok: 'done: ok', lint: 'done: fail lint', test: 'done: fail test', turn: 'done: fail turn' });
 const STEPS = [
   { name: 'lint', fail: EXIT.DONE_LINT_FAILED },
   { name: 'test', fail: EXIT.DONE_TESTS_FAILED },
@@ -33,9 +34,29 @@ export function npmStep(step, launch = spawnSync, platform = process.platform) {
 }
 
 // Returns what the command prints and its exit code; the block below only prints and exits.
-export function cliDone(run = npmStep) {
-  const { code, line } = runDone(run);
-  return { code, stdout: `${line}\n`, stderr: '' };
+// `turno` (scripts/lib/turno.mjs) waits for the turn and for free memory and returns the handle that gives it back; when the
+// wait runs out nothing runs. The real command always passes it; only the tests that fake the steps leave it out.
+export function cliDone(run = npmStep, turno = null) {
+  let handle = null;
+  if (turno) {
+    try { handle = turno(); } catch (e) {
+      if (!(e instanceof ExitError)) throw e;
+      return { code: e.exit, stdout: `${DONE_LINE.turn}\n`, stderr: `${e.message}\n` };
+    }
+  }
+  try {
+    const { code, line } = runDone(run);
+    return { code, stdout: `${line}\n`, stderr: '' };
+  } finally { handle?.soltar(); }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) finish(cliDone());
+// The real turn: it is given back on any end, including a signal.
+export function turnoReal(env = process.env, opciones = {}, proc = process) {
+  const minLibre = umbralDeEntorno(env);
+  if (minLibre !== MIN_LIBRE_BYTES) (opciones.decir ?? console.error)(`done: free-memory floor set by ${VAR_MIN_LIBRE_MB}: ${minLibre / 1024 ** 2} MB (default ${MIN_LIBRE_BYTES / 1024 ** 2} MB)`);
+  const handle = tomarTurno({ minLibre, ...opciones });
+  liberarAlTerminar(handle, proc);
+  return handle;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) finish(cliDone(npmStep, turnoReal));
