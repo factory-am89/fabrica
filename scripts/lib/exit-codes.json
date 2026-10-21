@@ -18,7 +18,8 @@
     "DONE_TESTS_FAILED": 31,
     "LESSON_FAULTS": 40,
     "ADOPTED_FAULTS": 41,
-    "REVIEWER_NO_FAULTS": 42
+    "REVIEWER_NO_FAULTS": 42,
+    "REVIEWER_NO_UNREADABLE": 43
   },
   "RETIRE_RESULT": {
     "REMOVED": "removed",
@@ -105,6 +106,10 @@
     "REVIEWER_NO_FAULTS": {
       "retry": "after-fix",
       "then": "fix the file and run it again"
+    },
+    "REVIEWER_NO_UNREADABLE": {
+      "retry": "no",
+      "then": "the figure would be false: report the check-run indexes printed in stderr; the judge wrote no record there"
     }
   }
 }

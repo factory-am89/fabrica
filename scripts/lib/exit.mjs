@@ -23,6 +23,7 @@ export const EXIT = Object.freeze({
   LESSON_FAULTS: 40, // lessons: the registry has at least one fault (the codes are in the output)
   ADOPTED_FAULTS: 41, // adopted: the project owns something it inherits (the fault codes are in the output)
   REVIEWER_NO_FAULTS: 42, // reviewer-no --debt: reviewer-no.json has at least one fault (the codes are in the output)
+  REVIEWER_NO_UNREADABLE: 43, // reviewer-no --debt: a check-run of a PR the debt counts (or of no PR) has no readable record
 });
 
 // What to do after each code. retry: YES = the same command may work if repeated as is; AFTER_FIX = only
@@ -50,6 +51,7 @@ export const RECOVERY = Object.freeze({
   LESSON_FAULTS: row(RETRY.AFTER_FIX, 'fix each fault code printed in the output and run lessons again'),
   ADOPTED_FAULTS: row(RETRY.NO, 'stop and write down the faults printed in the output; the fix belongs to the project, not to this command'),
   REVIEWER_NO_FAULTS: row(RETRY.AFTER_FIX, 'fix the file and run it again'),
+  REVIEWER_NO_UNREADABLE: row(RETRY.NO, 'the figure would be false: report the check-run indexes printed in stderr; the judge wrote no record there'),
 });
 
 // Result of `retire --json`: either the folder was removed or the command refused (see `error`).

@@ -47,6 +47,8 @@ export function humanDebt(d) {
     ...section('unmatched', d.unmatched, () => ''),
     `errored: ${d.errored.length}`,
     ...d.errored.map((e) => `  #${e.pr} ${e.error}`),
+    // check-runs with no record in PRs the debt does not count: shown, not lost (the full list is in --json)
+    `ignored: ${d.ignored.reduce((n, i) => n + i.checkRuns, 0)} check-runs without a record, in ${d.ignored.length} PRs the debt does not count${d.ignored.length > 0 ? ` (#${d.ignored[0].pr}..#${d.ignored.at(-1).pr})` : ''}`,
     ...(none ? ['sin deuda'] : []),
   ].join('\n');
 }
