@@ -8,10 +8,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER } from '../scripts/lib/entities.mjs';
+import { ANSWER, ERROR, RECORD_VERSION, formatBlock } from '../scripts/lib/record.mjs';
 import { NO_QUESTION, lessonContext, readLessons } from '../scripts/lib/lessons.mjs';
 import {
-  KINDS, OUTCOME_PENDING, OUTCOME_REASONS, REVIEWER_NO_FAULTS, REVIEWER_NO_FIELDS, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_OPTIONAL_FIELDS,
-  REVIEWER_NO_VERSION, readReviewerNo, reviewerNoFaults,
+  DEBT_SINCE, KINDS, OUTCOME_PENDING, OUTCOME_REASONS, REVIEWER_NO_FAULTS, REVIEWER_NO_FIELDS, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_OPTIONAL_FIELDS,
+  REVIEWER_NO_VERSION, readReviewerNo, reviewerNoDebt, reviewerNoFaults,
 } from '../scripts/lib/reviewer-no.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -193,4 +194,65 @@ test('a missing reviewer-no.json throws, never «no triaged cases»', (t) => {
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-reviewerno-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   assert.throws(() => readReviewerNo(root), /not found/);
+});
+
+// The debt (chunk 3): pure, from {pulls, checkRuns} and the rows. In-memory data, no network, no clock.
+const SINCE = '2026-10-19';
+const rec = (pr, answers, over = {}) => ({ v: RECORD_VERSION, repo: 'o/r', pr, sha: 'a'.repeat(40), standard: 'standards/code.md', ok: false, answers, invalid: 0, error: null, run: null, ...over });
+const checkRun = (r) => ({ head_sha: r.sha, output: { title: 'Veredicto', text: formatBlock(r) } });
+const pull = (number, merged) => ({ number, state: 'closed', created_at: '2026-10-01T10:00:00Z', merged_at: merged, head_ref: 'feat/x', files: [], commits: [] });
+const NO = ANSWER.no;
+const dataOf = (pulls, records, extra = []) => ({ pulls, checkRuns: [...records.map(checkRun), ...extra] });
+const debtRow = (n, question, outcome = OUTCOME_PENDING) => ({ [SOURCE]: `#${n}`, [QUESTION]: question, [KIND]: KINDS[0], [OUTCOME]: outcome });
+
+test('debt: a «no» of a merged PR since DEBT_SINCE without a row is missing, once per PR and question however many rounds', () => {
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO, C9: NO }), rec(10, { C5: NO, C9: ANSWER.yes })]);
+  const d = reviewerNoDebt(data, [], SINCE);
+  assert.deepEqual(d.missing, [{ pr: 10, question: 'C5' }, { pr: 10, question: 'C9' }]);
+  assert.deepEqual([d.pending, d.unmatched], [[], []]);
+  assert.equal(d.since, SINCE);
+});
+
+test('debt: DEBT_SINCE is the day #112 merged, and the default of the function', () => {
+  assert.equal(DEBT_SINCE, '2026-10-19');
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })]);
+  assert.deepEqual(reviewerNoDebt(data, []), reviewerNoDebt(data, [], DEBT_SINCE));
+});
+
+test('debt: what was merged before the date, is still open, or has a record with an error is not missing', () => {
+  const data = dataOf(
+    [pull(11, '2026-10-18T23:59:59Z'), pull(12, null), pull(13, '2026-10-20T10:00:00Z'), pull(14, '2026-10-20T10:00:00Z')],
+    [rec(11, { C1: NO }), rec(12, { C2: NO }), rec(13, { C3: ANSWER.yes }, { ok: true }), rec(14, { C4: NO }, { error: ERROR.outputUnreadable })],
+  );
+  assert.deepEqual(reviewerNoDebt(data, [], SINCE).missing, []);
+});
+
+test('debt: a row covers its pair; a different question or PR does not', () => {
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO, C9: NO })]);
+  assert.deepEqual(reviewerNoDebt(data, [debtRow(10, 'C5', GOOD_ID)], SINCE).missing, [{ pr: 10, question: 'C9' }]);
+  assert.equal(reviewerNoDebt(data, [debtRow(11, 'C5', GOOD_ID), debtRow(10, 'C1', GOOD_ID)], SINCE).missing.length, 2);
+});
+
+test('debt: pending lists the rows with outcome pendiente, with their PR, question and class', () => {
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO, C9: NO })]);
+  const d = reviewerNoDebt(data, [debtRow(10, 'C5'), debtRow(10, 'C9', GOOD_ID)], SINCE);
+  assert.deepEqual(d.pending, [{ pr: 10, question: 'C5', kind: KINDS[0] }]);
+  assert.deepEqual(d.missing, []);
+});
+
+test('debt: unmatched is a row whose pair is no «no» in the records; an open PR with a «no» is a legit row', () => {
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z'), pull(12, null)], [rec(10, { C5: ANSWER.yes }, { ok: true }), rec(12, { C2: NO })]);
+  const d = reviewerNoDebt(data, [debtRow(10, 'C5', GOOD_ID), debtRow(12, 'C2'), debtRow(99, 'C1', GOOD_ID)], SINCE);
+  assert.deepEqual(d.unmatched, [{ pr: 10, question: 'C5' }, { pr: 99, question: 'C1' }]);
+});
+
+test('debt: a check-run without a readable record stops the figure with an error, it is never counted around', () => {
+  const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })], [{ head_sha: 'b'.repeat(40), output: { title: 'Veredicto', text: 'not a record' } }]);
+  assert.throws(() => reviewerNoDebt(data, [], SINCE), /without a readable record/);
+});
+
+test('debt: a malformed pull, a malformed row source or a malformed date throws, never reads as empty', () => {
+  assert.throws(() => reviewerNoDebt({ pulls: [{ number: 1 }], checkRuns: [] }, [], SINCE), /malformed/);
+  assert.throws(() => reviewerNoDebt(dataOf([], []), [{ ...debtRow(1, 'C1'), [SOURCE]: 'x' }], SINCE), /must be #<n>/);
+  assert.throws(() => reviewerNoDebt(dataOf([], []), [], '19/10/2026'), /YYYY-MM-DD/);
 });

@@ -17,7 +17,8 @@
     "DONE_LINT_FAILED": 30,
     "DONE_TESTS_FAILED": 31,
     "LESSON_FAULTS": 40,
-    "ADOPTED_FAULTS": 41
+    "ADOPTED_FAULTS": 41,
+    "REVIEWER_NO_FAULTS": 42
   },
   "RETIRE_RESULT": {
     "REMOVED": "removed",
@@ -100,6 +101,10 @@
     "ADOPTED_FAULTS": {
       "retry": "no",
       "then": "stop and write down the faults printed in the output; the fix belongs to the project, not to this command"
+    },
+    "REVIEWER_NO_FAULTS": {
+      "retry": "after-fix",
+      "then": "fix the file and run it again"
     }
   }
 }
