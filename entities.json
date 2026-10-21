@@ -18,7 +18,7 @@
     {
       "id": "reviewer-no", "name": "«No» del revisor", "scope": "horizontal", "term": "«no» del revisor",
       "source_of_truth": "reviewer-no.json",
-      "readers": ["scripts/lib/lesson-effect.mjs", "scripts/lib/free-values.mjs"],
+      "readers": ["scripts/lib/lesson-effect.mjs", "scripts/lib/free-values.mjs", "scripts/audit.mjs"],
       "base": "hueco", "base_reason": "otro", "base_note": "la forja existe (reviewerNoFaults) y falta escribir su base",
       "forge": "scripts/lib/reviewer-no.mjs"
     },
