@@ -5,7 +5,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { OTHER } from './entities.mjs';
-import { NO_QUESTION, PR_SOURCE, REASON_SINGLE, keysFault, noteFault, requiredOf } from './lessons.mjs';
+import { readPulls } from './audit-data.mjs';
+import { NO_QUESTION, PR_SOURCE, REASON_SINGLE, keysFault, noteFault, requiredOf, sourceNumber } from './lessons.mjs';
+import { ANSWER, readCheckRuns } from './record.mjs';
 
 export const REVIEWER_NO_FILE = 'reviewer-no.json';
 export const REVIEWER_NO_VERSION = 1;
@@ -86,4 +88,43 @@ export function reviewerNoFaults(text, ctx, lessonIds) {
     seen.add(key);
   });
   return faults;
+}
+
+// The debt (chunk 3 of plans/registro-de-no.md). The rule «triar los no» started when #112 merged; what was merged before is not counted.
+export const DEBT_SINCE = '2026-10-19';
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const pairKey = (pr, question) => JSON.stringify([pr, question]);
+
+// {pulls, checkRuns} as scripts/collect-records.mjs writes them, rows = the list of reviewer-no.json -> { since, missing, pending, unmatched }:
+//   missing: [{pr, question}] a «no» of a PR merged on or after `since` (UTC) with no row;
+//   pending: [{pr, question, kind}] the rows whose outcome is pendiente;
+//   unmatched: [{pr, question}] rows whose pair is no «no» in any record (an invented row or a wrong PR). An open PR's «no» is a legit pair: the row is written in the fix;
+//   errored: [{pr, error}] the rounds that ended in an error of the judge: they say nothing about the questions, so they are not debt, but they are listed.
+// A check-run without a readable record stops the figure with an error; counting around it would be false (as `rounds` of audit-data.mjs).
+export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
+  if (!DAY.test(since)) throw new Error(`since must be YYYY-MM-DD, got ${since}`);
+  const from = Date.parse(`${since}T00:00:00Z`);
+  const mergedSince = new Set(readPulls(pulls).filter((p) => p.merged !== null && p.merged >= from).map((p) => p.number));
+  const { records, unreadable } = readCheckRuns(checkRuns);
+  if (unreadable.length > 0) throw new Error(`check-runs without a readable record (index: ${unreadable.map((u) => u.index).join(', ')})`);
+  const noPairs = new Map();
+  const errored = [];
+  for (const r of records) {
+    if (r.error !== null) { // a record with an error says nothing about the questions (aggregate does the same), but it is shown, not lost
+      errored.push({ pr: r.pr, error: r.error });
+      continue;
+    }
+    for (const [question, answer] of Object.entries(r.answers)) if (answer === ANSWER.no) noPairs.set(pairKey(r.pr, question), { pr: r.pr, question });
+  }
+  const { source: SOURCE, question: QUESTION, kind: KIND, outcome: OUTCOME } = REVIEWER_NO_KEYS;
+  const mine = rows.map((r) => ({ pr: sourceNumber(r[SOURCE]), question: r[QUESTION], kind: r[KIND], outcome: r[OUTCOME] }));
+  const covered = new Set(mine.map((r) => pairKey(r.pr, r.question)));
+  const byPair = (a, b) => a.pr - b.pr || a.question.localeCompare(b.question);
+  return {
+    since,
+    missing: [...noPairs.values()].filter((p) => mergedSince.has(p.pr) && !covered.has(pairKey(p.pr, p.question))).sort(byPair),
+    pending: mine.filter((r) => r.outcome === OUTCOME_PENDING).map(({ pr, question, kind }) => ({ pr, question, kind })),
+    unmatched: mine.filter((r) => !noPairs.has(pairKey(r.pr, r.question))).map(({ pr, question }) => ({ pr, question })),
+    errored: errored.sort((a, b) => a.pr - b.pr || a.error.localeCompare(b.error)),
+  };
 }
