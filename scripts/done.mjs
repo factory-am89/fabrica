@@ -51,9 +51,9 @@ export function cliDone(run = npmStep, turno = null) {
 }
 
 // The real turn: it is given back on any end, including a signal.
-export function turnoReal(env = process.env) {
-  const handle = tomarTurno({ minLibre: umbralDeEntorno(env) });
-  liberarAlTerminar(handle);
+export function turnoReal(env = process.env, opciones = {}, proc = process) {
+  const handle = tomarTurno({ minLibre: umbralDeEntorno(env), ...opciones });
+  liberarAlTerminar(handle, proc);
   return handle;
 }
 

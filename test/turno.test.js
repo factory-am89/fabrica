@@ -11,7 +11,7 @@ import {
   rutaDeCandadoDone, tomarTurno, liberarAlTerminar, umbralDeEntorno, pidVivoReal, SENALES,
   MIN_LIBRE_BYTES, ESPERA_MAX_MS, CANDADO_MAX_EDAD_MS, SONDEO_MS, VAR_MIN_LIBRE_MB,
 } from '../scripts/lib/turno.mjs';
-import { cliDone, DONE_LINE } from '../scripts/done.mjs';
+import { cliDone, turnoReal, DONE_LINE } from '../scripts/done.mjs';
 
 const T0 = Date.parse('2026-10-21T10:00:00Z');
 const GIB = 1024 ** 3;
@@ -85,6 +85,27 @@ test('turno: a lock just under the cap with a live pid is respected', () => {
   m.ponerCandado(OTHER, T0 - CANDADO_MAX_EDAD_MS + 1000);
   assert.throws(() => tomarTurno({ ...m.opciones, esperaMax: 0 }), (e) => e instanceof ExitError);
   assert.equal(dueno(m).pid, OTHER, 'the other lock must still be there');
+});
+
+test('turno: a lock that changes hands while being judged stale is not removed', () => {
+  const m = mundo();
+  m.ponerCandado(OTHER, T0 - 1000);
+  // judged dead (first answer), but by then a third process has taken the lock
+  const opciones = { ...m.opciones, esperaMax: 0, pidVivo: () => { m.ponerCandado(3333, T0); return false; } };
+  assert.throws(() => tomarTurno(opciones), (e) => e instanceof ExitError);
+  assert.equal(dueno(m).pid, 3333);
+  assert.deepEqual(m.dichos, []);
+});
+
+test('done: the real turn is wired to the end of the process (exit and signals), and gives the lock back', () => {
+  const m = mundo();
+  const proc = Object.assign(new EventEmitter(), { salidas: [], exit(c) { this.salidas.push(c); } });
+  turnoReal({}, m.opciones, proc);
+  assert.equal(existsSync(m.ruta), true);
+  assert.equal(proc.listenerCount('exit'), 1);
+  proc.emit('SIGINT');
+  assert.equal(existsSync(m.ruta), false);
+  assert.deepEqual(proc.salidas, [SENALES.SIGINT]);
 });
 
 test('turno: the wait runs out -> fails loud with DONE_TURN_TIMEOUT, leaves the other lock, never takes the turn', () => {

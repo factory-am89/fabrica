@@ -102,7 +102,7 @@ export function tomarTurno({
   for (;;) {
     const r = intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir });
     if (r.tomado) break;
-    if (ahora() >= limite) throw alFallar(r.dueno?.ilegible ? `the lock ${ruta} (unreadable)` : `the turn of pid ${r.dueno?.pid}`);
+    if (ahora() >= limite) throw alFallar(r.dueno?.ilegible ? `the lock ${ruta} (unreadable)` : `the turn of pid ${r.dueno?.pid ?? '(changing hands)'}`);
     if (r.dueno?.ilegible) avisar(`done: waiting: the lock ${ruta} cannot be read (pid and time unknown)`);
     else if (r.dueno) avisar(`done: waiting for my turn: pid ${r.dueno.pid} has been running done since ${r.dueno.desde}`);
     if (r.dueno !== null && r.dueno !== undefined) dormir(sondeo);
