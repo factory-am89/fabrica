@@ -1,5 +1,28 @@
 {
   "$comment": "Una fila por cada «no» del revisor: PR, pregunta, clase del fallo y desenlace. Esquema y vocabulario: REVIEWER_NO_FIELDS, KINDS y OUTCOME_REASONS en scripts/lib/reviewer-no.mjs. Está en la raíz y no en lessons/, que se lee entera como lecciones.",
   "version": 1,
-  "rows": []
+  "rows": [
+    { "source": "#98", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#100", "question": "C5", "kind": "error-tragado", "outcome": "pendiente" },
+    { "source": "#102", "question": "C5", "kind": "error-tragado", "outcome": "pendiente" },
+    { "source": "#102", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#102", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#104", "question": "C8", "kind": "otro", "kind_note": "código copiado, no solo vocabulario: la puerta de escritura de la API (cabeceras y mensaje de error) reescrita a mano en humo.mjs en vez de reutilizar makeWriteApi", "outcome": "pendiente" },
+    { "source": "#109", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#109", "question": "C9", "kind": "otro", "kind_note": "evidencia de un commit anterior al que se fusiona: «8 lecciones migradas» era cierto sobre la base del PR y falso en main (una lección nueva sin migrar)", "outcome": "pendiente" },
+    { "source": "#112", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#114", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#116", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#117", "question": "C5", "kind": "error-tragado", "outcome": "pendiente" },
+    { "source": "#117", "question": "C6", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#117", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#117", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#117", "question": "C9", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" },
+    { "source": "#120", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#123", "question": "C5", "kind": "error-tragado", "outcome": "pendiente" },
+    { "source": "#123", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#125", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#129", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#137", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" }
+  ]
 }
