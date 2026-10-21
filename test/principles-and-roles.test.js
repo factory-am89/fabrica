@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { parsePrinciples } from '../scripts/lib/decision.mjs';
 import { readQuestions } from '../scripts/lib/questions.mjs';
 import { KEY, LIST } from '../scripts/lib/goals.mjs';
+import { REVIEWER_NO_FILE } from '../scripts/lib/reviewer-no.mjs';
 import { leer, preguntas } from './apoyo/fabrica.mjs';
 import { real } from './apoyo/goals-casos.mjs';
 
@@ -70,6 +71,15 @@ test('los tres roles tienen su modelo y el revisor no escribe', () => {
     assert.match(cabecera, new RegExp(`^model: ${modelo}$`, 'm'));
     if (rol !== 'constructor') assert.doesNotMatch(cabecera, /Edit|Write/);
   }
+});
+
+test('el constructor apunta una fila por cada «no» en el registro y deja el desenlace a otra sesión', () => {
+  const texto = leer('.claude/agents/constructor.md');
+  assert.ok(texto.includes(REVIEWER_NO_FILE), `constructor.md no nombra ${REVIEWER_NO_FILE}`);
+  for (const nombre of ['REVIEWER_NO_FIELDS', 'KINDS', 'OUTCOME_PENDING']) {
+    assert.ok(texto.includes(nombre), `constructor.md no nombra ${nombre}`);
+  }
+  assert.match(texto, /otra sesión/, 'no dice que el desenlace lo pone otra sesión');
 });
 
 test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bien y mal', () => {
