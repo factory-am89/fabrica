@@ -1,9 +1,9 @@
 {
-  "run": ["--test", "test/lessons.test.js"],
+  "run": ["--test", "test/reviewer-no.test.js"],
   "ops": [
     {
-      "write": "no-lesson.json",
-      "json": { "version": 1, "entries": [{ "source": "#1", "question": "C1", "reason": "porque-si" }] }
+      "write": "reviewer-no.json",
+      "json": { "version": 1, "rows": [{ "source": "#1", "question": "C1", "kind": "afirmacion-sin-prueba", "outcome": "porque-si" }] }
     }
   ]
 }

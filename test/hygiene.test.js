@@ -13,9 +13,10 @@ import { MS_DAY } from '../scripts/lib/audit-data.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CODES, GROUP, NEEDS_RECORDS, NOT_COMPUTED, hygiene, hygieneCounts, humanHygiene, mergeCandidates, promoteCandidates, readLessonRows, retireTextCandidates, reworkCandidates } from '../scripts/lib/hygiene.mjs';
 import { DOC, REF, overlaps } from '../scripts/lib/hygiene-refs.mjs';
-import { LESSONS_DIR, NO_LESSON_FILE, NO_QUESTION, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
+import { LESSONS_DIR, NO_QUESTION, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { REFERENCES_DIR, SKILL_FILE } from '../scripts/lib/skills.mjs';
 import { ANSWER, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
+import { REVIEWER_NO_FILE } from '../scripts/lib/reviewer-no.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const T = 'test/a.test.js'; // a mechanism that is a test
@@ -33,7 +34,7 @@ function root(t, { lessons = [], skills = {}, scripts = ['known'], missing = [],
   const dir = mkdtempSync(path.join(tmpdir(), 'fabrica-hygiene-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   put(dir, 'package.json', JSON.stringify({ scripts: Object.fromEntries(scripts.map((s) => [s, 'x'])) }));
-  put(dir, NO_LESSON_FILE, JSON.stringify({ version: 1, entries: [] }));
+  put(dir, REVIEWER_NO_FILE, JSON.stringify({ version: 1, rows: [] }));
   for (const l of lessons) {
     put(dir, `${LESSONS_DIR}/${l.id}.json`, JSON.stringify({ question: l.question, mechanism: l.mechanism, signal: l.signal, sources }));
     if (!missing.includes(l.mechanism)) put(dir, l.mechanism, '');

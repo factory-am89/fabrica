@@ -6,8 +6,9 @@ import path from 'node:path';
 import { CORPUS, MIN_CASES_PER_CELL, STANDARD, answersOf, loadCorpus, loadOutputs } from '../golden.mjs';
 import { variance } from '../golden-run.mjs';
 import { cargarPreguntas } from '../veredicto.mjs';
-import { NO_LESSON_KEYS, NO_QUESTION, REASON_NOISE, readLessons, readNoLesson, sourceNumber } from './lessons.mjs';
+import { NO_QUESTION, readLessons, sourceNumber } from './lessons.mjs';
 import { ANSWER, OVERRIDE_TITLE, aggregate, readCheckRuns } from './record.mjs';
+import { OUTCOME_NOISE, REVIEWER_NO_KEYS, readReviewerNo } from './reviewer-no.mjs';
 
 // Why a lesson has no conclusive effect (a list: it can be several).
 export const WHY = Object.freeze({ noQuestion: 'lesson-without-question', noDate: 'no-merged-source-pr', sourceNotInData: 'source-pr-not-in-data', fewCases: 'few-cases-on-a-side' });
@@ -20,12 +21,12 @@ const TRIAL_FILE = /^\d+\.json$/;
 
 const rate = (n, d) => (d === 0 ? null : n / d);
 
-// The ONE place that reads the triaged «no» (no-lesson.json today). Returns [{source: PR number, question, noise: boolean}].
-// plans/registro-de-no.md moves this reading to reviewer-no.json: only this function changes.
+// The ONE place that reads the triaged «no» (reviewer-no.json). Returns [{source: PR number, question, noise: boolean}].
+// A row is one «no»; two rows of the same PR and question (two classes of failure) come out as two items.
 export function readTriagedNo(root) {
-  const d = JSON.parse(readNoLesson(root));
-  if (!Array.isArray(d.entries)) throw new Error('triaged «no»: entries must be a list');
-  return d.entries.map((e) => ({ source: sourceNumber(e[NO_LESSON_KEYS.source]), question: e[NO_LESSON_KEYS.question], noise: e[NO_LESSON_KEYS.reason] === REASON_NOISE }));
+  const d = JSON.parse(readReviewerNo(root));
+  if (!Array.isArray(d.rows)) throw new Error('triaged «no»: rows must be a list');
+  return d.rows.map((r) => ({ source: sourceNumber(r[REVIEWER_NO_KEYS.source]), question: r[REVIEWER_NO_KEYS.question], noise: r[REVIEWER_NO_KEYS.outcome] === OUTCOME_NOISE }));
 }
 
 // [{id, question, sources: [PR number]}] from lessons/; a lesson without a list of sources stops the figure.

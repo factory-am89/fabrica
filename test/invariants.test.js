@@ -18,15 +18,16 @@ import { ENTITY_FAULTS } from '../scripts/lib/entities.mjs';
 import { FIELD_FAULTS } from '../scripts/lib/fields.mjs';
 import { CHECK, GOAL_FAULTS, KEY, LIST, readGoals } from '../scripts/lib/goals.mjs';
 import { CODES } from '../scripts/lib/hygiene.mjs';
-import { LESSON_FAULTS, NO_LESSON_FAULTS } from '../scripts/lib/lessons.mjs';
+import { LESSON_FAULTS } from '../scripts/lib/lessons.mjs';
 import { PLAN_FAULTS } from '../scripts/lib/plan.mjs';
+import { REVIEWER_NO_FAULTS } from '../scripts/lib/reviewer-no.mjs';
 import { SKILL_FAULTS } from '../scripts/lib/skills.mjs';
 import { TRIGGER_FAULTS } from '../scripts/lib/triggers.mjs';
 
 const HERE = import.meta.dirname;
 const ROOT = path.join(HERE, '..');
 const CASES_DIR = path.join(HERE, 'fixtures', path.basename(import.meta.filename, '.test.js'));
-const FAULT_SETS = { ADOPTED_FAULTS, CODES, DECISION_FAULTS, ENTITY_FAULTS, FIELD_FAULTS, GOAL_FAULTS, LESSON_FAULTS, NO_LESSON_FAULTS, PLAN_FAULTS, SKILL_FAULTS, TRIGGER_FAULTS };
+const FAULT_SETS = { ADOPTED_FAULTS, CODES, DECISION_FAULTS, ENTITY_FAULTS, FIELD_FAULTS, GOAL_FAULTS, LESSON_FAULTS, PLAN_FAULTS, REVIEWER_NO_FAULTS, SKILL_FAULTS, TRIGGER_FAULTS };
 // The detectors are the words of goals.json «check» (who checks a rule today), read from goals-shape.mjs and not retyped.
 const DETECTORS = { machine: CHECK.machine, judge: CHECK.judge, none: CHECK.nobody };
 const INVARIANTS = readGoals(ROOT)[LIST.invariants].map((i) => i[KEY.id]);
