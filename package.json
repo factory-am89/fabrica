@@ -19,6 +19,7 @@
     "sesiones": "node scripts/sesiones.mjs",
     "install-pc": "node scripts/install-pc.mjs instalar",
     "check-pc": "node scripts/install-pc.mjs comprobar",
+    "sin-emsign": "node scripts/sin-emsign.mjs",
     "contract": "node scripts/contract.mjs",
     "lessons": "node scripts/lessons.mjs",
     "hygiene": "node scripts/hygiene.mjs",

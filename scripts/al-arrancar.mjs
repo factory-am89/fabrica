@@ -9,6 +9,7 @@ import { limpiar, imprimir } from './clean.mjs';
 import { pasoAlDia } from './pull-main.mjs';
 import { pasoHora } from './madrid-time.mjs';
 import { pasoSesiones } from './sesiones.mjs';
+import { pasoTls } from './sin-emsign.mjs';
 import { ExitError } from './lib/exit.mjs';
 import { pasoPeriodico } from './lib/periodic.mjs';
 
@@ -23,7 +24,8 @@ export const pasoLimpiar = (limpiarFn = limpiar) => ({
 
 // al-dia primero: trae a la principal la ficha .fabrica.json (y lo nuevo) antes de que limpiar la lea.
 // periodico (audit local, higiene y deuda; lib/periodic.mjs) corre solo al abrir sesión: lo autorizó Pablo (decisión A1 del plan trabajar-solos).
-export const PASOS = [pasoAlDia(), pasoLimpiar(), pasoSesiones(), pasoPeriodico(), pasoHora()];
+// tls: que Node no confíe en las raíces emSign (scripts/sin-emsign.mjs); sin red, solo mira este proceso.
+export const PASOS = [pasoAlDia(), pasoLimpiar(), pasoSesiones(), pasoPeriodico(), pasoTls(), pasoHora()];
 
 export const SOLO = '--solo';
 const SOLO_ARGS = 2; // --solo y el nombre del paso
