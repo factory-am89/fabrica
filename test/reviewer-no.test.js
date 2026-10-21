@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OTHER } from '../scripts/lib/entities.mjs';
+import { ExitError } from '../scripts/lib/exit.mjs';
 import { ANSWER, ERROR, RECORD_VERSION, formatBlock } from '../scripts/lib/record.mjs';
 import { NO_QUESTION, lessonContext, readLessons } from '../scripts/lib/lessons.mjs';
 import {
@@ -269,6 +270,40 @@ test('debt: unmatched is a row whose pair is no «no» in the records; an open P
 test('debt: a check-run without a readable record stops the figure with an error, it is never counted around', () => {
   const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })], [{ head_sha: 'b'.repeat(40), output: { title: 'Veredicto', text: 'not a record' } }]);
   assert.throws(() => reviewerNoDebt(data, [], SINCE), /without a readable record/);
+});
+
+const SHA_OLD = 'c'.repeat(40);
+const SHA_COUNTED = 'd'.repeat(40);
+const broken = (sha) => ({ head_sha: sha, output: { title: 'Veredicto', text: 'not a record' } });
+const withCommits = (p, ...commits) => ({ ...p, commits });
+const unreadableError = (e) => e instanceof ExitError && e.key === 'REVIEWER_NO_UNREADABLE' && /without a readable record/.test(e.message);
+
+test('debt: an unreadable check-run of PRs the debt does not count is ignored but shown (PR and how many), the figure still comes', () => {
+  const data = dataOf(
+    [pull(10, '2026-10-20T10:00:00Z'), withCommits(pull(2, '2026-10-16T10:00:00Z'), SHA_OLD), withCommits(pull(12, null), 'e'.repeat(40)), withCommits(pull(13, null), 'f'.repeat(40))],
+    [rec(10, { C5: NO })],
+    [broken('e'.repeat(40)), broken(SHA_OLD), broken(SHA_OLD)],
+  );
+  const d = reviewerNoDebt(data, [], SINCE);
+  assert.deepEqual(d.ignored, [{ pr: 2, checkRuns: 2 }, { pr: 12, checkRuns: 1 }]);
+  assert.deepEqual(d.missing, [{ pr: 10, question: 'C5' }]);
+  assert.deepEqual(reviewerNoDebt(dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })]), [], SINCE).ignored, []);
+});
+
+test('debt: an unreadable check-run of a PR merged since DEBT_SINCE stops the figure with its own exit class', () => {
+  const data = dataOf([withCommits(pull(10, '2026-10-20T10:00:00Z'), SHA_COUNTED), withCommits(pull(2, '2026-10-16T10:00:00Z'), SHA_OLD)], [], [broken(SHA_OLD), broken(SHA_COUNTED)]);
+  assert.throws(() => reviewerNoDebt(data, [], SINCE), (e) => unreadableError(e) && /index: 1\)/.test(e.message));
+});
+
+test('debt: an unreadable check-run held by an old PR and by a counted one (shared commit) stops the figure', () => {
+  const data = dataOf([withCommits(pull(10, '2026-10-20T10:00:00Z'), SHA_OLD), withCommits(pull(2, '2026-10-16T10:00:00Z'), SHA_OLD)], [], [broken(SHA_OLD)]);
+  assert.throws(() => reviewerNoDebt(data, [], SINCE), unreadableError);
+});
+
+test('debt: an unreadable check-run that no PR holds (or with no head_sha) stops the figure, it is never ignored', () => {
+  const pulls = [withCommits(pull(2, '2026-10-16T10:00:00Z'), SHA_OLD)];
+  assert.throws(() => reviewerNoDebt(dataOf(pulls, [], [broken('9'.repeat(40))]), [], SINCE), unreadableError);
+  assert.throws(() => reviewerNoDebt(dataOf(pulls, [], [{ output: { title: 'Veredicto', text: 'x' } }]), [], SINCE), unreadableError);
 });
 
 test('debt: a malformed pull, a malformed row source or a malformed date throws, never reads as empty', () => {

@@ -8,6 +8,7 @@ import { OTHER } from './entities.mjs';
 import { readPulls } from './audit-data.mjs';
 import { NO_QUESTION, PR_SOURCE, REASON_SINGLE, keysFault, noteFault, requiredOf, sourceNumber } from './lessons.mjs';
 import { ANSWER, readCheckRuns } from './record.mjs';
+import { ExitError } from './exit.mjs';
 
 export const REVIEWER_NO_FILE = 'reviewer-no.json';
 export const REVIEWER_NO_VERSION = 1;
@@ -100,13 +101,26 @@ const pairKey = (pr, question) => JSON.stringify([pr, question]);
 //   pending: [{pr, question, kind}] the rows whose outcome is pendiente;
 //   unmatched: [{pr, question}] rows whose pair is no «no» in any record (an invented row or a wrong PR). An open PR's «no» is a legit pair: the row is written in the fix;
 //   errored: [{pr, error}] the rounds that ended in an error of the judge: they say nothing about the questions, so they are not debt, but they are listed.
-// A check-run without a readable record stops the figure with an error; counting around it would be false (as `rounds` of audit-data.mjs).
+// A check-run without a readable record stops the figure with an error (REVIEWER_NO_UNREADABLE); counting around it would be false
+// (as `rounds` of audit-data.mjs). The exception: one that belongs only to PRs the debt does not count (not merged since `since`) is not
+// read, but it is shown: ignored: [{pr, checkRuns}] (its PR, how many). One that no PR holds by head_sha (or with no head_sha) still stops.
+//   (with `ignored`, the other fields as above)
 export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
   if (!DAY.test(since)) throw new Error(`since must be YYYY-MM-DD, got ${since}`);
   const from = Date.parse(`${since}T00:00:00Z`);
-  const mergedSince = new Set(readPulls(pulls).filter((p) => p.merged !== null && p.merged >= from).map((p) => p.number));
+  const prs = readPulls(pulls);
+  const mergedSince = new Set(prs.filter((p) => p.merged !== null && p.merged >= from).map((p) => p.number));
   const { records, unreadable } = readCheckRuns(checkRuns);
-  if (unreadable.length > 0) throw new Error(`check-runs without a readable record (index: ${unreadable.map((u) => u.index).join(', ')})`);
+  const ignoredBy = new Map();
+  const stopping = [];
+  for (const u of unreadable) {
+    const sha = checkRuns[u.index]?.head_sha;
+    const owners = prs.filter((p) => p.commits.has(sha)).map((p) => p.number); // no head_sha: no owner, so it stops
+    if (owners.length === 0 || owners.some((n) => mergedSince.has(n))) stopping.push(u.index);
+    else for (const n of owners) ignoredBy.set(n, (ignoredBy.get(n) ?? 0) + 1);
+  }
+  if (stopping.length > 0) throw new ExitError('REVIEWER_NO_UNREADABLE', `check-runs without a readable record (index: ${stopping.join(', ')})`);
+  const ignored = [...ignoredBy].map(([pr, n]) => ({ pr, checkRuns: n })).sort((a, b) => a.pr - b.pr);
   const noPairs = new Map();
   const errored = [];
   for (const r of records) {
@@ -126,5 +140,6 @@ export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
     pending: mine.filter((r) => r.outcome === OUTCOME_PENDING).map(({ pr, question, kind }) => ({ pr, question, kind })),
     unmatched: mine.filter((r) => !noPairs.has(pairKey(r.pr, r.question))).map(({ pr, question }) => ({ pr, question })),
     errored: errored.sort((a, b) => a.pr - b.pr || a.error.localeCompare(b.error)),
+    ignored,
   };
 }

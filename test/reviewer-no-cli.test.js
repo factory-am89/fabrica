@@ -99,9 +99,28 @@ test('a check-run without a readable record stops the command with an error, no 
   const file = path.join(dir, 'records.json');
   writeFileSync(file, JSON.stringify(records));
   const r = cliReviewerNo(['--debt', '--records', file, '--json']);
-  assert.notEqual(r.code, EXIT.OK);
+  assert.equal(r.code, EXIT.REVIEWER_NO_UNREADABLE);
   assert.match(r.stderr, /without a readable record/);
-  assert.equal(JSON.parse(r.stdout).ok, false);
+  const d = JSON.parse(r.stdout);
+  assert.equal(d.ok, false);
+  assert.equal(d.error, 'REVIEWER_NO_UNREADABLE');
+});
+
+test('an unreadable check-run of a PR the debt does not count is shown as ignored (human and json); one of a counted PR stops with its own code', (t) => {
+  const withBroken = (sha) => {
+    const records = JSON.parse(readFileSync(RECORDS, 'utf8'));
+    records.checkRuns.push({ head_sha: sha, output: { title: 'x', summary: 'x', text: 'nothing' } });
+    const dir = mkdtempSync(path.join(tmpdir(), 'fabrica-reviewerno-recs-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const file = path.join(dir, 'records.json');
+    writeFileSync(file, JSON.stringify(records));
+    return file;
+  };
+  const old = withBroken('3'.repeat(40)); // PR 11, merged before DEBT_SINCE
+  assert.deepEqual(JSON.parse(cliReviewerNo(['--debt', '--records', old, '--json']).stdout).ignored, [{ pr: 11, checkRuns: 1 }]);
+  assert.match(cliReviewerNo(['--debt', '--records', old]).stdout, /ignored: 1 check-runs without a record, in 1 PRs the debt does not count \(#11\.\.#11\)/);
+  assert.match(cliReviewerNo(debtArgs()).stdout, /ignored: 0 check-runs/);
+  assert.equal(cliReviewerNo(['--debt', '--records', withBroken('1'.repeat(40)), '--json']).code, EXIT.REVIEWER_NO_UNREADABLE); // PR 10, counted
 });
 
 test('usage: --debt is required, and exactly one of --records or --repo; a flag without value is refused', async () => {
