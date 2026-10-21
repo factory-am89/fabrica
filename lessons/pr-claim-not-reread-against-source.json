@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "question": "C9",
+  "sources": [
+    "#98",
+    "#102",
+    "#116",
+    "#117"
+  ],
+  "mechanism": ".claude/skills/github/referencias/subir.md",
+  "origin": "constructor",
+  "signal": "none",
+  "reason": [
+    "otro"
+  ],
+  "reason_note": "una frase libre del cuerpo del PR (lo que dice el diff, un recuento, un «no se probó») no la verifica ninguna máquina: pr-body.mjs y evidence.mjs comprueban la forma y generan los números, no que la prosa diga la verdad",
+  "escaped": false
+}

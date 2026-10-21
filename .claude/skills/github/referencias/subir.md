@@ -12,6 +12,9 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    `node scripts/pr-body.mjs --body-file <scratchpad>/body.md --files-file <scratchpad>/files.txt` -> `pr-body: ok`.
    `--files-file` does NOT check the Evidence HEAD (it prints a note saying so); only CI's `--compare-file` does.
    Check it by hand: the `HEAD <sha>` line of the body must equal `git rev-parse --short HEAD`.
+   Before pushing, re-read every sentence of the body that says what the diff does or does not contain, or gives a count,
+   against the diff itself (`git diff origin/main...HEAD`); a sentence with no command and output behind it goes
+   to «Not verified» (lesson: pr-claim-not-reread-against-source; no machine reads this prose).
 4. **Body before push.** The body must already cite the HEAD you are about to push. Updating an existing PR: run
    `node scripts/token.mjs -- gh pr edit <n> --body-file <scratchpad>/body.md` first, then push. If the push goes
    first, the edit and the push can each start a `tests` run (inferred), and a run that reads the old body is red
