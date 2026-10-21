@@ -240,6 +240,13 @@ test('debt: what was merged before the date, is still open, or has a record with
   assert.deepEqual(reviewerNoDebt(data, [], SINCE).missing, []);
 });
 
+test('debt: a round that ended in an error is listed in errored (PR and error), never dropped without a trace', () => {
+  const data = dataOf([pull(14, '2026-10-20T10:00:00Z'), pull(15, '2026-10-20T10:00:00Z')], [rec(15, { C5: NO }, { error: ERROR.standardUnloadable }), rec(14, { C4: NO }, { error: ERROR.outputUnreadable })]);
+  const d = reviewerNoDebt(data, [], SINCE);
+  assert.deepEqual(d.errored, [{ pr: 14, error: ERROR.outputUnreadable }, { pr: 15, error: ERROR.standardUnloadable }]);
+  assert.deepEqual(reviewerNoDebt(dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })]), [], SINCE).errored, []);
+});
+
 test('debt: a row covers its pair; a different question or PR does not', () => {
   const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO, C9: NO })]);
   assert.deepEqual(reviewerNoDebt(data, [debtRow(10, 'C5', GOOD_ID)], SINCE).missing, [{ pr: 10, question: 'C9' }]);

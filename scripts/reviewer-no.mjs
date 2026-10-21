@@ -45,6 +45,8 @@ export function humanDebt(d) {
     ...section('missing', d.missing, () => ''),
     ...section('pending', d.pending, (i) => ` (${i.kind})`),
     ...section('unmatched', d.unmatched, () => ''),
+    `errored: ${d.errored.length}`,
+    ...d.errored.map((e) => `  #${e.pr} ${e.error}`),
     ...(none ? ['sin deuda'] : []),
   ].join('\n');
 }

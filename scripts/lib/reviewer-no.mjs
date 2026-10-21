@@ -98,7 +98,8 @@ const pairKey = (pr, question) => JSON.stringify([pr, question]);
 // {pulls, checkRuns} as scripts/collect-records.mjs writes them, rows = the list of reviewer-no.json -> { since, missing, pending, unmatched }:
 //   missing: [{pr, question}] a «no» of a PR merged on or after `since` (UTC) with no row;
 //   pending: [{pr, question, kind}] the rows whose outcome is pendiente;
-//   unmatched: [{pr, question}] rows whose pair is no «no» in any record (an invented row or a wrong PR). An open PR's «no» is a legit pair: the row is written in the fix.
+//   unmatched: [{pr, question}] rows whose pair is no «no» in any record (an invented row or a wrong PR). An open PR's «no» is a legit pair: the row is written in the fix;
+//   errored: [{pr, error}] the rounds that ended in an error of the judge: they say nothing about the questions, so they are not debt, but they are listed.
 // A check-run without a readable record stops the figure with an error; counting around it would be false (as `rounds` of audit-data.mjs).
 export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
   if (!DAY.test(since)) throw new Error(`since must be YYYY-MM-DD, got ${since}`);
@@ -107,8 +108,12 @@ export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
   const { records, unreadable } = readCheckRuns(checkRuns);
   if (unreadable.length > 0) throw new Error(`check-runs without a readable record (index: ${unreadable.map((u) => u.index).join(', ')})`);
   const noPairs = new Map();
+  const errored = [];
   for (const r of records) {
-    if (r.error !== null) continue; // a record with an error says nothing about the questions (aggregate does the same)
+    if (r.error !== null) { // a record with an error says nothing about the questions (aggregate does the same), but it is shown, not lost
+      errored.push({ pr: r.pr, error: r.error });
+      continue;
+    }
     for (const [question, answer] of Object.entries(r.answers)) if (answer === ANSWER.no) noPairs.set(pairKey(r.pr, question), { pr: r.pr, question });
   }
   const { source: SOURCE, question: QUESTION, kind: KIND, outcome: OUTCOME } = REVIEWER_NO_KEYS;
@@ -120,5 +125,6 @@ export function reviewerNoDebt({ pulls, checkRuns }, rows, since = DEBT_SINCE) {
     missing: [...noPairs.values()].filter((p) => mergedSince.has(p.pr) && !covered.has(pairKey(p.pr, p.question))).sort(byPair),
     pending: mine.filter((r) => r.outcome === OUTCOME_PENDING).map(({ pr, question, kind }) => ({ pr, question, kind })),
     unmatched: mine.filter((r) => !noPairs.has(pairKey(r.pr, r.question))).map(({ pr, question }) => ({ pr, question })),
+    errored: errored.sort((a, b) => a.pr - b.pr || a.error.localeCompare(b.error)),
   };
 }

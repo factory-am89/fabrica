@@ -76,6 +76,20 @@ test('a reviewer-no.json with faults: the dedicated exit code, the fault codes l
   assert.equal(d.exit, EXIT.REVIEWER_NO_FAULTS);
 });
 
+test('a round with an error is shown by the command, in human and json, and does not count as debt', (t) => {
+  const records = JSON.parse(readFileSync(RECORDS, 'utf8'));
+  const record = { v: 1, repo: 'o/r', pr: 13, sha: 'e'.repeat(40), standard: null, ok: false, answers: {}, invalid: 0, error: 'output-unreadable', run: null };
+  records.checkRuns.push({ head_sha: record.sha, output: { title: 'x', summary: 'x', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` } });
+  const dir = mkdtempSync(path.join(tmpdir(), 'fabrica-reviewerno-recs-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'records.json');
+  writeFileSync(file, JSON.stringify(records));
+  const j = cliReviewerNo(['--debt', '--records', file, '--json']);
+  assert.deepEqual(JSON.parse(j.stdout).errored, [{ pr: 13, error: 'output-unreadable' }]);
+  assert.match(cliReviewerNo(['--debt', '--records', file]).stdout, /errored: 1\n {2}#13 output-unreadable/);
+  assert.match(cliReviewerNo(debtArgs()).stdout, /errored: 0/);
+});
+
 test('a check-run without a readable record stops the command with an error, no debt printed', (t) => {
   const records = JSON.parse(readFileSync(RECORDS, 'utf8'));
   records.checkRuns.push({ head_sha: 'f'.repeat(40), output: { title: 'x', summary: 'x', text: 'nothing' } });
