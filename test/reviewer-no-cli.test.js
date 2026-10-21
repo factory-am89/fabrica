@@ -29,8 +29,8 @@ function fixtureRoot(t, content) {
   return root;
 }
 
-test('good case, --json: one object; the «no» of the merged PR since DEBT_SINCE is missing, the old, open and clean ones are not', () => {
-  const r = cliReviewerNo(debtArgs('--json'));
+test('good case, --json: one object; the «no» of the merged PR since DEBT_SINCE is missing, the old, open and clean ones are not', (t) => {
+  const r = cliReviewerNo(debtArgs('--json', fixtureRoot(t, []))); // an empty registry: the real reviewer-no.json grows and must not decide this test
   assert.equal(r.code, EXIT.OK);
   assert.equal(r.stdout.trim().split('\n').length, 1);
   const d = JSON.parse(r.stdout);
@@ -48,8 +48,8 @@ test('rows of the file cover the pairs, are listed as pending, and a row without
   assert.deepEqual(d.unmatched, [{ pr: 10, question: 'C1' }]);
 });
 
-test('human text says the date the debt counts from, the missing pairs and the PR', () => {
-  const r = cliReviewerNo(debtArgs());
+test('human text says the date the debt counts from, the missing pairs and the PR', (t) => {
+  const r = cliReviewerNo(debtArgs(fixtureRoot(t, [])));
   assert.equal(r.code, EXIT.OK);
   assert.match(r.stdout, new RegExp(DEBT_SINCE));
   assert.match(r.stdout, /missing: 2/);
