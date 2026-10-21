@@ -16,7 +16,8 @@ import { freeValues, humanFreeValues } from './lib/free-values.mjs';
 import { DEBT_ID, passesPath, debtOf, staticDebt } from './lib/goals-debt.mjs';
 import { readGoals } from './lib/goals.mjs';
 import { hygieneCounts } from './lib/hygiene.mjs';
-import { localInputs } from './lib/lesson-effect.mjs';
+import { localInputs, readLessonSources } from './lib/lesson-effect.mjs';
+import { noPerKind, reviewerNoRows } from './lib/reviewer-no.mjs';
 import { exportedStrings, stringsOf } from './lib/quoted-strings.mjs';
 import { contarMensajes } from './lib/message-log.mjs';
 import { collect, getWithToken } from './collect-records.mjs';
@@ -36,6 +37,7 @@ export const INDICATORS = Object.freeze({
   baseHoles: 'base-holes',
   testDuplication: 'test-duplication',
   freeValues: 'free-values',
+  noPerKind: 'no-per-kind', // the «no» of the reviewer by kind of failure, outcome and question, and the relapses (scripts/lib/reviewer-no.mjs)
   hygiene: 'hygiene', // candidates by code (npm run hygiene lists them)
   goalsDebt: DEBT_ID, // what the goals owe: holes, readers that fire by hand (scripts/lib/goals-debt.mjs); a pass of audit --data or --hitl adds its indicators that cannot conclude
   ...DATA_IDS, // the data indicators (audit --data), listed in scripts/lib/audit-data.mjs
@@ -109,6 +111,7 @@ export function audit(root, { logPath } = {}) {
     [INDICATORS.baseHoles]: { holes: baseHoles(readEntities(root)) },
     [INDICATORS.testDuplication]: duplicationInTests(root),
     [INDICATORS.freeValues]: freeValues(root),
+    [INDICATORS.noPerKind]: noPerKind(reviewerNoRows(root), readLessonSources(root)),
     [INDICATORS.hygiene]: hygieneCounts(root),
     [INDICATORS.goalsDebt]: debtOf(staticDebt(readGoals(root), root)),
   };
@@ -142,6 +145,9 @@ export function humanLocal(r) {
     line(INDICATORS.testDuplication, `${r[INDICATORS.testDuplication].count} strings of >= ${r[INDICATORS.testDuplication].minLength} chars`),
     ...r[INDICATORS.testDuplication].values.map((v) => `  ${JSON.stringify(v.value)}: ${v.tests.join(', ')} <- ${v.lib.join(', ')}`),
     ...humanFreeValues(INDICATORS.freeValues, r[INDICATORS.freeValues]),
+    line(INDICATORS.noPerKind, `${r[INDICATORS.noPerKind].total} rows, ${r[INDICATORS.noPerKind].relapses.length} relapses, ${r[INDICATORS.noPerKind].otherNotes.length} notes of otro`),
+    `  by kind: ${JSON.stringify(r[INDICATORS.noPerKind].byKind)}`,
+    `  by outcome: ${JSON.stringify(r[INDICATORS.noPerKind].byOutcome)}`,
     line(INDICATORS.hygiene, `${r[INDICATORS.hygiene].total} ${JSON.stringify(r[INDICATORS.hygiene].byCode)}`),
   ].join('\n');
 }

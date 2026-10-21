@@ -28,8 +28,8 @@ const SCRIPT = path.join(RAIZ, 'scripts', 'audit.mjs');
 const NON_LOCAL = [...DATA_INDICATORS, ...HITL_INDICATORS]; // measured by audit --data and audit --hitl, not by the local audit
 const NO_LOG = 'no-such-log.jsonl';
 
-// What hygiene needs of any lesson (a lesson without them stops the audit).
-const READABLE = { signal: SIGNAL_NONE, question: NO_QUESTION, mechanism: 'scripts/con.mjs' };
+// What hygiene and no-per-kind need of any lesson (a lesson without them stops the audit).
+const READABLE = { signal: SIGNAL_NONE, question: NO_QUESTION, mechanism: 'scripts/con.mjs', sources: ['#9'] };
 const run = (root) => audit(root, { logPath: path.join(root, NO_LOG) });
 
 test('INDICATORS is the closed list: the local audit returns exactly one value per non-data id', (t) => {
@@ -141,7 +141,7 @@ test('hygiene: the candidates are counted by code; the codes that need records a
 });
 
 test('hygiene: a lesson whose mechanism is gone counts as DEAD_REF, and the text output has the indicator line', (t) => {
-  const root = fixture(t, { [`${LESSONS_DIR}/d.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/gone.mjs' }) });
+  const root = fixture(t, { [`${LESSONS_DIR}/d.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/gone.mjs', sources: ['#9'] }) });
   const r = run(root);
   assert.equal(r[INDICATORS.hygiene].byCode[CODES.DEAD_REF], 1);
   assert.ok(humanLocal(r).split('\n').includes(`${INDICATORS.hygiene}: 3 ${JSON.stringify(r[INDICATORS.hygiene].byCode)}`));

@@ -91,6 +91,53 @@ export function reviewerNoFaults(text, ctx, lessonIds) {
   return faults;
 }
 
+// The signal of audit (chunk 6 of plans/registro-de-no.md): no-per-kind. Local, no network, no threshold.
+// The two groups of outcome that name a lesson: the PR is in its sources (the row made the lesson) or it is not (the lesson already
+// existed: a relapse). They are keys of the figure, not values of the file.
+export const OUTCOME_GROUPS = Object.freeze({ lessonNew: 'leccion-nueva', lessonExisting: 'leccion-existente' });
+const zeros = (keys) => Object.fromEntries(keys.map((k) => [k, 0]));
+
+export const reviewerNoRows = (root) => {
+  const d = JSON.parse(readReviewerNo(root));
+  if (!Array.isArray(d.rows)) throw new Error(`${REVIEWER_NO_FILE}: rows must be a list`);
+  return d.rows;
+};
+
+// rows: the list of reviewer-no.json; lessons: [{id, sources: [PR number]}] (readLessonSources) ->
+//   { total, byKind (every kind of KINDS, with 0), byOutcome (OUTCOME_GROUPS and every closed outcome, with 0),
+//     byKindQuestion {kind: {question: n}} (only kinds with rows), otherNotes [{pr, question, field, note}] (rows kind or outcome otro),
+//     relapses [{pr, question, kind, lesson}] (outcome is a lesson without that PR in its sources) }.
+// A kind or an outcome outside the closed lists throws: it is never counted as «otro».
+export function noPerKind(rows, lessons) {
+  const { source: SOURCE, question: QUESTION, kind: KIND, kindNote: KIND_NOTE, outcome: OUTCOME, outcomeNote: OUTCOME_NOTE } = REVIEWER_NO_KEYS;
+  const byKind = zeros(KINDS);
+  const byOutcome = { ...zeros(Object.values(OUTCOME_GROUPS)), ...zeros(OUTCOME_REASONS) };
+  const byKindQuestion = {};
+  const otherNotes = [];
+  const relapses = [];
+  for (const r of rows) {
+    const pr = sourceNumber(r[SOURCE]);
+    const [question, kind, outcome] = [r[QUESTION], r[KIND], r[OUTCOME]];
+    if (!KINDS.includes(kind)) throw new Error(`row #${pr}: ${KIND} ${JSON.stringify(kind)} is not in ${KINDS.join(', ')}`);
+    byKind[kind] += 1;
+    byKindQuestion[kind] = { ...byKindQuestion[kind], [question]: (byKindQuestion[kind]?.[question] ?? 0) + 1 };
+    if (kind === OTHER) otherNotes.push({ pr, question, field: KIND, note: r[KIND_NOTE] });
+    if (OUTCOME_REASONS.includes(outcome)) {
+      byOutcome[outcome] += 1;
+      if (outcome === OTHER) otherNotes.push({ pr, question, field: OUTCOME, note: r[OUTCOME_NOTE] });
+      continue;
+    }
+    const lesson = lessons.find((l) => l.id === outcome);
+    if (lesson === undefined) throw new Error(`row #${pr}: ${OUTCOME} ${JSON.stringify(outcome)} is neither a closed value nor a lesson`);
+    if (lesson.sources.includes(pr)) byOutcome[OUTCOME_GROUPS.lessonNew] += 1;
+    else {
+      byOutcome[OUTCOME_GROUPS.lessonExisting] += 1;
+      relapses.push({ pr, question, kind, lesson: lesson.id });
+    }
+  }
+  return { total: rows.length, byKind, byOutcome, byKindQuestion, otherNotes, relapses };
+}
+
 // The debt (chunk 3 of plans/registro-de-no.md). The rule «triar los no» started when #112 merged; what was merged before is not counted.
 export const DEBT_SINCE = '2026-10-19';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
