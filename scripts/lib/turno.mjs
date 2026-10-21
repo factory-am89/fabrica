@@ -1,6 +1,7 @@
 // Turn for `npm run done`: one suite at a time on the machine, and only when there is memory to run it.
 // Measured 21 oct 2026: several builders ran `done` together with ~2.2 GB free of 16 GB and the system killed
-// background processes for lack of memory. So: a lock file in ~/.fabrica/ (one holder at a time) and a floor of free memory.
+// background processes for lack of memory. So: a lock file in ~/.fabrica/ (one holder at a time) and a floor of free memory
+// calibrated on the measured peak of one suite (below), not on a guess.
 // Everything outside the pure logic (clock, sleeping, free memory, live pids, files, printing) is injected.
 import * as fsReal from 'node:fs';
 import { freemem, homedir } from 'node:os';
@@ -9,8 +10,15 @@ import { ExitError } from './exit.mjs';
 
 export const rutaDeCandadoDone = (casa = homedir) => join(casa(), '.fabrica', 'done.lock');
 
-// Free memory below which the suite does not start: the machine had 2.2 GB free of 16 GB and processes died, so 3 GiB.
-export const MIN_LIBRE_BYTES = 3 * 1024 ** 3;
+// Peak private memory of the whole process tree of one suite (`npm run lint` + `npm test`), the highest of 3 runs measured
+// 21 oct 2026 on the 16 GB machine (private: 1.70, 1.48, 1.42 GiB; working set, which counts shared pages twice: 2.02, 1.90,
+// 1.86 GiB; the fall of free memory during a run was 0.51, 1.11, 0.88 GiB). Re-measure if the suite grows.
+export const PICO_SUITE_BYTES = 1.7 * 1024 ** 3;
+// Safety factor over that peak: the suite grows, other programs move while it runs, and 3 runs are a small sample.
+export const MARGEN_UMBRAL = 1.25;
+// Free memory below which the suite does not start: the measured peak times the margin (about 2.1 GiB). The lock already
+// keeps two suites from running together, which is what killed processes at 2.2 GB free; one suite alone fits in this.
+export const MIN_LIBRE_BYTES = Math.ceil(PICO_SUITE_BYTES * MARGEN_UMBRAL);
 // Longest a run waits for its turn plus memory; past it, it fails (never starts anyway). A suite takes minutes, so 30 min is a long queue.
 export const ESPERA_MAX_MS = 30 * 60 * 1000;
 // A lock older than this is not a suite in progress, even if its pid is alive (a hung process or a reused pid).
@@ -41,7 +49,7 @@ export function pidVivoReal(pid, kill = process.kill.bind(process)) {
 // Sleeps in the same thread (the whole of `done` is synchronous).
 export const dormirReal = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-const GiB = (b) => (b / 1024 ** 3).toFixed(1);
+const GiB = (b) => (b / 1024 ** 3).toFixed(2);
 const dosDigitos = (n) => String(Math.floor(n)).padStart(2, '0');
 const minutos = (ms) => `${Math.floor(ms / 60000)}m${dosDigitos((ms % 60000) / 1000)}s`;
 
