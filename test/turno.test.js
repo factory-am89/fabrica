@@ -9,7 +9,7 @@ import path from 'node:path';
 import { ExitError, EXIT } from '../scripts/lib/exit.mjs';
 import {
   rutaDeCandadoDone, tomarTurno, liberarAlTerminar, umbralDeEntorno, pidVivoReal, SENALES,
-  MIN_LIBRE_BYTES, ESPERA_MAX_MS, CANDADO_MAX_EDAD_MS, SONDEO_MS, VAR_MIN_LIBRE_MB,
+  MIN_LIBRE_BYTES, PICO_SUITE_BYTES, MARGEN_UMBRAL, ESPERA_MAX_MS, CANDADO_MAX_EDAD_MS, SONDEO_MS, VAR_MIN_LIBRE_MB,
 } from '../scripts/lib/turno.mjs';
 import { cliDone, turnoReal, DONE_LINE } from '../scripts/done.mjs';
 
@@ -114,7 +114,7 @@ test('done: a floor set from the environment is said on screen, with its value',
   const proc = Object.assign(new EventEmitter(), { exit() {} });
   turnoReal({ [VAR_MIN_LIBRE_MB]: '512' }, m.opciones, proc).soltar();
   assert.equal(m.dichos.length, 1);
-  assert.match(m.dichos[0], new RegExp(`${VAR_MIN_LIBRE_MB}: 512 MB \\(default 3072 MB\\)`));
+  assert.match(m.dichos[0], new RegExp(`${VAR_MIN_LIBRE_MB}: 512 MB \\(default ${MIN_LIBRE_BYTES / 1024 ** 2} MB\\)`));
 });
 
 test('turno: the wait runs out -> fails loud with DONE_TURN_TIMEOUT, leaves the other lock, never takes the turn', () => {
@@ -140,18 +140,28 @@ test('turno: an unreadable lock is waited for and never removed; it times out sa
 });
 
 test('turno: low memory -> waits until it rises, says how much, then starts', () => {
-  const m = mundo({ libre: (w) => (w.sueños < 2 ? 2.2 * GIB : MIN_LIBRE_BYTES) });
+  const m = mundo({ libre: (w) => (w.sueños < 2 ? 1.9 * GIB : MIN_LIBRE_BYTES) });
   const t = tomarTurno(m.opciones);
   assert.equal(m.sueños, 2);
-  assert.match(m.dichos[0], /waiting for memory: 2\.2 GiB free, 3\.0 GiB needed/);
+  assert.match(m.dichos[0], /waiting for memory: 1\.90 GiB free, 2\.13 GiB needed/);
   assert.equal(dueno(m).pid, ME, 'it holds the turn while it waits for memory');
   t.soltar();
 });
 
 test('turno: memory never rises -> DONE_TURN_TIMEOUT and our lock is released first', () => {
-  const m = mundo({ libre: () => 2.2 * GIB });
+  const m = mundo({ libre: () => 1.9 * GIB });
   assert.throws(() => tomarTurno(m.opciones), (e) => e instanceof ExitError && e.exit === EXIT.DONE_TURN_TIMEOUT && /free memory/.test(e.message));
   assert.equal(existsSync(m.ruta), false);
+});
+
+test('turno: the free memory that the suite measured to need passes at once; just under the floor it waits', () => {
+  for (const libre of [2.4 * GIB, 2.6 * GIB, MIN_LIBRE_BYTES]) {
+    const m = mundo({ libre: () => libre });
+    tomarTurno(m.opciones).soltar();
+    assert.equal(m.sueños, 0, `${libre / GIB} GiB free must pass without waiting`);
+  }
+  const m = mundo({ libre: () => MIN_LIBRE_BYTES - 1 });
+  assert.throws(() => tomarTurno({ ...m.opciones, esperaMax: SONDEO_MS }), /free memory/);
 });
 
 test('turno: soltar never removes a lock that is not ours', () => {
@@ -163,7 +173,10 @@ test('turno: soltar never removes a lock that is not ours', () => {
 });
 
 test('turno: the constants have the measured/derived values and make sense together', () => {
-  assert.ok(MIN_LIBRE_BYTES > 2.2 * GIB, 'the floor is above the free memory at which processes died');
+  assert.equal(MIN_LIBRE_BYTES, Math.ceil(PICO_SUITE_BYTES * MARGEN_UMBRAL), 'the floor is the measured peak times the margin');
+  assert.ok(MARGEN_UMBRAL > 1, 'the margin leaves room over the peak');
+  assert.ok(MIN_LIBRE_BYTES > 2.02 * GIB, 'the floor is above the highest working set measured for one suite');
+  assert.ok(MIN_LIBRE_BYTES < 2.4 * GIB, 'the floor lets through the 2.4-2.6 GiB free that the machine usually has');
   assert.ok(CANDADO_MAX_EDAD_MS > SONDEO_MS && ESPERA_MAX_MS > SONDEO_MS);
 });
 
