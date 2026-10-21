@@ -1,4 +1,5 @@
 // Turn for `npm run done`: one suite at a time on the machine, and only when there is memory to run it.
+// The startup pull uses the same turn (one `git pull` at a time in the main folder; scripts/pull-main.mjs).
 // Measured 21 oct 2026: several builders ran `done` together with ~2.2 GB free of 16 GB and the system killed
 // background processes for lack of memory. So: a lock file in ~/.fabrica/ (one holder at a time) and a floor of free memory
 // calibrated on the measured peak of one suite (below), not on a guess.
@@ -67,7 +68,7 @@ function leer(fs, ruta) {
 }
 
 // Takes the lock or reports who holds it. Returns { tomado: true } or { tomado: false, dueno }.
-function intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir }) {
+function intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir, quien }) {
   fs.mkdirSync(join(ruta, '..'), { recursive: true });
   try {
     fs.writeFileSync(ruta, JSON.stringify({ pid, desde: new Date(ahora()).toISOString() }), { flag: 'wx' });
@@ -85,7 +86,7 @@ function intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir }) {
   const ahoraEs = leer(fs, ruta);
   if (ahoraEs?.texto === dueno.texto) {
     fs.rmSync(ruta);
-    decir(`done: removed the lock of pid ${dueno.pid} (since ${dueno.desde}): ${motivo}`);
+    decir(`${quien}: removed the lock of pid ${dueno.pid} (since ${dueno.desde}): ${motivo}`);
   }
   return { tomado: false, dueno: null };
 }
@@ -98,28 +99,30 @@ function soltar({ fs, ruta, pid }) {
 
 // Waits for its turn and for free memory. Returns { soltar } (idempotent). Throws ExitError('DONE_TURN_TIMEOUT') when
 // ESPERA_MAX_MS runs out; the lock is then released first, and the suite is never started.
+// `quien` (the prefix of every message) and `tarea` (what is not started on timeout) let another command use the
+// same turn: the startup pull (scripts/pull-main.mjs) does, with no memory floor.
 export function tomarTurno({
   fs = fsReal, ruta = rutaDeCandadoDone(), pid = process.pid, ahora = Date.now, dormir = dormirReal, pidVivo = pidVivoReal,
   libre = freemem, minLibre = MIN_LIBRE_BYTES, esperaMax = ESPERA_MAX_MS, edadMax = CANDADO_MAX_EDAD_MS, sondeo = SONDEO_MS,
-  decir = (m) => console.error(m),
+  decir = (m) => console.error(m), quien = 'done', tarea = 'the suite',
 } = {}) {
   const limite = ahora() + esperaMax;
-  const alFallar = (que) => new ExitError('DONE_TURN_TIMEOUT', `done: gave up after ${minutos(esperaMax)} waiting for ${que}; the suite was not started`);
+  const alFallar = (que) => new ExitError('DONE_TURN_TIMEOUT', `${quien}: gave up after ${minutos(esperaMax)} waiting for ${que}; ${tarea} was not started`);
   let ultimo = '';
   const avisar = (m) => { if (m !== ultimo) { ultimo = m; decir(m); } };
   for (;;) {
-    const r = intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir });
+    const r = intentar({ fs, ruta, pid, ahora, pidVivo, edadMax, decir, quien });
     if (r.tomado) break;
     if (ahora() >= limite) throw alFallar(r.dueno?.ilegible ? `the lock ${ruta} (unreadable)` : `the turn of pid ${r.dueno?.pid ?? '(changing hands)'}`);
-    if (r.dueno?.ilegible) avisar(`done: waiting: the lock ${ruta} cannot be read (pid and time unknown)`);
-    else if (r.dueno) avisar(`done: waiting for my turn: pid ${r.dueno.pid} has been running done since ${r.dueno.desde}`);
+    if (r.dueno?.ilegible) avisar(`${quien}: waiting: the lock ${ruta} cannot be read (pid and time unknown)`);
+    else if (r.dueno) avisar(`${quien}: waiting for my turn: pid ${r.dueno.pid} has been running ${quien} since ${r.dueno.desde}`);
     if (r.dueno !== null && r.dueno !== undefined) dormir(sondeo);
   }
   const liberar = () => soltar({ fs, ruta, pid });
   try {
     while (libre() < minLibre) {
       if (ahora() >= limite) throw alFallar(`free memory (${GiB(libre())} GiB free, ${GiB(minLibre)} GiB needed)`);
-      avisar(`done: waiting for memory: ${GiB(libre())} GiB free, ${GiB(minLibre)} GiB needed`);
+      avisar(`${quien}: waiting for memory: ${GiB(libre())} GiB free, ${GiB(minLibre)} GiB needed`);
       dormir(sondeo);
     }
   } catch (e) { liberar(); throw e; }
