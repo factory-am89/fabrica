@@ -14,6 +14,10 @@
   ],
   "mechanism": "scripts/lib/quoted-strings.mjs",
   "origin": "constructor",
-  "signal": "machine",
+  "signal": "none",
+  "reason": [
+    "otro"
+  ],
+  "reason_note": "el indicador test-duplication de audit cuenta (87 cadenas hoy) pero no falla ni lo dispara nada solo, y no ve copias en prosa ni entre ficheros de lib; hace falta un test que falle (plan aparte, toca audit.mjs)",
   "escaped": false
 }

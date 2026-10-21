@@ -1,5 +1,5 @@
 // Quoted strings of a source file, for the test-duplication indicator of scripts/audit.mjs.
-// lesson: vocabulary-retyped-not-imported (the indicator only counts: a signal, not a gate, and blind to copies in prose or in other lib files)
+// lesson: vocabulary-retyped-not-imported (the indicator only counts: a signal, not a gate, and blind to copies in prose or between lib files)
 // The quoted strings of a source, without line comments (a `//` after a space or at the start of a line).
 const QUOTED = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1/g;
 export const stringsOf = (text) => [...text.replace(/(^|\s)\/\/.*$/gm, '$1').matchAll(QUOTED)].map((m) => m[2]);
