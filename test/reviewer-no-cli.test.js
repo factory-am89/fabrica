@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { DEBT_SINCE, KINDS, OUTCOME_NOISE, OUTCOME_PENDING, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_VERSION } from '../scripts/lib/reviewer-no.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
-import { cliReviewerNo, mainReviewerNo } from '../scripts/reviewer-no.mjs';
+import { cliReviewerNo, downloadWithToken, mainReviewerNo } from '../scripts/reviewer-no.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RECORDS = path.join(RAIZ, 'test', 'fixtures', 'reviewer-no', 'records.json');
@@ -95,6 +95,17 @@ test('usage: --debt is required, and exactly one of --records or --repo; a flag 
     assert.equal(cliReviewerNo(argv).code, EXIT.USAGE, argv.join(' '));
   }
   assert.equal((await mainReviewerNo(['--debt'], async () => { throw new Error('must not be called'); })).code, EXIT.USAGE);
+});
+
+test('the real download keeps a PR created long before DEBT_SINCE and merged after it (collect is called without --since)', async () => {
+  const old = { number: 7, state: 'closed', created_at: '2026-09-01T10:00:00Z', merged_at: '2026-10-20T10:00:00Z', head: { ref: 'feat/old' } };
+  const get = async (route) => {
+    if (route.includes('/pulls?')) return [old];
+    if (route.includes('/actions/workflows/')) return { workflow_runs: [], total_count: 0 };
+    return [];
+  };
+  const data = await downloadWithToken(REPO, get);
+  assert.deepEqual(data.pulls.map((p) => p.number), [7]);
 });
 
 test('--repo downloads that repo without --since (a PR created before and merged after must come), and a failed download is GH_FAILED', async () => {

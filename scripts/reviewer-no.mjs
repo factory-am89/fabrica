@@ -67,7 +67,8 @@ export function cliReviewerNo(argv, { collected = null } = {}) {
   });
 }
 
-const downloadWithToken = (repo) => collect({ get: async (route) => getWithToken(route), repo, since: null });
+// No `since`: collect filters by creation date. `get` is the real GET through the token unless a test gives another.
+export const downloadWithToken = (repo, get = async (route) => getWithToken(route)) => collect({ get, repo, since: null });
 
 // A failed download is GH_FAILED; a usage error is still USAGE (the arguments are read before anything is downloaded).
 export async function mainReviewerNo(argv, download = downloadWithToken) {

@@ -213,6 +213,19 @@ test('debt: a «no» of a merged PR since DEBT_SINCE without a row is missing, o
   assert.equal(d.since, SINCE);
 });
 
+test('debt: only an answer «no» is a «no» (not «no aplica», not an unanswered one), and the list is sorted by PR and question', () => {
+  const data = dataOf(
+    [pull(10, '2026-10-20T10:00:00Z'), pull(11, '2026-10-20T10:00:00Z')],
+    [rec(11, { C9: NO, C5: NO }), rec(10, { C9: NO, C1: ANSWER.notApplicable, C2: null })],
+  );
+  assert.deepEqual(reviewerNoDebt(data, [], SINCE).missing, [{ pr: 10, question: 'C9' }, { pr: 11, question: 'C5' }, { pr: 11, question: 'C9' }]);
+});
+
+test('debt: the day itself counts from 00:00 UTC (the instant is in, the second before is out)', () => {
+  const data = dataOf([pull(10, '2026-10-19T00:00:00Z'), pull(11, '2026-10-18T23:59:59Z')], [rec(10, { C5: NO }), rec(11, { C5: NO })]);
+  assert.deepEqual(reviewerNoDebt(data, [], SINCE).missing, [{ pr: 10, question: 'C5' }]);
+});
+
 test('debt: DEBT_SINCE is the day #112 merged, and the default of the function', () => {
   assert.equal(DEBT_SINCE, '2026-10-19');
   const data = dataOf([pull(10, '2026-10-20T10:00:00Z')], [rec(10, { C5: NO })]);
