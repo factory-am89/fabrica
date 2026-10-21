@@ -2,13 +2,14 @@
 // Exit codes are read from the contract file (scripts/lib/exit-codes.json), never typed here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CONTRACT_FILE } from '../scripts/contract.mjs';
+import { VAR_MIN_LIBRE_MB } from '../scripts/lib/turno.mjs';
 import { runDone, cliDone, npmStep, DONE_LINE } from '../scripts/done.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,16 +68,20 @@ function fakeProject({ lint, test: testExit }) {
   const marker = path.join(dir, 'test-ran');
   const scripts = {
     lint: `node -e "process.exit(${lint})"`,
-    test: `node -e "require('fs').writeFileSync('test-ran','x');process.exit(${testExit})"`,
+    // the marker says whether the turn (the lock file in HOME) existed while the tests ran
+    test: `node -e "const f=require('fs');f.writeFileSync('test-ran',String(f.existsSync(require('path').join(process.env.HOME,'.fabrica','done.lock'))));process.exit(${testExit})"`,
   };
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fake', version: '1.0.0', scripts }));
-  return { dir, marker };
+  return { dir, marker, casa: path.join(dir, 'casa') };
 }
 
-const runDoneProcess = (dir) => {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'done.mjs')], { cwd: dir, encoding: 'utf8' });
+// The real process gets its own home (so it never touches the real ~/.fabrica) and no memory floor (so the machine's
+// load cannot make the test wait).
+const runDoneProcess = (dir, casa = path.join(dir, 'casa')) => {
+  const env = { ...process.env, HOME: casa, USERPROFILE: casa, [VAR_MIN_LIBRE_MB]: '0' };
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'done.mjs')], { cwd: dir, encoding: 'utf8', env });
   const lines = r.stdout.trimEnd().split('\n');
-  return { status: r.status, last: lines[lines.length - 1], stdout: r.stdout };
+  return { status: r.status, last: lines[lines.length - 1], stdout: r.stdout, stderr: r.stderr, lock: path.join(casa, '.fabrica', 'done.lock') };
 };
 
 test('done as a real process: lint and tests pass -> contract OK and last line "done: ok"', () => {
@@ -85,6 +90,30 @@ test('done as a real process: lint and tests pass -> contract OK and last line "
   assert.equal(r.status, contract().EXIT.OK, r.stdout);
   assert.equal(r.last, 'done: ok');
   assert.ok(existsSync(marker), 'tests must run after lint passes');
+  assert.equal(readFileSync(marker, 'utf8'), 'true', 'the real command holds the turn while the suite runs');
+  assert.equal(existsSync(r.lock), false, 'and gives it back at the end');
+});
+
+test('done as a real process: a stale lock of a dead pid is removed and said, then the suite runs', () => {
+  const { dir, marker } = fakeProject({ lint: 0, test: 0 });
+  const casa = path.join(dir, 'casa');
+  mkdirSync(path.join(casa, '.fabrica'), { recursive: true });
+  const muerto = spawnSync(process.execPath, ['-e', '0']); // a process that already ended: its pid is dead now
+  writeFileSync(path.join(casa, '.fabrica', 'done.lock'), JSON.stringify({ pid: muerto.pid, desde: new Date().toISOString() }));
+  const r = runDoneProcess(dir, casa);
+  assert.equal(r.status, contract().EXIT.OK, r.stdout + r.stderr);
+  assert.match(r.stderr, new RegExp(`removed the lock of pid ${muerto.pid}`));
+  assert.equal(readFileSync(marker, 'utf8'), 'true');
+  assert.equal(existsSync(r.lock), false);
+});
+
+test('done as a real process: the turn is given back also when lint or the tests fail', () => {
+  for (const cfg of [{ lint: 1, test: 0 }, { lint: 0, test: 1 }]) {
+    const { dir } = fakeProject(cfg);
+    const r = runDoneProcess(dir);
+    assert.notEqual(r.status, 0);
+    assert.equal(existsSync(r.lock), false);
+  }
 });
 
 test('done as a real process: lint fails -> contract DONE_LINT_FAILED, last line "done: fail lint", tests not run', () => {

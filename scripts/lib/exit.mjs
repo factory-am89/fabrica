@@ -20,6 +20,7 @@ export const EXIT = Object.freeze({
   NODE_MODULES_SHARED: 26, // retire: another folder's node_modules junction points into this one
   DONE_LINT_FAILED: 30, // done: npm run lint failed
   DONE_TESTS_FAILED: 31, // done: npm test failed
+  DONE_TURN_TIMEOUT: 32, // done: the wait for its turn or for free memory ran out; the suite was not started
   LESSON_FAULTS: 40, // lessons: the registry has at least one fault (the codes are in the output)
   ADOPTED_FAULTS: 41, // adopted: the project owns something it inherits (the fault codes are in the output)
 });
@@ -46,6 +47,7 @@ export const RECOVERY = Object.freeze({
   NODE_MODULES_SHARED: row(RETRY.AFTER_FIX, 'retire the other folder first, or remove its node_modules junction'),
   DONE_LINT_FAILED: row(RETRY.AFTER_FIX, 'fix what lint reports and run done again'),
   DONE_TESTS_FAILED: row(RETRY.AFTER_FIX, 'fix the failing test or the code it checks and run done again'),
+  DONE_TURN_TIMEOUT: row(RETRY.YES, 'another done holds the turn or memory is low: run done again later; if it keeps failing, read the lock in ~/.fabrica/done.lock and free memory, do not start the suite by hand'),
   LESSON_FAULTS: row(RETRY.AFTER_FIX, 'fix each fault code printed in the output and run lessons again'),
   ADOPTED_FAULTS: row(RETRY.NO, 'stop and write down the faults printed in the output; the fix belongs to the project, not to this command'),
 });

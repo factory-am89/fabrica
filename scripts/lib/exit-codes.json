@@ -16,6 +16,7 @@
     "NODE_MODULES_SHARED": 26,
     "DONE_LINT_FAILED": 30,
     "DONE_TESTS_FAILED": 31,
+    "DONE_TURN_TIMEOUT": 32,
     "LESSON_FAULTS": 40,
     "ADOPTED_FAULTS": 41
   },
@@ -92,6 +93,10 @@
     "DONE_TESTS_FAILED": {
       "retry": "after-fix",
       "then": "fix the failing test or the code it checks and run done again"
+    },
+    "DONE_TURN_TIMEOUT": {
+      "retry": "yes",
+      "then": "another done holds the turn or memory is low: run done again later; if it keeps failing, read the lock in ~/.fabrica/done.lock and free memory, do not start the suite by hand"
     },
     "LESSON_FAULTS": {
       "retry": "after-fix",
