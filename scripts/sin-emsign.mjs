@@ -2,7 +2,7 @@
 // de 8 certificados intermedios se podían calcular; Mozilla, bug 2083449) Node 24.12 seguía confiando en las 4 raíces
 // emSign y no había parche. usuario/tls/sin-emsign.cjs las quita en cada proceso Node del PC; install-pc lo copia a
 // ~/.claude/tls/ y este script hace que Node lo cargue siempre (NODE_OPTIONS del usuario de Windows).
-//   node scripts/sin-emsign.mjs instalar    pone NODE_OPTIONS=--require <~/.claude/tls/sin-emsign.cjs> (setx; terminal nueva)
+//   node scripts/sin-emsign.mjs instalar    añade --require <~/.claude/tls/sin-emsign.cjs> a NODE_OPTIONS del usuario (terminal nueva)
 //   node scripts/sin-emsign.mjs comprobar   sale con 1 si este proceso Node confía aún en alguna raíz emSign
 // El arranque lo comprueba en cada sesión (paso «tls»). Windows (git, curl) ya rechaza esas cadenas por revocación.
 import { spawnSync } from 'node:child_process';
@@ -30,12 +30,22 @@ export const pasoTls = (raices = raicesEmSign) => ({
   },
 });
 
-// NODE_OPTIONS del usuario tal como está guardado (no el de este proceso): '' si no hay.
+// NODE_OPTIONS guardada para el usuario de Windows (no la de este proceso). '' solo si no existe; si la lectura falla,
+// lanza: tomar un fallo por «no hay nada» haría que la escritura pisara lo que había.
+const powershell = (orden, env = process.env) =>
+  spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', orden], { encoding: 'utf8', env });
+const fallo = (r) => r.error?.message ?? (r.stderr.trim() || `salió con ${r.status}`);
+
 function leerDelUsuario() {
-  const r = spawnSync('reg', ['query', 'HKCU\\Environment', '/v', 'NODE_OPTIONS'], { encoding: 'utf8' });
-  if (r.status !== 0) return '';
-  const linea = r.stdout.split(/\r?\n/).find((l) => /^\s*NODE_OPTIONS\s+REG_/.test(l));
-  return linea ? linea.replace(/^\s*NODE_OPTIONS\s+REG_\w+\s+/, '').trim() : '';
+  const r = powershell("[Environment]::GetEnvironmentVariable('NODE_OPTIONS', 'User')");
+  if (r.error || r.status !== 0) throw new Error(`no pude leer NODE_OPTIONS del usuario: ${fallo(r)}`);
+  return r.stdout.trim();
+}
+
+// El valor va por una variable de entorno, no dentro de la orden: así no hay que escapar nada.
+function escribirDelUsuario(valor) {
+  const r = powershell("[Environment]::SetEnvironmentVariable('NODE_OPTIONS', $env:FABRICA_NODE_OPTIONS, 'User')", { ...process.env, FABRICA_NODE_OPTIONS: valor });
+  if (r.error || r.status !== 0) throw new Error(`no pude guardar NODE_OPTIONS del usuario: ${fallo(r)}`);
 }
 
 // Valor nuevo de NODE_OPTIONS: el que había más la opción, sin repetirla. null si ya estaba.
@@ -46,13 +56,15 @@ export function nuevoValor(actual, precarga) {
   return actual ? `${actual} ${opcion}` : opcion;
 }
 
-export function instalar({ precarga = PRECARGA(), plataforma = process.platform, leer = leerDelUsuario, setx = (v) => spawnSync('setx', ['NODE_OPTIONS', v], { encoding: 'utf8' }) } = {}) {
+// Escribe y vuelve a leer: si lo leído no es lo escrito, falla.
+export function instalar({ precarga = PRECARGA(), plataforma = process.platform, leer = leerDelUsuario, escribir = escribirDelUsuario } = {}) {
   if (plataforma !== 'win32') throw new Error(`instalar solo sabe hacerlo en Windows (esto es ${plataforma})`);
   if (!existsSync(precarga)) throw new Error(`falta ${precarga}: corre antes npm run install-pc`);
   const valor = nuevoValor(leer(), precarga);
   if (valor === null) return `sin-emsign: NODE_OPTIONS ya carga ${precarga}`;
-  const r = setx(valor);
-  if (r.status !== 0) throw new Error(`setx falló: ${(r.stderr || r.stdout || '').trim()}`);
+  escribir(valor);
+  const leido = leer();
+  if (leido !== valor) throw new Error(`NODE_OPTIONS no quedó guardada: escribí «${valor}» y leo «${leido}»`);
   return `sin-emsign: NODE_OPTIONS=${valor} (vale en las terminales que abras a partir de ahora)`;
 }
 
