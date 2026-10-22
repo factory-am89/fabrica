@@ -6,9 +6,8 @@ import { spawnSync } from 'node:child_process';
 import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
 import { arrancar } from '../scripts/al-arrancar.mjs';
-import { instalar, nuevoValor, OPCION, pasoTls, raicesEmSign } from '../scripts/sin-emsign.mjs';
+import { FUENTE as PRECARGA, instalar, nuevoValor, OPCION, pasoTls, raicesEmSign } from '../scripts/sin-emsign.mjs';
 
-const PRECARGA = fileURLToPath(new URL('../usuario/tls/sin-emsign.cjs', import.meta.url));
 const SIN_EMSIGN = fileURLToPath(new URL('../scripts/sin-emsign.mjs', import.meta.url));
 // Un proceso Node limpio (sin la NODE_OPTIONS del PC), con o sin la precarga.
 const node = (args, conPrecarga) => spawnSync(process.execPath, [...(conPrecarga ? ['--require', PRECARGA] : []), ...args], {
@@ -22,7 +21,7 @@ const contar = (conPrecarga) => {
   return { total, emSign };
 };
 
-// Lo que depende del Node que corre la suite se salta, y lo dice, en vez de ponerse rojo: uno anterior a 22.19 / 24.5 no
+// Lo que depende del Node que corre la suite se salta, y lo dice, en vez de ponerse rojo: uno sin tls.setDefaultCACertificates no
 // sabe cambiar la lista (la precarga lanza, a propósito) y uno con el parche ya no trae raíces emSign (la precarga sobra).
 const SIN_API = typeof tls.setDefaultCACertificates !== 'function';
 const saltar = SIN_API
@@ -51,6 +50,13 @@ test('sin-emsign: dentro del arranque, quedar raíces es un titular de fallo del
   assert.equal(arrancar([pasoTls(() => ['CN=emSign Root CA - G1'])], (l) => lineas.push(l)), 1);
   assert.match(lineas[0], /^FÁBRICA AL ARRANCAR: FALLÓ el paso «tls»: Node confía aún en 1 raíces emSign/);
   assert.equal(arrancar([pasoTls(() => [])], () => {}), 0);
+});
+
+test('sin-emsign: el remedio del paso «tls» es instalar en Windows y NODE_OPTIONS a mano en otro sistema', () => {
+  const error = (plataforma) => { try { pasoTls(() => ['x'], plataforma).ejecutar(() => {}); } catch (e) { return e.message; } return ''; };
+  assert.match(error('win32'), /npm run sin-emsign -- instalar/);
+  assert.match(error('linux'), /NODE_OPTIONS en tu shell/);
+  assert.doesNotMatch(error('linux'), /sin-emsign -- instalar/);
 });
 
 test('sin-emsign: raicesEmSign no cuenta nada en la lista que deja la precarga', { skip: SIN_API && saltar }, () => {

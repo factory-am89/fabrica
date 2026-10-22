@@ -9,6 +9,7 @@ import path from 'node:path';
 import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
 import { ampliaciones } from '../scripts/lib/settings-widening.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
+import { FUENTE, PRECARGA } from '../scripts/sin-emsign.mjs';
 
 const leer = (nombre) => JSON.parse(readFileSync(path.join(ORIGEN, nombre), 'utf8'));
 const plantilla = () => leer('settings.json');
@@ -63,8 +64,7 @@ test('instalar con valores de prueba escribe CLAUDE.md, settings.json relleno, l
   const confirmar = confirmarEnTerminal({ tty: true, leerLinea: () => 'AMPLIAR', escribir: () => {} });
   instalar({ home, valores: VALORES_PRUEBA, confirmar });
   assert.deepEqual(readdirSync(path.join(home, '.claude')).sort(), ['CLAUDE.md', 'fabrica-huella.json', 'settings.json', 'tls']);
-  const precarga = path.join('tls', 'sin-emsign.cjs'); // scripts/sin-emsign.mjs
-  assert.equal(readFileSync(path.join(home, '.claude', precarga), 'utf8'), readFileSync(path.join(ORIGEN, precarga), 'utf8'));
+  assert.equal(readFileSync(PRECARGA(home), 'utf8'), readFileSync(FUENTE, 'utf8')); // donde sin-emsign la busca
   const instalado = readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8');
   assert.doesNotMatch(instalado, /\{\{/);
   assert.equal(instalado, `${JSON.stringify(rellenar(plantilla(), VALORES_PRUEBA), null, 2)}\n`);

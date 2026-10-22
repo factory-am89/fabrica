@@ -1,10 +1,10 @@
 // Node trae su propia lista de autoridades (CA) y no mira revocaciones. Tras el incidente de eMudhra (oct 2026: las claves
-// de 8 certificados intermedios se podían calcular; Mozilla, bug 2083449) Node 24.12 seguía confiando en las 4 raíces
-// emSign y no había parche. usuario/tls/sin-emsign.cjs las quita en cada proceso Node del PC; install-pc lo copia a
+// de 8 certificados intermedios se podían calcular; Mozilla, bug 2083449) Node 24.12 confiaba en las 4 raíces emSign y
+// el parche, 24.22.1, aún confía en la G1. usuario/tls/sin-emsign.cjs las quita en cada proceso Node del PC; install-pc lo copia a
 // ~/.claude/tls/ y este script hace que Node lo cargue siempre (NODE_OPTIONS del usuario de Windows).
 //   node scripts/sin-emsign.mjs instalar    añade --require <~/.claude/tls/sin-emsign.cjs> a NODE_OPTIONS del usuario (terminal nueva)
 //   node scripts/sin-emsign.mjs comprobar   sale con 1 si este proceso Node confía aún en alguna raíz emSign
-// El arranque lo comprueba en cada sesión (paso «tls»). Windows (git, curl) ya rechaza esas cadenas por revocación.
+// El arranque lo comprueba en cada sesión (paso «tls»). Windows (git y curl, con schannel) ya rechaza esas cadenas por revocación.
 import { spawnSync } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -13,18 +13,26 @@ import path from 'node:path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
 
-export const PRECARGA = (casa = homedir()) => path.join(casa, '.claude', 'tls', 'sin-emsign.cjs');
+// La precarga vive en usuario/<RELATIVA> del repo y install-pc la copia a ~/.claude/<RELATIVA>.
+export const RELATIVA = path.join('tls', 'sin-emsign.cjs');
+export const FUENTE = fileURLToPath(new URL(`../usuario/${RELATIVA.split(path.sep).join('/')}`, import.meta.url));
+export const PRECARGA = (casa = homedir()) => path.join(casa, '.claude', RELATIVA);
 export const OPCION = (precarga) => `--require ${precarga}`;
 
 export const raicesEmSign = (pems = tls.getCACertificates('default')) =>
   pems.map((pem) => new X509Certificate(pem).subject.replace(/\n/g, ', ')).filter((s) => /emSign/.test(s));
 
-export const pasoTls = (raices = raicesEmSign) => ({
+// Fuera de Windows el paso falla igual (el riesgo es el mismo), pero el remedio es a mano: instalar solo sabe de Windows.
+const remedio = (plataforma) => (plataforma === 'win32'
+  ? 'npm run install-pc, luego npm run sin-emsign -- instalar, y abre una terminal nueva'
+  : `npm run install-pc y añade «${OPCION(PRECARGA())}» a NODE_OPTIONS en tu shell (instalar solo lo hace en Windows)`);
+
+export const pasoTls = (raices = raicesEmSign, plataforma = process.platform) => ({
   nombre: 'tls',
   ejecutar: (escribir) => {
     const quedan = raices();
     if (quedan.length) {
-      throw new Error(`Node confía aún en ${quedan.length} raíces emSign (eMudhra, claves comprometidas): npm run install-pc, luego npm run sin-emsign -- instalar, y abre una terminal nueva`);
+      throw new Error(`Node confía aún en ${quedan.length} raíces emSign (eMudhra, claves comprometidas): ${remedio(plataforma)}`);
     }
     escribir('tls: Node no confía en ninguna raíz emSign');
   },
