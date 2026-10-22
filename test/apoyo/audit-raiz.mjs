@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { INDICATORS } from '../../scripts/audit.mjs';
-import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL } from '../../scripts/lib/entities.mjs';
+import { KINDS, OUTCOME_PENDING, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_VERSION } from '../../scripts/lib/reviewer-no.mjs';
+import { BASE_HOLE, ENTITIES_FILE, HORIZONTAL, OTHER } from '../../scripts/lib/entities.mjs';
 import { ENTITY, FIELDS_FILE, KEYS, TEXT } from '../../scripts/lib/fields.mjs';
 import { CHECK, GOALS_FILE, KEY, LIST } from '../../scripts/lib/goals.mjs';
 import { INTERVENCIONES_FILE, LESSONS_DIR, LESSON_NOTE, NO_QUESTION, REASON_SINGLE, STANDARDS, SIGNAL_MACHINE, SIGNAL_NONE } from '../../scripts/lib/lessons.mjs';
@@ -30,9 +31,18 @@ export function fixture(t, over = {}) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const files = {
     [STANDARDS[0]]: question(1, CHECKED_BY.machine) + question(2, CHECKED_BY.reviewer) + question(3, CHECKED_BY.reviewer),
-    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'test/uses.test.js' }),
-    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'scripts/con.mjs' }),
-    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/sin.mjs' }),
+    [`${LESSONS_DIR}/a.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'test/uses.test.js', sources: ['#1'] }),
+    [`${LESSONS_DIR}/b.json`]: JSON.stringify({ signal: SIGNAL_NONE, reason: [REASON_SINGLE], question: 'C1', mechanism: 'scripts/con.mjs', sources: ['#5'] }),
+    [`${LESSONS_DIR}/c.json`]: JSON.stringify({ signal: SIGNAL_MACHINE, question: NO_QUESTION, mechanism: 'scripts/sin.mjs', sources: ['#6'] }),
+    // Three rows: #1 closes lesson a (new), #2 points at a too (a relapse), #3 is pending with a class of its own.
+    [REVIEWER_NO_FILE]: JSON.stringify({
+      version: REVIEWER_NO_VERSION,
+      rows: [
+        { [REVIEWER_NO_KEYS.source]: '#1', [REVIEWER_NO_KEYS.question]: 'C1', [REVIEWER_NO_KEYS.kind]: KINDS[0], [REVIEWER_NO_KEYS.outcome]: 'a' },
+        { [REVIEWER_NO_KEYS.source]: '#2', [REVIEWER_NO_KEYS.question]: 'C2', [REVIEWER_NO_KEYS.kind]: KINDS[0], [REVIEWER_NO_KEYS.outcome]: 'a' },
+        { [REVIEWER_NO_KEYS.source]: '#3', [REVIEWER_NO_KEYS.question]: 'C1', [REVIEWER_NO_KEYS.kind]: OTHER, [REVIEWER_NO_KEYS.kindNote]: 'nueva clase', [REVIEWER_NO_KEYS.outcome]: OUTCOME_PENDING },
+      ],
+    }),
     'package.json': JSON.stringify({ scripts: {} }),
     [FIELDS_FILE]: JSON.stringify({ fields: [{ [KEYS.name]: LESSON_NOTE, [KEYS.owner]: ENTITY.lesson, [KEYS.values]: TEXT }] }),
     [RULES_BUDGET_FILE]: JSON.stringify({ budget: { uno: 3, dos: 4 } }),

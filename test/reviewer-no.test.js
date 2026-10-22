@@ -12,9 +12,10 @@ import { ExitError } from '../scripts/lib/exit.mjs';
 import { ANSWER, ERROR, RECORD_VERSION, formatBlock } from '../scripts/lib/record.mjs';
 import { NO_QUESTION, lessonContext, readLessons } from '../scripts/lib/lessons.mjs';
 import {
-  DEBT_SINCE, KINDS, OUTCOME_PENDING, OUTCOME_REASONS, REVIEWER_NO_FAULTS, REVIEWER_NO_FIELDS, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_OPTIONAL_FIELDS,
-  REVIEWER_NO_VERSION, readReviewerNo, reviewerNoDebt, reviewerNoFaults,
+  DEBT_SINCE, KINDS, OUTCOME_GROUPS, OUTCOME_PENDING, OUTCOME_REASONS, REVIEWER_NO_FAULTS, REVIEWER_NO_FIELDS, REVIEWER_NO_FILE, REVIEWER_NO_KEYS, REVIEWER_NO_OPTIONAL_FIELDS,
+  REVIEWER_NO_VERSION, noPerKind, readReviewerNo, reviewerNoDebt, reviewerNoFaults, reviewerNoRows,
 } from '../scripts/lib/reviewer-no.mjs';
+import { readLessonSources } from '../scripts/lib/lesson-effect.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REAL = lessonContext(RAIZ);
@@ -310,4 +311,56 @@ test('debt: a malformed pull, a malformed row source or a malformed date throws,
   assert.throws(() => reviewerNoDebt({ pulls: [{ number: 1 }], checkRuns: [] }, [], SINCE), /malformed/);
   assert.throws(() => reviewerNoDebt(dataOf([], []), [{ ...debtRow(1, 'C1'), [SOURCE]: 'x' }], SINCE), /must be #<n>/);
   assert.throws(() => reviewerNoDebt(dataOf([], []), [], '19/10/2026'), /YYYY-MM-DD/);
+});
+
+// The signal of audit (chunk 6): pure, from the rows and the sources of the lessons. In-memory data.
+const NEW_LESSON = { id: 'new-lesson', sources: [7] };
+const OLD_LESSON = { id: 'old-lesson', sources: [1] };
+const LESSONS = [NEW_LESSON, OLD_LESSON];
+const kindRow = (pr, question, kind, outcome, extra = {}) => ({ [SOURCE]: `#${pr}`, [QUESTION]: question, [KIND]: kind, [OUTCOME]: outcome, ...extra });
+const [K_CLAIM, K_VOCAB] = KINDS;
+
+test('no-per-kind: rows are counted by kind (every kind of the list shows, with 0), by outcome and by kind x question', () => {
+  const rows = [
+    kindRow(7, 'C9', K_CLAIM, NEW_LESSON.id),
+    kindRow(8, 'C9', K_CLAIM, OLD_LESSON.id),
+    kindRow(8, 'C8', K_VOCAB, OUTCOME_PENDING),
+    kindRow(9, 'C8', K_VOCAB, OUTCOME_PENDING),
+  ];
+  const n = noPerKind(rows, LESSONS);
+  assert.equal(n.total, rows.length);
+  assert.deepEqual(Object.keys(n.byKind), KINDS);
+  assert.deepEqual(n.byKind, Object.fromEntries(KINDS.map((k) => [k, { [K_CLAIM]: 2, [K_VOCAB]: 2 }[k] ?? 0])));
+  assert.deepEqual(n.byOutcome, { [OUTCOME_GROUPS.lessonNew]: 1, [OUTCOME_GROUPS.lessonExisting]: 1, ...Object.fromEntries(OUTCOME_REASONS.map((o) => [o, o === OUTCOME_PENDING ? 2 : 0])) });
+  assert.deepEqual(n.byKindQuestion, { [K_CLAIM]: { C9: 2 }, [K_VOCAB]: { C8: 2 } });
+});
+
+test('no-per-kind: a relapse is a row whose outcome is a lesson that does not have that PR in sources', () => {
+  const n = noPerKind([kindRow(7, 'C9', K_CLAIM, NEW_LESSON.id), kindRow(8, 'C9', K_CLAIM, NEW_LESSON.id)], LESSONS);
+  assert.deepEqual(n.relapses, [{ pr: 8, question: 'C9', kind: K_CLAIM, lesson: NEW_LESSON.id }]);
+  assert.deepEqual([n.byOutcome[OUTCOME_GROUPS.lessonNew], n.byOutcome[OUTCOME_GROUPS.lessonExisting]], [1, 1]);
+});
+
+test('no-per-kind: the notes of the rows kind otro and outcome otro are listed with their field, PR and question', () => {
+  const rows = [
+    kindRow(5, 'C8', OTHER, OUTCOME_PENDING, { [KIND_NOTE]: 'clase nueva' }),
+    kindRow(6, 'C9', K_CLAIM, OTHER, { [OUTCOME_NOTE]: 'a ojo' }),
+  ];
+  assert.deepEqual(noPerKind(rows, LESSONS).otherNotes, [
+    { pr: 5, question: 'C8', field: KIND, note: 'clase nueva' },
+    { pr: 6, question: 'C9', field: OUTCOME, note: 'a ojo' },
+  ]);
+});
+
+test('no-per-kind: no rows is all zeros, and an outcome that is neither a closed value nor a lesson throws, never counted', () => {
+  const n = noPerKind([], LESSONS);
+  assert.deepEqual([n.total, n.relapses, n.otherNotes, n.byKindQuestion], [0, [], [], {}]);
+  assert.throws(() => noPerKind([kindRow(7, 'C9', K_CLAIM, 'no-such-lesson')], LESSONS), /no-such-lesson/);
+  assert.throws(() => noPerKind([kindRow(7, 'C9', 'porque-si', OUTCOME_PENDING)], LESSONS), /porque-si/);
+});
+
+test('no-per-kind: the real file is counted against the real lessons, and every row lands in exactly one kind and one outcome', () => {
+  const n = noPerKind(reviewerNoRows(RAIZ), readLessonSources(RAIZ));
+  const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+  assert.deepEqual([sum(n.byKind), sum(n.byOutcome)], [n.total, n.total]);
 });
