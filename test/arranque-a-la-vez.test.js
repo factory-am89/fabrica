@@ -81,6 +81,22 @@ const lanzar = ({ orden, args }, cwd, env) => new Promise((resolver) => {
   });
 });
 
+// Todas a la vez, y una orden que acaba antes que la más lenta se relanza hasta que acabe la última: al-arrancar tarda
+// segundos en cargar y un hook ligero acabaría antes de que llegase a su fetch, sin que nunca se solapasen. Cada orden se lanza al menos una vez.
+async function rondaSolapada(lanzamientos, cwd, env) {
+  const resultados = [];
+  let sinAcabar = lanzamientos.length;
+  await Promise.all(lanzamientos.map(async (l) => {
+    let primera = true;
+    do {
+      resultados.push(await lanzar(l, cwd, env));
+      if (primera) sinAcabar--;
+      primera = false;
+    } while (sinAcabar > 0);
+  }));
+  return resultados;
+}
+
 test('una orden SessionStart que no está clasificada pone el test en rojo', () => {
   assert.throws(() => aLanzar(['node "$CLAUDE_PROJECT_DIR/scripts/nuevo.mjs"']), /^Error: hook de arranque sin clasificar: node "\$CLAUDE_PROJECT_DIR\/scripts\/nuevo\.mjs"$/);
 });
@@ -102,7 +118,7 @@ test(`el arranque entero a la vez, ${RONDAS} rondas con un commit nuevo en el re
   for (let ronda = 1; ronda <= RONDAS; ronda++) {
     commit(otro, 'a.txt', `ronda ${ronda}`);
     git(otro, 'push', '-q', 'origin', 'main');
-    const resultados = await Promise.all(lanzamientos.map((l) => lanzar(l, principal, env)));
+    const resultados = await rondaSolapada(lanzamientos, principal, env);
     for (const r of resultados) if (r.fallo) fallos.push(`ronda ${ronda}: ${r.detalle}`);
     if (git(principal, 'rev-parse', 'HEAD') !== git(otro, 'rev-parse', 'HEAD')) fallos.push(`ronda ${ronda}: la principal no está en la punta del remoto`);
   }
