@@ -31,6 +31,7 @@ The gate flag of a chunk and the «needs Pablo» flag are computed from `Files`;
 | P10 | I1 and I2 (`goals.json`): a field or entity named twice, or in no table, is the cost the base files (`entities.json`, `fields.json`) exist to stop. |
 | P11 | I4 (`goals.json`): a decision only counts if it is written down with its principle and the alternative it discarded; `FORMS` in `scripts/lib/decision.mjs` checks the form, not the fit. |
 | P12 | I3 (`goals.json`): a rule with no reader and no trigger is a sentence, and a failure is asked for its class, not its case. |
+| P13 | I3 (`goals.json`): PR #145 fixed al-dia against al-dia without reproducing the real failure (both SessionStart hooks at once) or listing who else wrote in `.git`; a fix validated against its own hypothesis is not proof. |
 
 ## Questions
 
@@ -99,3 +100,9 @@ Quién: revisor.
 The triggers are the closed list `TRIGGERS` of `scripts/lib/triggers.mjs`; `manual` is only valid when the plan declares it as debt.
 Bien: «reader `test/<name>.test.js`, trigger `ci-test`; Done runs `node --test test/<name>.test.js` and a bad fixture turns it red», and «class: a rule with no reader» for a chunk that comes from a failure.
 Mal: a rule written as a sentence in a standard with no reader, a Done that calls the function by hand and not the command CI runs, or a chunk that fixes one failure without naming its class.
+
+### P13 — Does each chunk born from a failure show the failure reproduced through its real entry point, with the figure before and after, and the list of everything else that reads or writes the same state, with how it was searched?
+Quién: revisor.
+The reviewer asks whether the chunk was validated against the failure or against its own hypothesis; the machine cannot tell which chunk is born from a failure (no field of `scripts/lib/plan.mjs` says so).
+Bien: «reproduced with the two real startup hooks at once: 27 of 30 fail before, 0 of 50 after», and a list of every writer of the shared state (user and project layers, other tools), saying which command found each.
+Mal: a test that pits the fixed command against itself (PR #145 fixed al-dia against al-dia, deduced the cause without reproducing it and without listing who else wrote in `.git`, although the reflog of `refs/remotes/origin/main` already had `fetch -q --prune origin` entries that were not al-dia's).

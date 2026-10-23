@@ -45,6 +45,7 @@
     { "id": "i3-plan-done-npm-test", "invariant": "I3", "detector": "juez", "reader": "C16 (P2)", "why": "plan cuyo trozo tiene Done: npm test" },
     { "id": "i3-plan-regla-sin-lector", "invariant": "I3", "detector": "juez", "reader": "C16 (P12)", "why": "plan con una regla nueva sin lector" },
     { "id": "i3-done-llama-funcion", "invariant": "I3", "detector": "juez", "reader": "C16 (P12) y C17", "why": "Done que llama a la función a mano en vez de al CLI" },
+    { "id": "i3-plan-fallo-sin-reproducir", "invariant": "I3", "detector": "juez", "reader": "C16 (P13)", "why": "plan cuyo trozo nace de un fallo y se prueba contra el propio arreglo (como #145: al-dia contra al-dia), sin reproducir la entrada real ni listar quién más escribe el mismo estado" },
     { "id": "i3-tests-yml-con-if", "invariant": "I3", "detector": "juez", "reader": "C13", "why": "paso de tests.yml con un if que salta los tests en ciertos PR; el trozo 20 no lo ve" },
     { "id": "i1-sinonimo-entre-idiomas", "invariant": "I1", "detector": "juez", "reader": "C16 (P10)", "why": "importe frente a price en un plan" },
     { "id": "i1-rol-duplicado-en-fabrica", "invariant": "I1", "detector": "juez", "reader": "C8", "why": "un solo caso hoy" },
