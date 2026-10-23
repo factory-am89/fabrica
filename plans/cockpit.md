@@ -1,13 +1,15 @@
 # Plan: cockpit en homenu-panel (pizarra de encargos y aviso en vivo de cada sesión)
 
-Verdict: se puede hacer sin secretos nuevos reutilizando el envío PC -> panel por Tailscale que ya existe, pero ese envío lleva roto en silencio desde el 15 oct, y «espera a Pablo» solo se detecta tocando los ganchos de `.claude/settings.json`, que decide Pablo (A); el trozo 1 prueba el circuito entero sin A.
+Verdict: se puede hacer sin secretos nuevos reutilizando la forma del envío PC -> panel por la red privada; el envío viejo llevaba roto en silencio desde el 15 oct y ya se quitó (trozo 10), y «espera a Pablo» solo se detecta tocando los ganchos de `.claude/settings.json`, que decide Pablo (A); el trozo 1 prueba el circuito entero sin A.
+
+Los trozos 1 y 10 ya están hechos: los construyó el PR #8 de `homenu-panel` (merge `998b965`, 23 oct 2026, un solo PR que hizo las dos ideas). «Lo que hay hoy» y los `Existing` de esos dos trozos describen el estado de antes de ese PR.
 
 Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. «(Panel)» es `factory-am89/homenu-panel`, «(Fábrica)» es `factory-am89/fabrica`.
 
 ## Lo que hay hoy (comprobado)
 
-- Lo desagradable primero: el único envío PC -> panel que existe está roto. `~/.claude/menuplan-fabrica/ultimo-envio.txt` es del 2026-10-15 22:09; `grep -c "Cannot find module" ~/.claude/menuplan-fabrica/enviar.log` -> 1340 (busca `C:\dev\MenuPlan-panel-lectura\scripts\fabrica.mjs`, que ya no existe), y aun así `Get-ScheduledTaskInfo "HoMenu panel - enviar fabrica"` -> `LastTaskResult : 0`. Causa: `cliente/oculto.vbs` hace `sh.Run orden, 0, True` y no devuelve el código (no hay `WScript.Quit`). Clase: un lanzador que traga el código de salida. El cockpit no puede repetirla: su envío devuelve el código y el panel enseña la edad del último envío.
-- Transporte: el panel ya recibe datos del PC sin clave. `server.mjs` (origin/main `61a82c8`) acepta `POST /ingest/fabrica`, valida forma y tamaño (`MAX_BYTES`) y guarda en `datos/` con escritura atómica (`guardarInforme`); `compose.yaml` ata el puerto a la IP de Tailscale `100.73.252.32:8080` y monta el volumen `/data`. `curl -s -o /dev/null -w "%{http_code}" http://100.73.252.32:8080/` desde el PC -> `200`.
+- Lo desagradable primero: el único envío PC -> panel que existía (antes del PR #8 del panel, que lo quitó: trozo 10) estaba roto. `~/.claude/menuplan-fabrica/ultimo-envio.txt` es del 2026-10-15 22:09; `grep -c "Cannot find module" ~/.claude/menuplan-fabrica/enviar.log` -> 1340 (busca `C:\dev\MenuPlan-panel-lectura\scripts\fabrica.mjs`, que ya no existe), y aun así `Get-ScheduledTaskInfo "HoMenu panel - enviar fabrica"` -> `LastTaskResult : 0`. Causa: `cliente/oculto.vbs` hace `sh.Run orden, 0, True` y no devuelve el código (no hay `WScript.Quit`). Clase: un lanzador que traga el código de salida. El cockpit no puede repetirla: su envío devuelve el código y el panel enseña la edad del último envío.
+- Transporte: el panel ya recibía datos del PC por la red privada. `server.mjs` (origin/main `61a82c8`, antes del PR #8) aceptaba `POST /ingest/fabrica`, validaba forma y tamaño (`MAX_BYTES`) y guardaba en `datos/` con escritura atómica (`guardarInforme`); `compose.yaml` ata el puerto a la dirección privada del servidor (dónde vive: skills `hetzner` y `tailscale`) y monta el volumen `/data`. El trozo 1 reutiliza esa forma para `POST /ingest/sesiones`.
 - Registro de sesiones (Fábrica): una ficha por sesión en `~/.fabrica/sesiones/<id>.json` con solo `id, carpeta, rama, inicio, ultima` (`scripts/lib/session-log.mjs:13`; la cabecera dice «no prompt, no tool name, no free text»). La escriben `sesiones.mjs tocar` en `UserPromptSubmit` y `PostToolBatch` y la borra `fin` en `SessionEnd` (`.claude/settings.json`). `npm run sesiones -- --json` ya da la lista (`scripts/sesiones.mjs:98-105`).
 - Restos: `ls ~/.fabrica/sesiones | grep -c tmp` -> 10 ficheros `.tmp` (16 a 19 oct) junto a 3 fichas: escrituras que no llegaron a renombrarse.
 - Qué trae cada gancho (leído del binario de Claude Code 2.1.309, no de la documentación): `PostToolBatch` trae `tool_calls: [{tool_name, tool_input, tool_use_id, tool_response?}]`; `PermissionRequest` trae `tool_name, tool_input`; `Stop` trae `stop_hook_active`, `last_assistant_message` y `background_tasks` («lets hooks distinguish session is done from paused waiting for background work»); `Notification` trae `notification_type` con valores `permission_prompt`, `idle_prompt`, `elicitation_dialog`, `auth_success`.
@@ -43,12 +45,12 @@ Un solo sitio: `session-states.json` de la Fábrica; el panel lo lee de GitHub c
 
 ## Chunks
 
-### 1. (Panel) Circuito de punta a punta: el PC manda las sesiones y `/cockpit` las enseña con «sin señal»
-Files: `cliente/enviar-sesiones.mjs`, `cockpit.mjs`, `server.mjs`, `lib.mjs`, `Dockerfile`, `cockpit.test.js`, `fixtures/fabrica-falsa/scripts/sesiones.mjs`
+### 1. (Panel) Circuito de punta a punta: el PC manda las sesiones y `/cockpit` las enseña con «sin señal» (HECHO: PR #8 de homenu-panel, merge `998b965`)
+Files: `cliente/enviar-sesiones.mjs`, `cockpit.mjs`, `server.mjs`, `lib.mjs`, `Dockerfile`, `cockpit.test.js`, `panel.test.js`, `fixtures/fabrica-falsa/scripts/sesiones.mjs`
 Depends on: none
 Blocked by: none
 Existing: `git -C C:/dev/homenu-panel grep -n -i "cockpit\|ingest/sesiones\|enviar-sesiones\|sin señal" origin/main` -> sin salida. Lo que se reutiliza: la forma de `POST /ingest/fabrica` y de `guardarInforme` (`server.mjs`), `banner` e `insignia` de `lib.mjs`, y `npm run sesiones -- --json` de la Fábrica, que ya existe (`scripts/sesiones.mjs:98-105`).
-Not done: usa la ficha de hoy (rama, carpeta, minutos desde `ultima`), sin qué hace ni espera (trozos 4 a 8); con solo esos datos una sesión callada más de 15 min sale «sin señal (puede estar esperándote)», y el texto lo dice. El envío ejecuta `node <fabrica>/scripts/sesiones.mjs --json` de la carpeta principal de la Fábrica y manda su salida tal cual: la forma vive en la Fábrica, el panel la valida al recibir (422 si no). No instala la tarea (trozo 2). No arregla `enviar-fabrica` (duda 1 del informe). El aviso de PC callado y el umbral de 15 min viven en `cockpit.mjs`, un solo sitio. La página entra en `SECCIONES` (grupo «Trabajo») y `cockpit.mjs` en el `Dockerfile` (lo vigila `panel.test.js:135`).
+Not done: usa la ficha de hoy (rama, carpeta, minutos desde `ultima`), sin qué hace ni espera (trozos 4 a 8); con solo esos datos una sesión callada más de 15 min sale «sin señal (puede estar esperándote)», y el texto lo dice. El envío ejecuta `node <fabrica>/scripts/sesiones.mjs --json` de la carpeta principal de la Fábrica y manda su salida tal cual: la forma vive en la Fábrica, el panel la valida al recibir (422 si no). No instala la tarea (trozo 2). No quita el envío viejo ni sus rutas: es el trozo 10, que el mismo PR hizo a la vez. El aviso de PC callado y el umbral de 15 min viven en `cockpit.mjs`, un solo sitio. La página entra en `SECCIONES` (grupo «Trabajo») y `cockpit.mjs` en el `Dockerfile` (lo vigila `panel.test.js:135`).
 Done:
 ```sh
 node --test cockpit.test.js panel.test.js
@@ -58,11 +60,11 @@ node --test cockpit.test.js panel.test.js
 Files: `cliente/sesiones-oculto.vbs`, `cliente/instalar-tarea-sesiones.ps1`, `cliente-sesiones.test.js`, `README.md`
 Depends on: 1
 Blocked by: none
-Existing: `Get-ScheduledTask -TaskName "HoMenu panel*"` -> solo `HoMenu panel - enviar fabrica`. `cliente/oculto.vbs` traga el código (`sh.Run orden, 0, True` sin `WScript.Quit`): 1340 fallos con `LastTaskResult 0`, medido arriba.
-Not done: el lanzador nuevo termina con `WScript.Quit sh.Run(...)`; el test lo comprueba con `cscript` y un `node` que sale 1, y se salta fuera de Windows (el CI de GitHub es Linux; esa parte solo la ve el PC). No corrige `oculto.vbs` de `enviar-fabrica` (misma clase; duda 1 del informe). Requiere el trozo 1 fusionado y desplegado con `desplegar.sh` antes de la segunda orden del Done. Registrar una tarea de usuario es reversible (`Unregister-ScheduledTask`) y no es de la lista cerrada: la registra el constructor y lo apunta en el PR.
+Existing: `Get-ScheduledTask -TaskName "HoMenu panel*"` -> solo `HoMenu panel - enviar fabrica`. `cliente/oculto.vbs` (borrado después por el PR #8, trozo 10) tragaba el código (`sh.Run orden, 0, True` sin `WScript.Quit`): 1340 fallos con `LastTaskResult 0`, medido arriba. La tarea vieja ya está deshabilitada a mano por Pablo; este trozo no la toca.
+Not done: el lanzador nuevo termina con `WScript.Quit sh.Run(...)`; el test lo comprueba con `cscript` y un `node` que sale 1, y se salta fuera de Windows (el CI de GitHub es Linux; esa parte solo la ve el PC). No toca el envío viejo (ya quitado, trozo 10). `PANEL_URL` es la dirección del servidor del panel por la red privada: la pone quien lanza la orden, y su valor no se escribe en el plan (skills `hetzner` y `tailscale`). Requiere el trozo 1 fusionado y desplegado con `desplegar.sh` antes de la segunda orden del Done. Registrar una tarea de usuario es reversible (`Unregister-ScheduledTask`) y no es de la lista cerrada: la registra el constructor y lo apunta en el PR.
 Done:
 ```sh
-node --test cliente-sesiones.test.js && node cliente/enviar-sesiones.mjs --fabrica C:/dev/fabrica --url http://100.73.252.32:8080 && curl -s http://100.73.252.32:8080/cockpit | grep -q "data-sesion=" && powershell -NoProfile -Command "exit (Get-ScheduledTaskInfo -TaskName \"HoMenu panel - enviar sesiones\").LastTaskResult"
+node --test cliente-sesiones.test.js && node cliente/enviar-sesiones.mjs --fabrica C:/dev/fabrica --url "$PANEL_URL" && curl -s "$PANEL_URL/cockpit" | grep -q "data-sesion=" && powershell -NoProfile -Command "exit (Get-ScheduledTaskInfo -TaskName \"HoMenu panel - enviar sesiones\").LastTaskResult"
 ```
 
 ### 3. (Fábrica) La ficha de sesión se escribe sin dejar `.tmp` y la purga recoge los restos
@@ -122,7 +124,7 @@ node --test test/session-states.test.js
 
 ### 8. (Panel) Bocadillo de cada sesión y caja «Qué espera de ti» con el vocabulario de la Fábrica
 Files: `cockpit.mjs`, `server.mjs`, `cockpit.test.js`, `config/fabrica.json`
-Depends on: 1, 4
+Depends on: 1, 4, 10
 Blocked by: none
 Existing: tras el trozo 1, `cockpit.mjs` solo enseña rama y minutos. `git -C C:/dev/homenu-panel grep -n "session-states" origin/main` -> sin salida.
 Not done: lee `session-states.json` de la rama `main` de la Fábrica con `texto(...)` y la caché que ya existe (`server.mjs:79-95`); un valor que no está en el vocabulario sale como error visible en la tarjeta, nunca neutro en silencio. Urgente -> insignia `error`, aviso -> `aviso` (tonos de `estilo.mjs`, sin colores nuevos). Bocadillo «Editando · scripts/x.mjs», «Ejecutando · tests», «Necesito: <pregunta>». Antes del trozo 6 ninguna ficha trae un estado de espera, y la caja dice «Sin datos de espera: falta la decisión A» en vez de «nada te espera». Sin resultados («12/12 en verde», «HTTP 401»): no hay dato de resultado (duda 3 del informe).
@@ -142,8 +144,19 @@ Done:
 node --test cockpit.test.js
 ```
 
+### 10. (Panel) Quitar el envío viejo y las rutas que sobraban (HECHO: PR #8 de homenu-panel, merge `998b965`)
+Files: `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1`, `cliente/oculto.vbs`, `server.mjs`
+Depends on: 1
+Blocked by: none
+Existing: antes del PR #8 los tres ficheros de `cliente/` existían y `server.mjs` tenía `/ingest/fabrica`, `/coste` y `/fondos`. Hoy: `git -C C:/dev/homenu-panel ls-tree -r --name-only origin/main | grep -E "enviar-fabrica|oculto|instalar-tarea"` -> sin salida; `git -C C:/dev/homenu-panel grep -n -E "ingest/fabrica|/coste|/fondos" origin/main -- server.mjs` -> sin salida.
+Not done: la tarea de Windows `HoMenu panel - enviar fabrica` la deshabilitó Pablo a mano el 23 oct 2026; ningún trozo la toca ni la borra del registro de tareas. Quitar `/coste`, `/fondos` y `/ingest/fabrica` con su código fue decisión de Pablo, no del plan. No arregla el envío viejo: se quita (clase: un lanzador que traga el código de salida; no se repetirá en el trozo 2). Lo construyó el mismo PR que el trozo 1 porque comparten `server.mjs` y `lib.mjs`.
+Done:
+```sh
+node --test panel.test.js cockpit.test.js
+```
+
 ## Build order
-Ola 1: 1 y 3 a la vez (repos distintos). Ola 2: 2 (tras desplegar el 1) y 4. Ola 3: 5 y 8. Ola 4: 9; y 6 en cuanto Pablo conteste A, luego 7. El 1 prueba el circuito: su test corre el envío real contra el servidor real en local; el Done del 2 lo prueba por Tailscale con las sesiones de verdad.
+Ola 1 (hecha el 1 y el 10 en un solo PR; el 3 sigue): 1, 10 y 3 a la vez (repos distintos). Ola 2: 2 (tras desplegar el 1) y 4. Ola 3: 5 y 8. Ola 4: 9; y 6 en cuanto Pablo conteste A, luego 7. El 1 prueba el circuito: su test corre el envío real contra el servidor real en local; el Done del 2 lo prueba por Tailscale con las sesiones de verdad.
 
 ## Decisions taken
 - principio 4 | eligió: el vocabulario de estados, de qué hace y de columnas vive en session-states.json de la Fábrica y el panel lo lee de GitHub | descartó: una copia de la lista en lib.mjs del panel | motivo: decidido
@@ -151,12 +164,13 @@ Ola 1: 1 y 3 a la vez (repos distintos). Ola 2: 2 (tras desplegar el 1) y 4. Ola
 - principio 3 | eligió: el panel calcula sin-senal con 15 min de silencio en trabajo, 3 h en cualquier estado y 3 min sin envío del PC | descartó: dejar la última ficha como En curso hasta que la purga de 48 h la borre | motivo: decidido
 - principio 2 | eligió: umbral de 15 min sacado de 35 393 huecos medidos con p99,9 de 9,7 min | descartó: un umbral redondo sin medir como 5 o 60 min | motivo: decidido
 - principio 3 | eligió: el lanzador de la tarea devuelve el código de node y el panel enseña la edad del último envío | descartó: copiar oculto.vbs, que da LastTaskResult 0 con 1340 fallos | motivo: decidido
-- principio 6 | eligió: envío por la red de Tailscale al endpoint sin clave, como /ingest/fabrica | descartó: un token compartido nuevo entre PC y servidor | motivo: decidido
+- principio 6 | eligió: envío por la red privada al servidor del panel, con la forma que tenía /ingest/fabrica | descartó: un token compartido nuevo entre PC y servidor | motivo: decidido
 - principio 6 | eligió: listo significa PR abierto sin sesión viva, esperando a tests y revisor | descartó: listo como trozo de plan desbloqueado, que exige leer planes desde el panel | motivo: decidido
 - principio 4 | eligió: la rama es la llave del encargo entre ficha y PR | descartó: un número de issue escrito por cada sesión | motivo: decidido
 - principio 6 | eligió: solo viajan vocabulario cerrado, rutas relativas al repo y la línea de pregunta del agente | descartó: mandar el texto de la orden o el último mensaje del agente | motivo: decidido
 - principio 2 | eligió: qué hace sale de PostToolBatch, ya cableado | descartó: un gancho PreToolUse nuevo que cuesta unos 0,3 s por herramienta medidos | motivo: decidido
-- principio 3 | eligió: el trozo 1 también quita el envío viejo del panel (cliente/enviar-fabrica.mjs, instalar-tarea.ps1, oculto.vbs) y deshabilita su tarea de Windows (decisión de Pablo, 23 oct 2026) | descartó: dejar el envío roto en silencio o arreglarlo (duda 1 del informe) | motivo: decidido
+- principio 3 | eligió: el trozo 10 quita el envío viejo del panel (cliente/enviar-fabrica.mjs, instalar-tarea.ps1, oculto.vbs), por decisión de Pablo del 23 oct 2026, y él deshabilitó su tarea de Windows a mano | descartó: dejar el envío roto en silencio (1340 fallos con LastTaskResult 0) | motivo: decidido
+- principio 4 | eligió: quitar el envío viejo porque el nuevo cubre su función (decisión de Pablo, 23 oct 2026, que de paso quitó /coste, /fondos y /ingest/fabrica) | descartó: arreglar enviar-fabrica y mantener dos envíos PC -> panel | motivo: decidido
 
 ## Decisions for Pablo
 
@@ -171,7 +185,6 @@ Por qué te lo pregunto: es cambiar `.claude/settings.json`, que pone en marcha 
 - Que los 17 huecos de más de 15 min sean esperas de permiso: solo se ve que terminan en un `tool_result`. La muestra son 36 transcripts de 2 carpetas; no hay carpetas `C--dev-fabrica-*` en `~/.claude/projects`.
 - Que los 10 `.tmp` vengan de un renombrado fallido y no de un proceso cortado.
 - Quién despliega el panel (`desplegar.sh` en `/opt/panel/app` por ssh) y de qué rama tira el servidor; el Done del trozo 2 lo necesita.
-- Quién más está en la red de Tailscale: cualquiera dentro puede mandar a `/ingest/*`, igual que hoy.
 - La cuota de GitHub que ya gasta el panel (`leerIssues` hasta 20 peticiones cada 15 min) sumada a las 24 por hora del trozo 9: no medida en el servidor.
 - `gh` no tiene sesión en este PC (`gh auth status` -> «You are not logged into any GitHub hosts»): el plan no está en un issue; la API pública se leyó con `curl`.
 - La carpeta principal de homenu-panel va 5 commits por detrás de `origin/main`; todo se leyó de `origin/main` (`61a82c8`).
