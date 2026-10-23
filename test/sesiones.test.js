@@ -4,11 +4,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import * as fsReal from 'node:fs';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  ACTIVA_H, CADUCA_H, apuntarSesion, leerSesiones, purgarViejas, rutaDeSesiones,
+  ACTIVA_H, CADUCA_H, REINTENTOS_RENOMBRADO, SUFIJO_TMP, apuntarSesion, leerSesiones, purgarViejas, rutaDeSesiones,
 } from '../scripts/lib/session-log.mjs';
 import {
   choques, leerReparto, reservasVivasAjenas, solapan, validarReparto,
@@ -88,6 +89,53 @@ test('a session file with no activity for more than 48 h is purged at start-up; 
   assert.deepEqual(purgarViejas({ dir, reloj: () => T0 + 48 * H }), []);
   assert.deepEqual(purgarViejas({ dir, reloj: () => T0 + 48 * H + 1 }), [ID_A]);
   assert.deepEqual(readdirSync(dir), [`${ID_B}.json`]);
+}));
+
+// A disk whose renameSync fails with `codigo` the first `veces` times, counting the calls.
+const discoQueFalla = (codigo, veces) => {
+  const llamadas = { n: 0 };
+  return {
+    llamadas,
+    fs: {
+      ...fsReal,
+      renameSync: (a, b) => {
+        llamadas.n += 1;
+        if (llamadas.n <= veces) throw Object.assign(new Error(`${codigo}: rename`), { code: codigo });
+        fsReal.renameSync(a, b);
+      },
+    },
+  };
+};
+const restos = (dir) => readdirSync(dir).filter((n) => n.endsWith(SUFIJO_TMP));
+
+test('a rename that fails with EPERM or EBUSY is retried: the file is written and no .tmp is left', () => conCasa((_c, dir) => {
+  for (const codigo of ['EPERM', 'EBUSY']) {
+    const { fs, llamadas } = discoQueFalla(codigo, REINTENTOS_RENOMBRADO - 1);
+    apuntarSesion({ id: ID_A, carpeta: 'C:\\dev\\x', rama: 'feat/uno' }, { dir, fs });
+    assert.equal(llamadas.n, REINTENTOS_RENOMBRADO, codigo);
+    assert.deepEqual(readdirSync(dir), [`${ID_A}.json`], codigo);
+  }
+}));
+
+test('a rename that never works throws after the fixed retries and removes its own .tmp; another error is not retried', () => conCasa((_c, dir) => {
+  const eperm = discoQueFalla('EPERM', Infinity);
+  assert.throws(() => apuntarSesion({ id: ID_A, carpeta: 'C:\\dev\\x', rama: 'feat/uno' }, { dir, fs: eperm.fs }), { code: 'EPERM' });
+  assert.equal(eperm.llamadas.n, REINTENTOS_RENOMBRADO);
+  assert.deepEqual(readdirSync(dir), []);
+  const lleno = discoQueFalla('ENOSPC', Infinity);
+  assert.throws(() => apuntarSesion({ id: ID_A, carpeta: 'C:\\dev\\x', rama: 'feat/uno' }, { dir, fs: lleno.fs }), { code: 'ENOSPC' });
+  assert.equal(lleno.llamadas.n, 1);
+  assert.deepEqual(readdirSync(dir), []);
+}));
+
+test('the purge deletes .tmp leftovers older than 48 h and keeps a recent one; with no directory it deletes nothing', () => conCasa((_c, dir) => {
+  assert.deepEqual(purgarViejas({ dir }), []);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${ID_A}.123.tmp`), 'x');
+  assert.deepEqual(purgarViejas({ dir, reloj: () => Date.now() + 48 * H - 60000 }), []);
+  assert.deepEqual(restos(dir), [`${ID_A}.123.tmp`]);
+  purgarViejas({ dir, reloj: () => Date.now() + 48 * H + 60000 });
+  assert.deepEqual(readdirSync(dir), []);
 }));
 
 test('the register is closed: a field with a wrong shape is refused and nothing is written', () => conCasa((_c, dir) => {
