@@ -59,11 +59,11 @@ test('toda clave de la plantilla rellena está en la lista cerrada o la miran la
   assert.deepEqual(motivos.filter((m) => /fuera de la lista cerrada/.test(m)), []);
 });
 
-test('instalar con valores de prueba escribe CLAUDE.md, settings.json relleno, la precarga tls/ y la huella, y no los motivos', () => {
+test('instalar con valores de prueba escribe CLAUDE.md, settings.json relleno, hooks/, la precarga tls/ y la huella, y no los motivos', () => {
   const home = mkdtempSync(path.join(tmpdir(), 'install-pc-'));
   const confirmar = confirmarEnTerminal({ tty: true, leerLinea: () => 'AMPLIAR', escribir: () => {} });
   instalar({ home, valores: VALORES_PRUEBA, confirmar });
-  assert.deepEqual(readdirSync(path.join(home, '.claude')).sort(), ['CLAUDE.md', 'fabrica-huella.json', 'settings.json', 'tls']);
+  assert.deepEqual(readdirSync(path.join(home, '.claude')).sort(), ['CLAUDE.md', 'fabrica-huella.json', 'hooks', 'settings.json', 'tls']);
   assert.equal(readFileSync(PRECARGA(home), 'utf8'), readFileSync(FUENTE, 'utf8')); // donde sin-emsign la busca
   const instalado = readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8');
   assert.doesNotMatch(instalado, /\{\{/);

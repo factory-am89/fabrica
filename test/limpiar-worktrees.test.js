@@ -1,0 +1,106 @@
+// El hook de usuario limpiar-worktrees, por su entrada real (`node usuario/hooks/limpiar-worktrees.mjs --si --silencio`)
+// con cwd en un clon temporal. En un repo con ficha (.fabrica.json) no toca git; sin ficha, borra el worktree fusionado.
+// Todo ocurre dentro de carpetas temporales: nada se borra fuera de ellas.
+import { after, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
+
+const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const HOOK = path.join(RAIZ, 'usuario', 'hooks', 'limpiar-worktrees.mjs');
+// El hook no toca worktrees bajo AppData/Local/Temp (son de scratchpads de otras sesiones), así que las carpetas del
+// test van dentro del repo, en .tmp-limpiar-wt-* (invariants.test.js salta lo que empieza por .tmp al copiar el repo; ignorado por git) y se borran al acabar. Solo se borra lo que el test creó.
+const PREFIJO = '.tmp-limpiar-wt-';
+const bases = [];
+after(() => { for (const b of bases) rmSync(b, { recursive: true, force: true }); });
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+// Un clon con un worktree cuya rama ya está fusionada en origin/main, subida y limpia.
+function escenario(conFicha) {
+  const base = mkdtempSync(path.join(RAIZ, PREFIJO));
+  bases.push(base);
+  const remoto = path.join(base, 'remoto.git');
+  const clon = path.join(base, 'clon');
+  const wt = path.join(base, 'wt');
+  git(base, 'init', '-q', '--bare', '-b', 'main', remoto);
+  git(base, 'clone', '-q', remoto, clon);
+  for (const [k, v] of [['user.name', 't'], ['user.email', 't@t']]) git(clon, 'config', k, v);
+  git(clon, 'checkout', '-q', '-b', 'main');
+  writeFileSync(path.join(clon, 'a.txt'), 'a');
+  git(clon, 'add', '.');
+  git(clon, 'commit', '-qm', 'a');
+  git(clon, 'push', '-q', '-u', 'origin', 'main');
+  git(clon, 'worktree', 'add', '-q', '-b', 'feat/x', wt);
+  writeFileSync(path.join(wt, 'b.txt'), 'b');
+  git(wt, 'add', '.');
+  git(wt, 'commit', '-qm', 'b');
+  git(wt, 'push', '-q', '-u', 'origin', 'feat/x');
+  git(clon, 'merge', '-q', '--ff-only', 'feat/x');
+  git(clon, 'push', '-q', 'origin', 'main');
+  if (conFicha) writeFileSync(path.join(clon, NOMBRE_FICHA), '{}');
+  return { clon, wt };
+}
+const correr = (clon, ...extra) => spawnSync('node', [HOOK, '--si', '--silencio', ...extra], { cwd: clon, encoding: 'utf8' });
+
+test('con ficha .fabrica.json no toca git: el worktree fusionado sigue y no hay FETCH_HEAD', () => {
+  const { clon, wt } = escenario(true);
+  const r = correr(clon);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(existsSync(wt), 'el worktree sigue en disco');
+  assert.ok(!existsSync(path.join(clon, '.git', 'FETCH_HEAD')), 'no se escribió FETCH_HEAD');
+});
+
+test('sin ficha borra el worktree fusionado (la regla no apaga el hook entero)', () => {
+  const { clon, wt } = escenario(false);
+  const r = correr(clon);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!existsSync(wt), 'el worktree se borró');
+});
+
+test('si no puede listar los worktrees vivos no apunta nada y lo dice (un Set vacío apuntaría un worktree vivo)', async () => {
+  const { apuntarPendientes, ficheroPendientes } = await import(pathToFileURL(HOOK).href);
+  const comun = mkdtempSync(path.join(RAIZ, PREFIJO));
+  bases.push(comun);
+  const vivo = path.join(comun, 'wt-vivo');
+  mkdirSync(vivo);
+  const avisos = [];
+  const apuntado = apuntarPendientes(comun, [{ dir: vivo, rama: 'feat/x', motivo: 'm', cuando: 'c' }], () => { throw new Error('git roto'); }, { avisar: (m) => avisos.push(m) });
+  assert.equal(apuntado, false);
+  assert.ok(!existsSync(ficheroPendientes(comun)), 'no se escribió el registro de pendientes');
+  assert.match(avisos.join(' '), /no pude listar los worktrees \(git roto\)/);
+});
+
+test('leerUnion: solo «no existe» (ENOENT) y «no es enlace» (EINVAL) cuentan como sin unión; otro error sube', async () => {
+  const { leerUnion } = await import(pathToFileURL(HOOK).href);
+  const falla = (code) => () => { throw Object.assign(new Error(code), { code }); };
+  assert.equal(leerUnion('x', falla('ENOENT')), null);
+  assert.equal(leerUnion('x', falla('EINVAL')), null);
+  assert.equal(leerUnion('x', () => 'C:/destino'), 'C:/destino');
+  for (const code of ['EACCES', 'EBUSY']) assert.throws(() => leerUnion('x', falla(code)), { code });
+});
+
+test('siNo: solo la salida 1 de git es un «no»; otro fallo (128) sube', async () => {
+  const { siNo } = await import(pathToFileURL(HOOK).href);
+  const sale = (status) => () => { throw Object.assign(new Error(`exit ${status}`), { status }); };
+  assert.equal(siNo(() => 'abc'), 'abc');
+  assert.equal(siNo(sale(1)), null);
+  assert.throws(() => siNo(sale(128)), { status: 128 });
+});
+
+test('--hook con una entrada que no es JSON no limpia nada y lo dice', () => {
+  const r = spawnSync('node', [HOOK, '--hook'], { cwd: RAIZ, input: 'no es json', encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /no entiendo la entrada del hook/);
+});
+
+test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
+  assert.ok(readFileSync(HOOK, 'utf8').includes(`join(raiz, "${NOMBRE_FICHA}")`));
+});
+
+test('.gitignore ignora el prefijo de las carpetas del test', () => {
+  assert.ok(readFileSync(path.join(RAIZ, '.gitignore'), 'utf8').split(String.fromCharCode(10)).map((l) => l.trim()).includes(`${PREFIJO}*`));
+});
