@@ -1,7 +1,7 @@
-// El paso «al-dia» del arranque: la carpeta principal avanza con `pull --ff-only` o no se toca y se dice por qué.
+// El paso «al-dia» del arranque: la carpeta principal avanza (fetch a su ref propia + merge --ff-only) o no se toca y se dice por qué.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, realpathSync, rmSync, existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -44,7 +44,7 @@ test('al-dia: principal atrasada avanza hasta origin/main, con los hooks de git 
   const r = alDia(principal);
   assert.equal(r.ok, true);
   assert.notEqual(git(principal, 'rev-parse', 'HEAD'), antes);
-  assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'origin/main'));
+  assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'refs/fabrica/al-dia/main'));
 });
 
 test('al-dia: principal ya al día no cambia nada y no es un fallo', () => {
@@ -137,7 +137,7 @@ test('al-dia: dos arranques a la vez no se pisan; los dos acaban bien y la princ
     avanzaOrigin(`r${ronda}.txt`, `ronda ${ronda}`);
     const salidas = await Promise.all([alDiaEnOtroProceso(principal), alDiaEnOtroProceso(principal)]);
     for (const s of salidas) assert.equal(JSON.parse(s.salida).ok, true, `ronda ${ronda}: ${s.salida} ${s.avisos}`);
-    assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'origin/main'));
+    assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'refs/fabrica/al-dia/main'));
   }
 });
 
@@ -149,4 +149,44 @@ test('al-dia: PASOS lo incluye y el hook carpeta-principal deja pasar la orden `
   const entrada = (command) => ({ tool_name: 'Bash', tool_input: { command }, cwd: carpetas[1] });
   assert.equal(decidir(entrada(`git -C ${principal} pull --ff-only`), carpetas), null);
   assert.notEqual(decidir(entrada(`git -C ${principal} pull`), carpetas), null);
+});
+
+// 23 oct 2026: el hook de usuario (`git fetch -q --prune origin`) y otros fetch escriben .git/FETCH_HEAD y
+// refs/remotes/origin/main a la vez que al-dia; con `git pull` fallaron 26 de 30 arranques. al-dia trae a una ref
+// propia sin FETCH_HEAD, así que ningún otro fetch le pisa lo que lee. Aquí, un bucle de `fetch --prune` de verdad a la vez.
+test('al-dia: a la vez que un bucle de `git fetch --prune origin` en la misma carpeta, 10 rondas bien', async () => {
+  const { principal, avanzaOrigin, otra } = montar();
+  for (let i = 0; i < 40; i += 1) git(otra, 'push', 'origin', `HEAD:refs/heads/r${i}`);
+  let seguir = true;
+  const bucle = (async () => {
+    while (seguir) {
+      await new Promise((resolve) => { const h = spawn('git', ['fetch', '-q', '--prune', 'origin'], { cwd: principal }); h.on('close', resolve); h.on('error', resolve); });
+    }
+  })();
+  try {
+    for (let ronda = 0; ronda < 10; ronda += 1) {
+      avanzaOrigin(`f${ronda}.txt`, `ronda ${ronda}`);
+      const s = await alDiaEnOtroProceso(principal);
+      assert.equal(JSON.parse(s.salida).ok, true, `ronda ${ronda}: ${s.salida} ${s.avisos}`);
+      assert.equal(git(principal, 'rev-parse', 'HEAD'), git(otra, 'rev-parse', 'HEAD'), `ronda ${ronda}: la principal no quedó en la punta de origin`);
+    }
+  } finally {
+    seguir = false;
+    await bucle;
+  }
+});
+
+test('al-dia: no escribe .git/FETCH_HEAD ni mueve refs/remotes/origin/main; avanza desde su ref propia; sin upstream falla en alto', () => {
+  const { principal, avanzaOrigin } = montar();
+  rmSync(path.join(principal, '.git', 'FETCH_HEAD'), { force: true });
+  const remotoAntes = git(principal, 'rev-parse', 'origin/main');
+  avanzaOrigin('b.txt', 'dos');
+  assert.equal(alDia(principal).ok, true);
+  assert.equal(existsSync(path.join(principal, '.git', 'FETCH_HEAD')), false);
+  assert.equal(git(principal, 'rev-parse', 'origin/main'), remotoAntes);
+  assert.equal(git(principal, 'rev-parse', 'HEAD'), git(principal, 'rev-parse', 'refs/fabrica/al-dia/main'));
+  git(principal, 'config', '--unset', 'branch.main.merge');
+  const r = alDia(principal);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /upstream/);
 });

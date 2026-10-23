@@ -90,11 +90,11 @@ node --test test/sesiones.test.js test/fields.test.js
 ```
 
 ### 5. (Fábrica) `npm run sesiones -- --json` dice el repo de cada sesión
-Files: `scripts/sesiones.mjs`, `test/sesiones.test.js`, `scripts/lib/folders.mjs`
+Files: `scripts/sesiones.mjs`, `test/sesiones.test.js`, `scripts/lib/folders.mjs`, `fields.json`
 Depends on: 4
 Blocked by: none
 Existing: `listado` devuelve carpeta y rama, no repo (`scripts/sesiones.mjs:98-105`); `scripts/lib/folders.mjs` tiene `git` y `tieneOrigin` pero nada que saque `owner/name` de una URL (`grep -n export scripts/lib/folders.mjs`).
-Not done: el repo sale de `git remote get-url origin` de la carpeta al listar (una vez por sesión y por minuto, no en cada gancho); sin `origin`, `repo: null` y el panel lo enseña como «sin repo», nunca un valor inventado. La carpeta sigue en la salida local; el panel no la enseña.
+Not done: campo nuevo `repo` de `session` (atributo, texto `owner/name` o `null`; nueva, sin equivalente: `grep -n "\"repo\"" fields.json` -> sin salida, y `carpeta` es otro significado, una ruta local y no el repo remoto), declarado en `fields.json` junto a los del trozo 4. El repo sale de `git remote get-url origin` de la carpeta al listar (una vez por sesión y por minuto, no en cada gancho); sin `origin`, `repo: null` y el panel lo enseña como «sin repo», nunca un valor inventado. La carpeta sigue en la salida local; el panel no la enseña.
 Done:
 ```sh
 node --test test/sesiones.test.js
@@ -165,10 +165,10 @@ Ola 1 (hecha el 1 y el 10 en un solo PR; el 3 sigue): 1, 10 y 3 a la vez (repos 
 - principio 3 | eligió: el panel calcula sin-senal con 15 min de silencio en trabajo, 3 h en cualquier estado y 3 min sin envío del PC | descartó: dejar la última ficha como En curso hasta que la purga de 48 h la borre | motivo: decidido
 - principio 2 | eligió: umbral de 15 min sacado de 35 393 huecos medidos con p99,9 de 9,7 min | descartó: un umbral redondo sin medir como 5 o 60 min | motivo: decidido
 - principio 3 | eligió: el lanzador de la tarea devuelve el código de node y el panel enseña la edad del último envío | descartó: copiar oculto.vbs, que da LastTaskResult 0 con 1340 fallos | motivo: decidido
-- principio 6 | eligió: envío por la red privada al servidor del panel, con la forma que tenía /ingest/fabrica | descartó: un token compartido nuevo entre PC y servidor | motivo: decidido
+- principio 6 | eligió: envío por la red privada al servidor del panel, con la forma que tenía /ingest/fabrica | descartó: un token compartido nuevo entre PC y servidor, que sería un secreto nuevo y obliga a preguntar a Pablo (clase «Change permissions or secrets» de standards/intervention.md) | motivo: decidido
 - principio 4 | eligió: listo significa PR abierto sin sesión viva, esperando a tests y revisor, dato que ya está en GitHub | descartó: listo como trozo de plan desbloqueado, que obliga al panel a leer y interpretar los planes, otra copia de qué está listo además de los PR | motivo: decidido
 - principio 4 | eligió: la rama es la llave del encargo entre ficha y PR | descartó: un número de issue escrito por cada sesión | motivo: decidido
-- principio 6 | eligió: solo viajan vocabulario cerrado, rutas relativas al repo y la línea de pregunta del agente | descartó: mandar el texto de la orden o el último mensaje del agente | motivo: decidido
+- principio 5 | eligió: solo viajan vocabulario cerrado, rutas relativas al repo y la línea de pregunta del agente, y el panel lo valida al recibir (422 si no encaja) | descartó: mandar el texto de la orden o el último mensaje del agente y confiar en que nadie ponga un secreto, una regla en una frase sin check | motivo: decidido
 - principio 4 | eligió: qué hace sale de PostToolBatch, ya cableado, que trae los nombres de herramienta | descartó: un gancho PreToolUse nuevo que repetiría ese mismo dato en otro gancho (y suma unos 0,3 s por herramienta, medidos arriba) | motivo: decidido
 - principio 3 | eligió: el trozo 10 quita el envío viejo del panel (cliente/enviar-fabrica.mjs, instalar-tarea.ps1, oculto.vbs), por decisión de Pablo del 23 oct 2026, y él deshabilitó su tarea de Windows a mano | descartó: dejar el envío roto en silencio (1340 fallos con LastTaskResult 0) | motivo: decidido
 - principio 4 | eligió: quitar el envío viejo porque el nuevo cubre su función (decisión de Pablo, 23 oct 2026, que de paso quitó /coste, /fondos y /ingest/fabrica) | descartó: arreglar enviar-fabrica y mantener dos envíos PC -> panel | motivo: decidido
