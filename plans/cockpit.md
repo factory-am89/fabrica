@@ -2,7 +2,7 @@
 
 Verdict: se puede hacer sin secretos nuevos reutilizando la forma del envío PC -> panel por la red privada; el envío viejo llevaba roto en silencio desde el 15 oct y ya se quitó (trozo 10), y «espera a Pablo» solo se detecta tocando los ganchos de `.claude/settings.json`, que decide Pablo (A); el trozo 1 prueba el circuito entero sin A.
 
-Los trozos 1 y 10 ya están hechos: los construyó el PR #8 de `homenu-panel` (merge `998b965`, 23 oct 2026, un solo PR que hizo las dos ideas). «Lo que hay hoy» y los `Existing` de esos dos trozos describen el estado de antes de ese PR.
+Los trozos 1 y 10 ya están hechos: los construyó el PR #8 de `homenu-panel` (merge `998b965`, 23 oct 2026, un solo PR que hizo las dos ideas). El trozo 3 también: PR #150 de la Fábrica (merge `4c431db`). «Lo que hay hoy» y los `Existing` de esos dos trozos describen el estado de antes de ese PR.
 
 Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. «(Panel)» es `factory-am89/homenu-panel`, «(Fábrica)» es `factory-am89/fabrica`.
 
@@ -67,11 +67,11 @@ Done:
 node --test cliente-sesiones.test.js && node cliente/enviar-sesiones.mjs --fabrica C:/dev/fabrica --url "$PANEL_URL" && curl -s "$PANEL_URL/cockpit" | grep -q "data-sesion=" && powershell -NoProfile -Command "exit (Get-ScheduledTaskInfo -TaskName \"HoMenu panel - enviar sesiones\").LastTaskResult"
 ```
 
-### 3. (Fábrica) La ficha de sesión se escribe sin dejar `.tmp` y la purga recoge los restos
+### 3. (Fábrica) La ficha de sesión se escribe sin dejar `.tmp` y la purga recoge los restos (HECHO: PR #150 de la Fábrica, merge `4c431db`)
 Files: `scripts/lib/session-log.mjs`, `test/sesiones.test.js`
 Depends on: none
 Blocked by: none
-Existing: 10 `.tmp` en `~/.fabrica/sesiones` (medido arriba; el 23 oct había 11). Fallo reproducido por su entrada real: 25 rondas de 8 procesos `node scripts/sesiones.mjs tocar` a la vez con el mismo `session_id` y una casa temporal, en Windows, contra el código de `origin/main` -> 200 procesos, 14 con salida distinta de 0 y 14 `.tmp` que quedan; con el cambio del PR #150 -> 0 y 0 (una pasada por lado; el guion vive en el scratchpad de la sesión, no en el repo). Quién escribe en esa carpeta (`git grep -n -E "apuntarSesion|purgarViejas|quitarSesion" origin/main -- scripts` y `.claude/settings.json`): `sesiones.mjs tocar` (`UserPromptSubmit`, `PostToolBatch`), `sesiones.mjs fin` (`SessionEnd`) y el arranque (`al-arrancar.mjs` -> `pasoSesiones`: registra y purga); `~/.claude/hooks` no la toca. `apuntarSesion` escribe `<id>.<pid>.tmp` y renombra (`session-log.mjs:59-61`) y `purgarViejas` solo mira `.json` (`session-log.mjs:93,108-112`). `git grep -n "\.tmp" origin/main -- test/sesiones.test.js` -> sin salida.
+Existing: (estado de antes del PR #150, commit `ae39e86`) 10 `.tmp` en `~/.fabrica/sesiones` (medido arriba; el 23 oct había 11). Fallo reproducido por su entrada real: 25 rondas de 8 procesos `node scripts/sesiones.mjs tocar` a la vez con el mismo `session_id` y una casa temporal, en Windows, contra el código de `ae39e86` -> tres pasadas con 14, 29 y 37 de 200 procesos con salida distinta de 0 (todos `EPERM`) y un `.tmp` huérfano por fallo; con el cambio del PR #150 -> 0 de 200 (una pasada; el guion entero está en el cuerpo del PR #150). Quién escribe en esa carpeta (`git grep -n -E "apuntarSesion|purgarViejas|quitarSesion" ae39e86 -- scripts` y `.claude/settings.json`): `sesiones.mjs tocar` (`UserPromptSubmit`, `PostToolBatch`), `sesiones.mjs fin` (`SessionEnd`) y el arranque (`al-arrancar.mjs` -> `pasoSesiones`: registra y purga); `~/.claude/hooks` no la toca. `apuntarSesion` escribe `<id>.<pid>.tmp` y renombra (`session-log.mjs:59-61` en `ae39e86`) y `purgarViejas` solo mira `.json` (`session-log.mjs:93,108` en `ae39e86`). `git grep -n "\.tmp" ae39e86 -- test/sesiones.test.js` -> sin salida (el PR #150 ya añadió los tests de `.tmp`, por eso el trozo está hecho).
 Not done: clase: una escritura atómica que deja restos cuando el renombrado falla. Reintenta el renombrado ante `EPERM` o `EBUSY` un número fijo de veces, borra su `.tmp` si al final falla y lanza (el gancho sale 1, como hoy: se ve). La purga borra `.tmp` de más de `CADUCA_H`. No cambia la forma de la ficha (trozo 4). El estrés reproduce el síntoma (salida 1 y `.tmp` huérfano), pero no prueba que los 10 restos de octubre vengan de ahí y no de un proceso cortado.
 Done:
 ```sh
@@ -82,7 +82,7 @@ node --test test/sesiones.test.js
 Files: `session-states.json`, `scripts/lib/session-log.mjs`, `scripts/sesiones.mjs`, `test/sesiones.test.js`, `fields.json`, `scripts/lib/fields.mjs`
 Depends on: 3
 Blocked by: none
-Existing: `git grep -n -i "session-states\|espera-permiso" origin/main` -> sin salida; los `CAMPOS` de la ficha son cinco (`session-log.mjs:13`) y `validarFicha` exige exactamente esos (`session-log.mjs:32`); `tocar` ignora `tool_calls` (`scripts/sesiones.mjs:74-91`).
+Existing: `git grep -n -i "session-states\|espera-permiso" origin/main` -> sin salida; los `CAMPOS` de la ficha son cinco (`session-log.mjs:13`) y `validarFicha` exige exactamente esos (`session-log.mjs:34`); `tocar` ignora `tool_calls` (`scripts/sesiones.mjs:74-91`).
 Not done: campos nuevos de `session`: `estado` (enum; comparado con `intervention.clase`, otro significado: nueva, sin-equivalente), `hace` (enum, nueva), `objeto` (texto corto con forma comprobada, nueva), `desde` (fecha del último cambio de estado; mismo tipo que `intervention.t` y otro significado: nueva), `pregunta` (texto de una línea; nueva). Se declaran también los cinco de hoy y `session` entra en `FIELD_SOURCES`, que hoy no la lee. Una ficha con la forma vieja se lee como `sin-dato`, no como rota: las sesiones abiertas antes del cambio no ponen en rojo el arranque. Solo escribe `trabajando` (`PostToolBatch` con la última herramienta del lote, y `UserPromptSubmit` -> `pensando`); los estados de espera son el trozo 6. `entities.json` no se toca (la base de `session` sigue `hueco`; otra pregunta). Sin `PreToolUse`: se ve lo último que terminó, no lo que empieza (un `npm test` largo se ve al acabar).
 Done:
 ```sh
@@ -157,7 +157,7 @@ test -z "$(git -C C:/dev/homenu-panel ls-tree -r --name-only origin/main | grep 
 Rojo antes, medido en el padre del PR (`998b965~1`): `ls-tree` lista `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1` y `cliente/oculto.vbs`, y `git grep -c -E "ingest/fabrica|/coste|/fondos" 998b965~1 -- server.mjs` -> `4`. Verde después: las dos primeras órdenes salen 0 sobre `origin/main`.
 
 ## Build order
-Ola 1 (hecha el 1 y el 10 en un solo PR; el 3 sigue): 1, 10 y 3 a la vez (repos distintos). Ola 2: 2 (tras desplegar el 1) y 4. Ola 3: 5 y 8. Ola 4: 9; y 6 en cuanto Pablo conteste A, luego 7. El 1 prueba el circuito: su test corre el envío real contra el servidor real en local; el Done del 2 lo prueba por Tailscale con las sesiones de verdad.
+Ola 1 (hecha: el 1 y el 10 en un solo PR del panel, el 3 en el PR #150 de la Fábrica). Ola 2: 2 (tras desplegar el 1) y 4. Ola 3: 5 y 8. Ola 4: 9; y 6 en cuanto Pablo conteste A, luego 7. El 1 prueba el circuito: su test corre el envío real contra el servidor real en local; el Done del 2 lo prueba por Tailscale con las sesiones de verdad.
 
 ## Decisions taken
 - principio 4 | eligió: el vocabulario de estados, de qué hace y de columnas vive en session-states.json de la Fábrica y el panel lo lee de GitHub | descartó: una copia de la lista en lib.mjs del panel | motivo: decidido
