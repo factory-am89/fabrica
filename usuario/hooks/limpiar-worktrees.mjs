@@ -22,10 +22,10 @@
  * worktree. Se quita la unión ANTES de borrar el worktree; si no, borrar
  * recursivamente podría vaciar la carpeta de destino.
  *
- *   node scripts/limpiar-worktrees.mjs            # ensayo: dice qué borraría
- *   node scripts/limpiar-worktrees.mjs --si       # borra
- *   node scripts/limpiar-worktrees.mjs --si --silencio   # al empezar sesión
- *   node scripts/limpiar-worktrees.mjs --hook            # tras un `gh pr merge`
+ *   node usuario/hooks/limpiar-worktrees.mjs            # ensayo: dice qué borraría
+ *   node usuario/hooks/limpiar-worktrees.mjs --si       # borra
+ *   node usuario/hooks/limpiar-worktrees.mjs --si --silencio   # al empezar sesión
+ *   node usuario/hooks/limpiar-worktrees.mjs --hook            # tras un `gh pr merge`
  *
  * Lo que NO pudo borrar se dice siempre, también con --silencio (#141: dejaba
  * carpetas a medias y, como al arrancar va en silencio, nadie se enteraba). Lo
@@ -85,7 +85,8 @@ export function leerPendientes(comun) {
   const f = ficheroPendientes(comun);
   if (!existsSync(f)) return [];
   const lista = JSON.parse(readFileSync(f, "utf8"));
-  return Array.isArray(lista) ? lista : [];
+  if (!Array.isArray(lista)) throw new Error("el registro no es una lista");
+  return lista;
 }
 
 /**
@@ -300,7 +301,12 @@ if (esPrincipal) {
   // Un repo con ficha (.fabrica.json) ya trae y limpia en su propio arranque (al-dia y limpiar de
   // scripts/al-arrancar.mjs): aquí no se toca git, para no pisar su FETCH_HEAD ni sus refs (#147).
   if (existsSync(join(raiz, ".fabrica.json"))) process.exit(0);
-  intenta(() => git(["fetch", "-q", "--prune", "origin"], raiz));
+  // Un fetch fallido se dice (también con --silencio): sin él, `origin/main` queda viejo y nadie se entera.
+  try {
+    git(["fetch", "-q", "--prune", "origin"], raiz);
+  } catch (e) {
+    console.error(`⚠ limpiar-worktrees: git fetch --prune origin falló (${String(e?.message ?? e).slice(0, 200)}); sigo con lo que hay en local.`);
+  }
 
   // git worktree list --porcelain: bloques separados por línea vacía.
   const bloques = git(["worktree", "list", "--porcelain"], raiz).split(/\r?\n\r?\n/).map((b) => {

@@ -7,6 +7,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(RAIZ, 'usuario', 'hooks', 'limpiar-worktrees.mjs');
@@ -56,4 +58,8 @@ test('sin ficha borra el worktree fusionado (la regla no apaga el hook entero)',
   const r = correr(clon);
   assert.equal(r.status, 0, r.stderr);
   assert.ok(!existsSync(wt), 'el worktree se borró');
+});
+
+test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
+  assert.ok(readFileSync(HOOK, 'utf8').includes(`join(raiz, "${NOMBRE_FICHA}")`));
 });
