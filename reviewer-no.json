@@ -56,6 +56,6 @@
     { "source": "#154", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" },
     { "source": "#154", "question": "C8", "kind": "otro", "kind_note": "quinta ronda: la lista de settings de los que salen las órdenes (const ordenes = [...ordenesDe(...), ...]) copiada a mano en dos tests; debía vivir en una constante", "outcome": "pendiente" },
     { "source": "#154", "question": "C14", "kind": "otro", "kind_note": "quinta ronda: la misma receta (el par de ficheros settings) escrita dos veces en vez de una constante", "outcome": "pendiente" },
-    { "source": "#154", "question": "C9", "kind": "otro", "kind_note": "sexta ronda: cifra de filas de reviewer-no.json escrita en el cuerpo sin comando y desfasada tras añadir filas; y una lista de lo no lanzado incompleta (faltaban sesiones, tls y hora)", "outcome": "pendiente" }
+    { "source": "#154", "question": "C9", "kind": "otro", "kind_note": "sexta ronda: cifra de filas de reviewer-no.json escrita en el cuerpo sin comando y desfasada tras añadir filas; y una lista de lo no lanzado incompleta (faltaban sesiones, tls y hora); séptima ronda: una frase del cuerpo sobre la cabeza del PR («the head 196bb1a is the merge») desfasada tras un commit nuevo y su afirmación sobre el conflicto sin comando", "outcome": "pendiente" }
   ]
 }
