@@ -16,7 +16,7 @@ export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = 
   if (existsSync(carpeta)) throw new ExitError('FOLDER_EXISTS', `Ya existe ${carpeta}: otra sesión la usa, o hay un resto que borrar a mano.`);
   let base = 'main';
   if (tieneOrigin(raiz)) {
-    gitOk(['fetch', 'origin', 'main'], raiz);
+    gitOk(['fetch', '--no-write-fetch-head', 'origin', 'main'], raiz);
     base = 'origin/main';
   }
   gitOk(['worktree', 'add', '--no-track', '-b', rama, carpeta, base], raiz);
