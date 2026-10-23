@@ -74,6 +74,15 @@ test('si no puede listar los worktrees vivos no apunta nada y lo dice (un Set va
   assert.match(avisos.join(' '), /no pude listar los worktrees \(git roto\)/);
 });
 
+test('leerUnion: solo «no existe» (ENOENT) y «no es enlace» (EINVAL) cuentan como sin unión; otro error sube', async () => {
+  const { leerUnion } = await import(pathToFileURL(HOOK).href);
+  const falla = (code) => () => { throw Object.assign(new Error(code), { code }); };
+  assert.equal(leerUnion('x', falla('ENOENT')), null);
+  assert.equal(leerUnion('x', falla('EINVAL')), null);
+  assert.equal(leerUnion('x', () => 'C:/destino'), 'C:/destino');
+  for (const code of ['EACCES', 'EBUSY']) assert.throws(() => leerUnion('x', falla(code)), { code });
+});
+
 test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
   assert.ok(readFileSync(HOOK, 'utf8').includes(`join(raiz, "${NOMBRE_FICHA}")`));
 });

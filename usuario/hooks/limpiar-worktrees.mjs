@@ -183,24 +183,19 @@ export function problemaDelBorrado({ dir, rama, quitado, sigue, detalle }, ahora
  * Quita node_modules si es una unión o un enlace, sin tocar su destino. Si es
  * una carpeta de verdad no hace nada. Devuelve true si quitó una unión.
  * En Windows una junction se quita con rmdir (no recursivo); en otros, unlink.
+ * Si no se sabe si es una unión (un error de readlink que no es EINVAL), lanza:
+ * borrar en recursivo a ciegas podría vaciar el destino.
  */
 export function soltarUnion(dir) {
   const nm = join(dir, "node_modules");
   let st;
   try {
     st = lstatSync(nm);
-  } catch {
-    return false; // a propósito: sin node_modules no hay unión que soltar
+  } catch (e) {
+    if (e?.code === "ENOENT") return false; // sin node_modules no hay unión que soltar; otro error (EACCES, EBUSY) sube
+    throw e;
   }
-  let esUnion = st.isSymbolicLink();
-  if (!esUnion) {
-    try {
-      readlinkSync(nm);
-      esUnion = true;
-    } catch {
-      esUnion = false; // a propósito: readlink falla en una carpeta normal
-    }
-  }
+  const esUnion = st.isSymbolicLink() || leerUnion(nm) !== null;
   if (!esUnion) return false;
   try {
     rmdirSync(nm);
@@ -208,6 +203,20 @@ export function soltarUnion(dir) {
     unlinkSync(nm);
   }
   return true;
+}
+
+/**
+ * El destino de una unión o enlace, o null si `ruta` no existe (ENOENT) o no es
+ * un enlace (EINVAL, lo que da readlink en una carpeta o un fichero normal).
+ * Cualquier otro error (EACCES, EBUSY) sube: no se sabe si es una unión.
+ */
+export function leerUnion(ruta, leer = readlinkSync) {
+  try {
+    return leer(ruta);
+  } catch (e) {
+    if (e?.code === "ENOENT" || e?.code === "EINVAL") return null;
+    throw e;
+  }
 }
 
 /** ¿Tiene un `.git` que es una CARPETA? Es un clon con su propia historia, no un worktree (p. ej. MenuPlan-panel-lectura). */
@@ -368,14 +377,22 @@ if (esPrincipal) {
 
   // Worktrees que prestan su node_modules a otros por una unión: no se borran
   // mientras alguien cuelgue de ellos.
+  // Si no se puede leer una de esas uniones no se sabe a quién presta: no se borra ningún worktree en esta pasada.
   const anfitriones = new Set();
+  let sinAnfitriones = null;
   for (const w of bloques) {
-    const destino = intenta(() => readlinkSync(join(resolve(w.worktree), "node_modules")));
-    if (destino) anfitriones.add(resolve(destino, "..").toLowerCase());
+    const nm = join(resolve(w.worktree), "node_modules");
+    try {
+      const destino = leerUnion(nm);
+      if (destino) anfitriones.add(resolve(destino, "..").toLowerCase());
+    } catch (e) {
+      sinAnfitriones = `no pude leer ${nm} (${String(e?.code ?? e?.message ?? e)})`;
+    }
   }
+  if (sinAnfitriones) console.error(`⚠ limpiar-worktrees: ${sinAnfitriones}; no borro ningún worktree en esta pasada.`);
 
   let borrados = 0;
-  for (const w of bloques.slice(1)) {
+  for (const w of sinAnfitriones ? [] : bloques.slice(1)) {
     const dir = resolve(w.worktree);
     if (dir === principal || !existsSync(dir)) continue;
     // Los de un scratchpad (AppData\Local\Temp\claude\…) son de una sesión que
@@ -403,7 +420,13 @@ if (esPrincipal) {
     }
     log(`${SI ? "✓ borro" : "· borraría"} ${dir} (${rama})`);
     if (!SI) continue;
-    soltarUnion(dir);
+    // Sin saber si node_modules es una unión no se borra: en recursivo podría vaciar el destino.
+    try {
+      soltarUnion(dir);
+    } catch (e) {
+      problemas.push({ dir, rama, motivo: `no sé si su node_modules es una unión: ${String(e?.code ?? "")} ${String(e?.message ?? e).split("\n")[0]}`.trim(), cuando: new Date().toISOString() });
+      continue;
+    }
     // Si falla no se para: `worktree remove --force` borra igual, y si no puede, su error va a `problemas`.
     try {
       git(["checkout", "--", "."], dir);
@@ -430,7 +453,12 @@ if (esPrincipal) {
       borrarRama(rama, "-D");
     }
   }
-  intenta(() => git(["worktree", "prune"], raiz));
+  // Aquí un error es un fallo, no un «no» de git: se dice.
+  try {
+    git(["worktree", "prune"], raiz);
+  } catch (e) {
+    console.error(`⚠ limpiar-worktrees: git worktree prune falló (${String(e?.message ?? e).slice(0, LARGO_ERROR)}).`);
+  }
 
   // Lo que una pasada anterior dejó apuntado y ya no es un worktree vivo se
   // termina de borrar ahora (#725): sin esto, una carpeta sin registro no volvía
