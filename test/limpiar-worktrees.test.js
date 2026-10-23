@@ -83,6 +83,20 @@ test('leerUnion: solo «no existe» (ENOENT) y «no es enlace» (EINVAL) cuentan
   for (const code of ['EACCES', 'EBUSY']) assert.throws(() => leerUnion('x', falla(code)), { code });
 });
 
+test('siNo: solo la salida 1 de git es un «no»; otro fallo (128) sube', async () => {
+  const { siNo } = await import(pathToFileURL(HOOK).href);
+  const sale = (status) => () => { throw Object.assign(new Error(`exit ${status}`), { status }); };
+  assert.equal(siNo(() => 'abc'), 'abc');
+  assert.equal(siNo(sale(1)), null);
+  assert.throws(() => siNo(sale(128)), { status: 128 });
+});
+
+test('--hook con una entrada que no es JSON no limpia nada y lo dice', () => {
+  const r = spawnSync('node', [HOOK, '--hook'], { cwd: RAIZ, input: 'no es json', encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /no entiendo la entrada del hook/);
+});
+
 test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
   assert.ok(readFileSync(HOOK, 'utf8').includes(`join(raiz, "${NOMBRE_FICHA}")`));
 });

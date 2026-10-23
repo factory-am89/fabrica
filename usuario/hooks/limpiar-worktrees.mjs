@@ -200,7 +200,7 @@ export function soltarUnion(dir) {
   try {
     rmdirSync(nm);
   } catch {
-    unlinkSync(nm);
+    unlinkSync(nm); // a propósito: fuera de Windows el enlace se quita con unlink; si también falla, su error sube
   }
   return true;
 }
@@ -215,6 +215,21 @@ export function leerUnion(ruta, leer = readlinkSync) {
     return leer(ruta);
   } catch (e) {
     if (e?.code === "ENOENT" || e?.code === "EINVAL") return null;
+    throw e;
+  }
+}
+
+/**
+ * Una pregunta a git: su salida, o null si git dijo «no» saliendo con 1 (una
+ * ref que no existe con `rev-parse --verify --quiet`, una clave de `config` sin
+ * valor, `merge-base --is-ancestor` que no lo es). Otro fallo (128, git que no
+ * está) sube: no se toma por un «no».
+ */
+export function siNo(preguntar) {
+  try {
+    return preguntar();
+  } catch (e) {
+    if (e?.status === 1) return null;
     throw e;
   }
 }
@@ -302,34 +317,26 @@ if (esPrincipal) {
   if (HOOK) {
     let entrada = "";
     for await (const trozo of process.stdin) entrada += trozo;
-    const comando = (() => {
-      try {
-        return JSON.parse(entrada)?.tool_input?.command ?? "";
-      } catch {
-        return ""; // a propósito: sin entrada legible no es un merge y no hay nada que limpiar
-      }
-    })();
+    let comando = "";
+    try {
+      comando = JSON.parse(entrada)?.tool_input?.command ?? "";
+    } catch (e) {
+      console.error(`⚠ limpiar-worktrees: no entiendo la entrada del hook (${String(e?.message ?? e).slice(0, LARGO_ERROR)}); no limpio nada.`);
+      process.exit(0);
+    }
     if (!/\bgh\s+pr\s+merge\b|\bgit\s+(merge|pull)\b/.test(comando)) process.exit(0);
   }
   const SI = HOOK || process.argv.includes("--si");
   const SILENCIO = HOOK || process.argv.includes("--silencio");
   const log = (...a) => { if (!SILENCIO) console.log(...a); };
 
-  const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  const intenta = (f) => {
-    try {
-      return f();
-    } catch {
-      // a propósito: git dice «no» saliendo con error (una ref que no existe, una
-      // rama sin remota); quien llama trata el null. Lo que no se pudo BORRAR no
-      // se queda aquí: se mira el disco y va a `problemas`.
-      return null;
-    }
-  };
+  const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  // Una pregunta a git cuyo «no» es salir con 1 (ref que no existe, clave sin valor, no es antecesor).
+  const pregunta = (args, cwd = raiz) => siNo(() => git(args, cwd));
   const problemas = [];
   // Borrar la rama de un worktree ya quitado: si la rama existe y git no la borra, se dice (también con --silencio).
   const borrarRama = (rama, opcion) => {
-    if (!intenta(() => git(["rev-parse", "--verify", `refs/heads/${rama}`], process.cwd()))) return;
+    if (pregunta(["rev-parse", "--verify", "--quiet", `refs/heads/${rama}`], process.cwd()) === null) return;
     try {
       git(["branch", opcion, rama], process.cwd());
     } catch (e) {
@@ -338,8 +345,15 @@ if (esPrincipal) {
   };
 
   // El hook es de usuario (vale en cualquier carpeta): fuera de un repo, nada.
-  const comun = intenta(() => git(["rev-parse", "--path-format=absolute", "--git-common-dir"], process.cwd()));
-  if (!comun) process.exit(0);
+  // Cualquier otro fallo de git (no está, está roto) se dice.
+  let comun;
+  try {
+    comun = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], process.cwd());
+  } catch (e) {
+    if (/not a git repository/i.test(String(e?.stderr ?? ""))) process.exit(0);
+    console.error(`⚠ limpiar-worktrees: git rev-parse falló (${String(e?.stderr || e?.message || e).slice(0, LARGO_ERROR)}); no limpio nada.`);
+    process.exit(0);
+  }
   const raiz = comun.replace(/[\\/]\.git$/, "");
   // Este proceso no puede tener dentro la carpeta que va a borrar: en el hook
   // hereda el directorio de la sesión que acaba de fusionar, y en Windows eso
@@ -365,15 +379,15 @@ if (esPrincipal) {
     return o;
   });
   const principal = resolve(bloques[0].worktree);
-  const objetivos = ["origin/staging", "origin/main"].filter((r) => intenta(() => git(["rev-parse", "--verify", r], raiz)));
+  const objetivos = ["origin/staging", "origin/main"].filter((r) => pregunta(["rev-parse", "--verify", "--quiet", r]) !== null);
 
   const contenidaEn = (rama) =>
-    objetivos.some((o) => intenta(() => (git(["merge-base", "--is-ancestor", rama, o], raiz), true)));
+    objetivos.some((o) => pregunta(["merge-base", "--is-ancestor", rama, o]) !== null);
   const subidaConSuNombre = (rama) =>
-    intenta(() => git(["config", `branch.${rama}.merge`], raiz)) === `refs/heads/${rama}`;
+    pregunta(["config", `branch.${rama}.merge`]) === `refs/heads/${rama}`;
   const remotaBorradaDe = (rama) =>
-    Boolean(intenta(() => git(["config", `branch.${rama}.remote`], raiz))) &&
-    !intenta(() => git(["rev-parse", "--verify", `refs/remotes/origin/${rama}`], raiz));
+    Boolean(pregunta(["config", `branch.${rama}.remote`])) &&
+    pregunta(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${rama}`]) === null;
 
   // Worktrees que prestan su node_modules a otros por una unión: no se borran
   // mientras alguien cuelgue de ellos.
@@ -399,19 +413,27 @@ if (esPrincipal) {
     // puede estar usándolos ahora mismo para comparar: no se tocan.
     if (/[\\/]AppData[\\/]Local[\\/]Temp[\\/]/i.test(dir)) continue;
     const rama = typeof w.branch === "string" ? w.branch.replace("refs/heads/", "") : null;
-    const lista = rama && terminada({
-      rama,
-      subida: subidaConSuNombre(rama),
-      contenida: contenidaEn(rama),
-      remotaBorrada: remotaBorradaDe(rama),
-      sinSubir: intenta(() => git(["log", "--oneline", rama, "--not", "--remotes"], raiz)) ?? "x",
-    });
+    // Si git falla al decidir, ese worktree se deja y se dice: no se borra a ciegas.
+    let lista;
+    let sucio;
+    try {
+      lista = rama && terminada({
+        rama,
+        subida: subidaConSuNombre(rama),
+        contenida: contenidaEn(rama),
+        remotaBorrada: remotaBorradaDe(rama),
+        sinSubir: git(["log", "--oneline", rama, "--not", "--remotes"], raiz),
+      });
+      if (lista) sucio = git(["status", "--porcelain"], dir);
+    } catch (e) {
+      console.error(`⚠ limpiar-worktrees: dejo ${dir}: git falló al mirarlo (${String(e?.stderr || e?.message || e).slice(0, LARGO_ERROR)}).`);
+      continue;
+    }
     if (!lista) continue;
     if (anfitriones.has(dir.toLowerCase())) {
       log(`· dejo ${dir}: otros worktrees usan su node_modules`);
       continue;
     }
-    const sucio = intenta(() => git(["status", "--porcelain"], dir)) ?? "x";
     // El snapshot que vitest reescribe solo por fin de línea no cuenta como trabajo.
     const cambios = sucio.split(/\r?\n/).filter((l) => l && !/fichas\.test\.js\.snap$/.test(l));
     if (cambios.length) {
@@ -435,17 +457,13 @@ if (esPrincipal) {
     }
     // El error de git se guarda (antes iba a `ignore` y el motivo era genérico).
     let errorGit = "";
-    const quitado = Boolean(
-      intenta(() => {
-        try {
-          execFileSync("git", ["worktree", "remove", "--force", dir], { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-          return true;
-        } catch (e) {
-          errorGit = String(e?.stderr || e?.message || "");
-          throw e;
-        }
-      }),
-    );
+    let quitado = false;
+    try {
+      git(["worktree", "remove", "--force", dir], raiz);
+      quitado = true;
+    } catch (e) {
+      errorGit = String(e?.stderr || e?.message || ""); // va a `problemas` por problemaDelBorrado
+    }
     const problema = problemaDelBorrado({ dir, rama, quitado, sigue: existsSync(dir), detalle: errorGit });
     if (problema) problemas.push(problema);
     else {
