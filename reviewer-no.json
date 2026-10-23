@@ -47,6 +47,15 @@
     { "source": "#150", "question": "C14", "kind": "otro", "kind_note": "dato de produccion (lista de codigos, paso de ms a horas) escrito a mano otra vez en el test y en el codigo", "outcome": "pendiente" },
     { "source": "#150", "question": "C9", "kind": "otro", "kind_note": "rondas siguientes del mismo PR: cifra sin comando (274-301 ms), luego una afirmacion falsa en Decisions (purgarViejas se llamaria tambien en cada tocar) y un shortstat viejo; la clave (PR, pregunta, kind) no admite repetir la fila de la primera ronda", "outcome": "pendiente" },
     { "source": "#150", "question": "C15", "kind": "otro", "kind_note": "rondas siguientes del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado, y elecciones sin apuntar (borrar el tmp en el catch, horasEntre, SUFIJO_TMP)", "outcome": "pendiente" },
-    { "source": "#153", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" }
+    { "source": "#153", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#154", "question": "C15", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#154", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#154", "question": "C15", "kind": "otro", "kind_note": "segunda ronda del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado (5), y elecciones sin apuntar (cualquier cosa en stderr cuenta como fallo; CLAUDE_PROJECT_DIR al repo real); tercera ronda: otra Decision cuya alternativa descartada (copiar scripts/ a una carpeta temporal) tampoco incumple el principio citado (4), y la copia de usuario/hooks a una casa temporal sin apuntar; cuarta ronda: CLAUDE_PROJECT_DIR al repo, el relanzado de rondaSolapada y RONDAS sin apuntar; sexta ronda: lanzar al-arrancar solo con --solo al-dia (y dejar fuera sesiones, tls y hora) sin apuntar", "outcome": "pendiente" },
+    { "source": "#154", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#154", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#154", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#154", "question": "C8", "kind": "otro", "kind_note": "quinta ronda: la lista de settings de los que salen las órdenes (const ordenes = [...ordenesDe(...), ...]) copiada a mano en dos tests; debía vivir en una constante", "outcome": "pendiente" },
+    { "source": "#154", "question": "C14", "kind": "otro", "kind_note": "quinta ronda: la misma receta (el par de ficheros settings) escrita dos veces en vez de una constante", "outcome": "pendiente" },
+    { "source": "#154", "question": "C9", "kind": "otro", "kind_note": "sexta ronda: cifra de filas de reviewer-no.json escrita en el cuerpo sin comando y desfasada tras añadir filas; y una lista de lo no lanzado incompleta (faltaban sesiones, tls y hora); séptima ronda: una frase del cuerpo sobre la cabeza del PR («the head 196bb1a is the merge») desfasada tras un commit nuevo y su afirmación sobre el conflicto sin comando", "outcome": "pendiente" }
   ]
 }
