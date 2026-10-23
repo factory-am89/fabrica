@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  ACTIVA_H, CADUCA_H, REINTENTOS_RENOMBRADO, SUFIJO_TMP, apuntarSesion, leerSesiones, purgarViejas, rutaDeSesiones,
+  ACTIVA_H, CADUCA_H, CODIGOS_REINTENTABLES, REINTENTOS_RENOMBRADO, SUFIJO_TMP, apuntarSesion, leerSesiones, purgarViejas, rutaDeSesiones,
 } from '../scripts/lib/session-log.mjs';
 import {
   choques, leerReparto, reservasVivasAjenas, solapan, validarReparto,
@@ -109,7 +109,7 @@ const discoQueFalla = (codigo, veces) => {
 const restos = (dir) => readdirSync(dir).filter((n) => n.endsWith(SUFIJO_TMP));
 
 test('a rename that fails with EPERM or EBUSY is retried: the file is written and no .tmp is left', () => conCasa((_c, dir) => {
-  for (const codigo of ['EPERM', 'EBUSY']) {
+  for (const codigo of CODIGOS_REINTENTABLES) {
     const { fs, llamadas } = discoQueFalla(codigo, REINTENTOS_RENOMBRADO - 1);
     apuntarSesion({ id: ID_A, carpeta: 'C:\\dev\\x', rama: 'feat/uno' }, { dir, fs });
     assert.equal(llamadas.n, REINTENTOS_RENOMBRADO, codigo);

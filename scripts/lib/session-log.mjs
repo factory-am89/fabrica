@@ -14,6 +14,8 @@ export const CAMPOS = ['id', 'carpeta', 'rama', 'inicio', 'ultima'];
 export const SIN_RAMA = 'sin-rama';
 export const SUFIJO_TMP = '.tmp';
 
+const horasEntre = (desde, hasta) => (hasta - desde) / 36e5; // ms to hours, written once
+
 export const FORMA_ID = /^[\w-]{6,80}$/;
 export const FORMA_RAMA = /^[\w./-]{1,100}$/;
 // A path: no control characters (so no newline), as long as Windows allows.
@@ -72,7 +74,7 @@ export function apuntarSesion({ id, carpeta, rama }, { dir = rutaDeSesiones(), f
 // touch the same file). Retried a fixed number of times; any other error, or the last one, is thrown.
 export const REINTENTOS_RENOMBRADO = 5;
 export const ESPERA_RENOMBRADO_MS = 20;
-const CODIGOS_REINTENTABLES = ['EPERM', 'EBUSY'];
+export const CODIGOS_REINTENTABLES = ['EPERM', 'EBUSY'];
 function renombrar(fs, de, a) {
   for (let intento = 1; ; intento++) {
     try {
@@ -116,7 +118,7 @@ export function leerSesiones({ dir = rutaDeSesiones(), fs = fsReal, reloj = Date
   for (const nombre of nombres.filter((n) => n.endsWith('.json')).sort()) {
     try {
       const f = validarFicha(JSON.parse(fs.readFileSync(join(dir, nombre), 'utf8')));
-      const horas = (ahora - Date.parse(f.ultima)) / 36e5;
+      const horas = horasEntre(Date.parse(f.ultima), ahora);
       sesiones.push({ ...f, horas, activa: horas <= ACTIVA_H });
     } catch (e) {
       if (!esFichaRota(e)) throw e;
@@ -136,7 +138,7 @@ export function purgarViejas({ dir = rutaDeSesiones(), fs = fsReal, reloj = Date
   // leerSesiones returned with no error, so the directory exists or is missing (ENOENT, then there is nothing to purge).
   const nombres = sesiones.length || fs.existsSync(dir) ? fs.readdirSync(dir) : [];
   for (const nombre of nombres.filter((n) => n.endsWith(SUFIJO_TMP))) {
-    if ((reloj() - fs.statSync(join(dir, nombre)).mtimeMs) / 36e5 > CADUCA_H) fs.rmSync(join(dir, nombre), { force: true });
+    if (horasEntre(fs.statSync(join(dir, nombre)).mtimeMs, reloj()) > CADUCA_H) fs.rmSync(join(dir, nombre), { force: true });
   }
   return viejas.map((s) => s.id);
 }

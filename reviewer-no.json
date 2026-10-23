@@ -27,6 +27,7 @@
     { "source": "#144", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
     { "source": "#144", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
     { "source": "#150", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
-    { "source": "#150", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" }
+    { "source": "#150", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#150", "question": "C14", "kind": "otro", "kind_note": "dato de produccion (lista de codigos, paso de ms a horas) escrito a mano otra vez en el test y en el codigo", "outcome": "pendiente" }
   ]
 }
