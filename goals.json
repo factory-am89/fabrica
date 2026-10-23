@@ -38,7 +38,7 @@
     },
     {
       "id": "I3", "text": "Toda regla tiene un lector que falla y un disparador que lo ejecuta sin que nadie se acuerde, y todo fallo se pregunta por su clase; el arreglo es un mecanismo para la clase.",
-      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "C16", "C17", "P2", "P8", "P12"]
+      "goals": ["O3"], "principles": [5], "questions": ["C1", "C2", "C6", "C12", "C13", "C16", "C17", "P2", "P8", "P12", "P13"]
     },
     {
       "id": "I4", "text": "Lo que el agente necesita está en datos del repo legibles de una vez, y lo que decide queda apuntado con su motivo.",
@@ -46,7 +46,7 @@
     },
     {
       "id": "I5", "text": "Todo lector es una hipótesis que se mide: cifra antes y después, tasa de «no» falsos, y «no concluyente» con menos de MIN_CASES_PER_CELL casos.",
-      "goals": ["O2", "O3"], "principles": [2], "questions": ["C7", "C9", "P6"]
+      "goals": ["O2", "O3"], "principles": [2], "questions": ["C7", "C9", "P6", "P13"]
     }
   ],
   "questions": [
@@ -78,6 +78,7 @@
     { "id": "P9", "goals": ["O2"] },
     { "id": "P10", "goals": ["O1"] },
     { "id": "P11", "goals": ["O2"] },
-    { "id": "P12", "goals": ["O3"] }
+    { "id": "P12", "goals": ["O3"] },
+    { "id": "P13", "goals": ["O3"] }
   ]
 }
