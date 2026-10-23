@@ -35,6 +35,10 @@
     { "source": "#151", "question": "C14", "kind": "otro", "kind_note": "registro en disco copiado sin sus campos en fields.json ni excepción apuntada", "outcome": "pendiente" },
     { "source": "#151", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
     { "source": "#151", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
-    { "source": "#148", "question": "C6", "kind": "falta-de-rojo-antes", "outcome": "pendiente" }
+    { "source": "#148", "question": "C6", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#148", "question": "C6", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#149", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#149", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#149", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" }
   ]
 }
