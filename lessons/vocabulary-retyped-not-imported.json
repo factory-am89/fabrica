@@ -1,0 +1,23 @@
+{
+  "v": 2,
+  "question": "C8",
+  "sources": [
+    "#102",
+    "#109",
+    "#112",
+    "#114",
+    "#117",
+    "#120",
+    "#123",
+    "#125",
+    "#129"
+  ],
+  "mechanism": "scripts/lib/quoted-strings.mjs",
+  "origin": "constructor",
+  "signal": "none",
+  "reason": [
+    "otro"
+  ],
+  "reason_note": "el indicador test-duplication de audit solo cuenta y su disparador es manual (triggerOf devuelve manual), y solo compara cadenas de test/ con las de scripts/lib/, no copias en prosa ni entre ficheros de lib; hace falta un test que falle (plan aparte, toca audit.mjs)",
+  "escaped": false
+}

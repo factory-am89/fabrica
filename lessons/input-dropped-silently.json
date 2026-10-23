@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "question": "C5",
+  "sources": [
+    "#100",
+    "#102",
+    "#117",
+    "#123"
+  ],
+  "mechanism": "scripts/collect-records.mjs",
+  "origin": "constructor",
+  "signal": "none",
+  "reason": [
+    "otro"
+  ],
+  "reason_note": "una entrada que no encaja (lista cortada, ruta que no es texto, línea corrupta, fuente ausente) se descarta o se sustituye sin fallo: solo el caso de la lista cortada de collect-records.mjs tiene test; la clase la juzga el revisor y ninguna máquina la comprueba",
+  "escaped": false
+}

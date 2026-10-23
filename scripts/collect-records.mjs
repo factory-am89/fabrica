@@ -6,6 +6,7 @@
 // Plus, for the judge: 1 for the runs of golden.yml, 1 per page of commits per judge path, 1 for the date of the last good run's head_sha (--since does not limit them).
 // Reads with `node scripts/token.mjs -- gh api` (the constructor identity). A failed call, a cut list or a malformed
 // answer throws: a partial download would pass for a complete one.
+// lesson: input-dropped-silently (only this file's cut-list case is tested; the class is judged by the reviewer, C5)
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
