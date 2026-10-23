@@ -49,7 +49,9 @@
     { "source": "#150", "question": "C15", "kind": "otro", "kind_note": "rondas siguientes del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado, y elecciones sin apuntar (borrar el tmp en el catch, horasEntre, SUFIJO_TMP)", "outcome": "pendiente" },
     { "source": "#154", "question": "C15", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
     { "source": "#154", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
-    { "source": "#154", "question": "C15", "kind": "otro", "kind_note": "segunda ronda del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado (5), y elecciones sin apuntar (cualquier cosa en stderr cuenta como fallo; CLAUDE_PROJECT_DIR al repo real); tercera ronda: otra Decision cuya alternativa descartada (copiar scripts/ a una carpeta temporal) tampoco incumple el principio citado (4), y la copia de usuario/hooks a una casa temporal sin apuntar", "outcome": "pendiente" },
-    { "source": "#154", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" }
+    { "source": "#154", "question": "C15", "kind": "otro", "kind_note": "segunda ronda del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado (5), y elecciones sin apuntar (cualquier cosa en stderr cuenta como fallo; CLAUDE_PROJECT_DIR al repo real); tercera ronda: otra Decision cuya alternativa descartada (copiar scripts/ a una carpeta temporal) tampoco incumple el principio citado (4), y la copia de usuario/hooks a una casa temporal sin apuntar; cuarta ronda: CLAUDE_PROJECT_DIR al repo, el relanzado de rondaSolapada y RONDAS sin apuntar", "outcome": "pendiente" },
+    { "source": "#154", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#154", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#154", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" }
   ]
 }

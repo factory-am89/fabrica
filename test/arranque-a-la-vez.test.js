@@ -10,11 +10,19 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
+import { arrancar, SOLO } from '../scripts/al-arrancar.mjs';
+import { pasoAlDia } from '../scripts/pull-main.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Carpetas temporales del sistema; solo se borra lo que el test creó.
 const PREFIJO = 'arranque-a-la-vez-';
 const RONDAS = 10;
+// El arranque dice un paso fallido con este comienzo de línea: se saca de al-arrancar.mjs, no se copia.
+const TITULAR_FALLO = (() => {
+  const lineas = [];
+  arrancar([{ nombre: 'x', ejecutar: () => { throw new Error('e'); } }], (l) => lineas.push(l));
+  return lineas[0].slice(0, lineas[0].indexOf('«'));
+})();
 const bases = [];
 after(() => { for (const b of bases) rmSync(b, { recursive: true, force: true }); });
 const leerJson = (...partes) => JSON.parse(readFileSync(path.join(RAIZ, ...partes), 'utf8'));
@@ -22,7 +30,7 @@ const leerJson = (...partes) => JSON.parse(readFileSync(path.join(RAIZ, ...parte
 // Lista cerrada: la orden tal como está en el settings (con sus {{home}} y $CLAUDE_PROJECT_DIR) -> argumentos que
 // la dejan sin red ni token. al-arrancar solo con su paso al-dia (limpiar y periodico piden GitHub); el resto, tal cual.
 const CLASIFICADAS = new Map([
-  ['node "$CLAUDE_PROJECT_DIR/scripts/al-arrancar.mjs"', ['--solo', 'al-dia']],
+  ['node "$CLAUDE_PROJECT_DIR/scripts/al-arrancar.mjs"', [SOLO, pasoAlDia().nombre]],
   ['node "{{home}}/.claude/hooks/limpiar-worktrees.mjs" --si --silencio', []],
 ]);
 
@@ -67,7 +75,7 @@ function montar() {
   return { otro, principal, casa };
 }
 
-// Lanza una orden y espera a que acabe; un fallo es salida distinta de 0, algo en stderr o un «FALLÓ» en stdout.
+// Lanza una orden y espera a que acabe; un fallo es salida distinta de 0, algo en stderr o un paso fallido (TITULAR_FALLO) en stdout.
 const lanzar = ({ orden, args }, cwd, env) => new Promise((resolver) => {
   const p = spawn(process.execPath, args, { cwd, env });
   p.stdin.end(); // el arranque real da el JSON del gancho por stdin y lo cierra; sin cerrar, al-arrancar espera para siempre
@@ -76,7 +84,7 @@ const lanzar = ({ orden, args }, cwd, env) => new Promise((resolver) => {
   p.stdout.on('data', (d) => { out += d; });
   p.stderr.on('data', (d) => { err += d; });
   p.on('close', (status) => {
-    const fallo = status !== 0 || err.trim() !== '' || /FALLÓ/.test(out);
+    const fallo = status !== 0 || err.trim() !== '' || out.includes(TITULAR_FALLO);
     resolver({ orden, fallo, detalle: fallo ? `${orden}: status ${status}; stdout ${out.trim()}; stderr ${err.trim()}` : '' });
   });
 });
