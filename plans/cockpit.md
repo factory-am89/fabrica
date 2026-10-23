@@ -145,15 +145,16 @@ node --test cockpit.test.js
 ```
 
 ### 10. (Panel) Quitar el envío viejo y las rutas que sobraban (HECHO: PR #8 de homenu-panel, merge `998b965`)
-Files: `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1`, `cliente/oculto.vbs`, `server.mjs`
+Files: `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1`, `cliente/oculto.vbs`, `server.mjs`, `lib.mjs`, `panel.test.js`
 Depends on: 1
 Blocked by: none
 Existing: antes del PR #8 los tres ficheros de `cliente/` existían y `server.mjs` tenía `/ingest/fabrica`, `/coste` y `/fondos`. Hoy: `git -C C:/dev/homenu-panel ls-tree -r --name-only origin/main | grep -E "enviar-fabrica|oculto|instalar-tarea"` -> sin salida; `git -C C:/dev/homenu-panel grep -n -E "ingest/fabrica|/coste|/fondos" origin/main -- server.mjs` -> sin salida.
 Not done: la tarea de Windows `HoMenu panel - enviar fabrica` la deshabilitó Pablo a mano el 23 oct 2026, según él (no consultado en el PC); ningún trozo la toca ni la borra del registro de tareas. Quitar `/coste`, `/fondos` y `/ingest/fabrica` con su código fue decisión de Pablo, no del plan. No arregla el envío viejo: se quita (clase: un lanzador que traga el código de salida; no se repetirá en el trozo 2). Lo construyó el mismo PR que el trozo 1 porque comparten `server.mjs` y `lib.mjs`.
 Done:
 ```sh
-node --test panel.test.js cockpit.test.js
+test -z "$(git -C C:/dev/homenu-panel ls-tree -r --name-only origin/main | grep -E 'enviar-fabrica|oculto|instalar-tarea')" && ! git -C C:/dev/homenu-panel grep -q -E 'ingest/fabrica|/coste|/fondos' origin/main -- server.mjs && node --test panel.test.js cockpit.test.js
 ```
+Rojo antes, medido en el padre del PR (`998b965~1`): `ls-tree` lista `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1` y `cliente/oculto.vbs`, y `git grep -c -E "ingest/fabrica|/coste|/fondos" 998b965~1 -- server.mjs` -> `4`. Verde después: las dos primeras órdenes salen 0 sobre `origin/main`.
 
 ## Build order
 Ola 1 (hecha el 1 y el 10 en un solo PR; el 3 sigue): 1, 10 y 3 a la vez (repos distintos). Ola 2: 2 (tras desplegar el 1) y 4. Ola 3: 5 y 8. Ola 4: 9; y 6 en cuanto Pablo conteste A, luego 7. El 1 prueba el circuito: su test corre el envío real contra el servidor real en local; el Done del 2 lo prueba por Tailscale con las sesiones de verdad.
