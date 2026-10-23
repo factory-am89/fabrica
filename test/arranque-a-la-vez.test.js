@@ -35,6 +35,8 @@ const CLASIFICADAS = new Map([
 ]);
 
 const ordenesDe = (settings) => (settings.hooks?.SessionStart ?? []).flatMap((g) => g.hooks.map((h) => h.command));
+// Los settings de los que salen las órdenes de arranque: un solo sitio para los dos tests que las leen.
+const ORDENES = [...ordenesDe(leerJson('.claude', 'settings.json')), ...ordenesDe(leerJson('usuario', 'settings.json'))];
 
 // «node "ruta" arg arg» -> argumentos de node. Un trozo entre comillas dobles es uno solo.
 const trozos = (orden) => [...orden.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
@@ -110,17 +112,15 @@ test('una orden SessionStart que no está clasificada pone el test en rojo', () 
 });
 
 test('toda orden SessionStart de proyecto y de usuario está clasificada, y la lista no tiene órdenes que ya no existen', () => {
-  const ordenes = [...ordenesDe(leerJson('.claude', 'settings.json')), ...ordenesDe(leerJson('usuario', 'settings.json'))];
-  assert.ok(ordenes.length > 0);
-  assert.equal(aLanzar(ordenes).length, ordenes.length);
-  assert.deepEqual([...CLASIFICADAS.keys()].sort(), [...ordenes].sort());
+  assert.ok(ORDENES.length > 0);
+  assert.equal(aLanzar(ORDENES).length, ORDENES.length);
+  assert.deepEqual([...CLASIFICADAS.keys()].sort(), [...ORDENES].sort());
 });
 
 test(`el arranque entero a la vez, ${RONDAS} rondas con un commit nuevo en el remoto: 0 fallos y la principal en la punta`, async () => {
-  const ordenes = [...ordenesDe(leerJson('.claude', 'settings.json')), ...ordenesDe(leerJson('usuario', 'settings.json'))];
   const { otro, principal, casa } = montar();
   const sustituir = (l) => ({ ...l, args: l.args.map((a) => a.replaceAll('{{home}}', casa.replaceAll('\\', '/')).replaceAll('$CLAUDE_PROJECT_DIR', RAIZ.replaceAll('\\', '/'))) });
-  const lanzamientos = aLanzar(ordenes).map(sustituir);
+  const lanzamientos = aLanzar(ORDENES).map(sustituir);
   const env = { ...process.env, HOME: casa, USERPROFILE: casa, CLAUDE_PROJECT_DIR: RAIZ };
   const fallos = [];
   for (let ronda = 1; ronda <= RONDAS; ronda++) {
