@@ -14,11 +14,11 @@ const section = (text, name) => text.split(/^## /m).find((s) => s.startsWith(`${
 
 // Who checks each question, written once as a table (ids are derived from its positions, not typed twice).
 const { machine: M, reviewer: R } = CHECKED_BY;
-const EXPECTED = [M, R, R, R, R, R, M, R, M, R, R, R];
+const EXPECTED = [M, R, R, R, R, R, M, R, M, R, R, R, R];
 
-// The reviewer questions of chunk 11 (P10 to P12): the goal of the row each has in goals.json, and the invariants that list it.
+// The reviewer questions of chunk 11 (P10 to P13): the goal of the row each has in goals.json, and the invariants that list it.
 // They have no automatic judge yet, so they are in no goal's `readers` (a reviewer question of plan.md does not resolve to a trigger).
-const CHUNK_11 = { P10: { goal: 'O1', invariants: ['I1', 'I2'] }, P11: { goal: 'O2', invariants: ['I4'] }, P12: { goal: 'O3', invariants: ['I3'] } };
+const CHUNK_11 = { P10: { goal: 'O1', invariants: ['I1', 'I2'] }, P11: { goal: 'O2', invariants: ['I4'] }, P12: { goal: 'O3', invariants: ['I3'] }, P13: { goal: 'O3', invariants: ['I3'] } };
 const FILE_IN_BACKTICKS = /`((?:[\w.-]+\/)*[\w.-]+\.(?:mjs|json|md|js))`/g;
 
 test('plan.md has prefix P, ids 1..n in a row and the expected checkedBy per question', () => {
@@ -52,9 +52,9 @@ test('arquitecto.md links the plan standard and no longer carries its own list',
 });
 
 const block = (id) => md().split(/^### /m).find((b) => b.startsWith(`${id} — `));
-const NAMES = { P10: [ENTITIES_FILE, FIELDS_FILE], P11: ['scripts/lib/decision.mjs'], P12: ['scripts/lib/triggers.mjs'] };
+const NAMES = { P10: [ENTITIES_FILE, FIELDS_FILE], P11: ['scripts/lib/decision.mjs'], P12: ['scripts/lib/triggers.mjs'], P13: ['scripts/lib/plan.mjs'] };
 
-test('P10 to P12 each have a row in goals.json for their goal, and only their invariants list them', () => {
+test('P10 to P13 each have a row in goals.json for their goal, and only their invariants list them', () => {
   const registry = readGoals('.');
   for (const [id, { goal, invariants }] of Object.entries(CHUNK_11)) {
     const rows = registry[LIST.questions].filter((r) => r[KEY.id] === id);
@@ -66,7 +66,7 @@ test('P10 to P12 each have a row in goals.json for their goal, and only their in
   }
 });
 
-test('P10 to P12 name the files they depend on and every file they name exists', () => {
+test('P10 to P13 name the files they depend on and every file they name exists', () => {
   for (const [id, names] of Object.entries(NAMES)) {
     const text = block(id);
     assert.ok(text, `${id} is missing`);
