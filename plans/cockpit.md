@@ -60,7 +60,7 @@ node --test cockpit.test.js panel.test.js
 Files: `cliente/sesiones-oculto.vbs`, `cliente/instalar-tarea-sesiones.ps1`, `cliente-sesiones.test.js`, `README.md`
 Depends on: 1
 Blocked by: none
-Existing: `Get-ScheduledTask -TaskName "HoMenu panel*"` -> solo `HoMenu panel - enviar fabrica`. `cliente/oculto.vbs` (borrado después por el PR #8, trozo 10) tragaba el código (`sh.Run orden, 0, True` sin `WScript.Quit`): 1340 fallos con `LastTaskResult 0`, medido arriba. La tarea vieja ya está deshabilitada a mano por Pablo; este trozo no la toca.
+Existing: `Get-ScheduledTask -TaskName "HoMenu panel*"` -> solo `HoMenu panel - enviar fabrica`. `cliente/oculto.vbs` (borrado después por el PR #8, trozo 10) tragaba el código (`sh.Run orden, 0, True` sin `WScript.Quit`): 1340 fallos con `LastTaskResult 0`, medido arriba. Según Pablo (no consultado en el PC), la tarea vieja está deshabilitada a mano; este trozo no la toca.
 Not done: el lanzador nuevo termina con `WScript.Quit sh.Run(...)`; el test lo comprueba con `cscript` y un `node` que sale 1, y se salta fuera de Windows (el CI de GitHub es Linux; esa parte solo la ve el PC). No toca el envío viejo (ya quitado, trozo 10). `PANEL_URL` es la dirección del servidor del panel por la red privada: la pone quien lanza la orden, y su valor no se escribe en el plan (skills `hetzner` y `tailscale`). Requiere el trozo 1 fusionado y desplegado con `desplegar.sh` antes de la segunda orden del Done. Registrar una tarea de usuario es reversible (`Unregister-ScheduledTask`) y no es de la lista cerrada: la registra el constructor y lo apunta en el PR.
 Done:
 ```sh
@@ -71,8 +71,8 @@ node --test cliente-sesiones.test.js && node cliente/enviar-sesiones.mjs --fabri
 Files: `scripts/lib/session-log.mjs`, `test/sesiones.test.js`
 Depends on: none
 Blocked by: none
-Existing: 10 `.tmp` en `~/.fabrica/sesiones` (medido arriba); `apuntarSesion` escribe `<id>.<pid>.tmp` y renombra (`session-log.mjs:59-61`) y `purgarViejas` solo mira `.json` (`session-log.mjs:93,108-112`). `git grep -n "\.tmp" origin/main -- test/sesiones.test.js` -> sin salida.
-Not done: clase: una escritura atómica que deja restos cuando el renombrado falla. Reintenta el renombrado ante `EPERM` o `EBUSY` un número fijo de veces, borra su `.tmp` si al final falla y lanza (el gancho sale 1, como hoy: se ve). La purga borra `.tmp` de más de `CADUCA_H`. No cambia la forma de la ficha (trozo 4). Que los 10 restos vengan de un renombrado fallido y no de un proceso cortado no está comprobado.
+Existing: 10 `.tmp` en `~/.fabrica/sesiones` (medido arriba; el 23 oct había 11). Fallo reproducido por su entrada real: 25 rondas de 8 procesos `node scripts/sesiones.mjs tocar` a la vez con el mismo `session_id` y una casa temporal, en Windows, contra el código de `origin/main` -> 200 procesos, 14 con salida distinta de 0 y 14 `.tmp` que quedan; con el cambio del PR #150 -> 0 y 0 (una pasada por lado; el guion vive en el scratchpad de la sesión, no en el repo). Quién escribe en esa carpeta (`git grep -n -E "apuntarSesion|purgarViejas|quitarSesion" origin/main -- scripts` y `.claude/settings.json`): `sesiones.mjs tocar` (`UserPromptSubmit`, `PostToolBatch`), `sesiones.mjs fin` (`SessionEnd`) y el arranque (`al-arrancar.mjs` -> `pasoSesiones`: registra y purga); `~/.claude/hooks` no la toca. `apuntarSesion` escribe `<id>.<pid>.tmp` y renombra (`session-log.mjs:59-61`) y `purgarViejas` solo mira `.json` (`session-log.mjs:93,108-112`). `git grep -n "\.tmp" origin/main -- test/sesiones.test.js` -> sin salida.
+Not done: clase: una escritura atómica que deja restos cuando el renombrado falla. Reintenta el renombrado ante `EPERM` o `EBUSY` un número fijo de veces, borra su `.tmp` si al final falla y lanza (el gancho sale 1, como hoy: se ve). La purga borra `.tmp` de más de `CADUCA_H`. No cambia la forma de la ficha (trozo 4). El estrés reproduce el síntoma (salida 1 y `.tmp` huérfano), pero no prueba que los 10 restos de octubre vengan de ahí y no de un proceso cortado.
 Done:
 ```sh
 node --test test/sesiones.test.js
@@ -149,7 +149,7 @@ Files: `cliente/enviar-fabrica.mjs`, `cliente/instalar-tarea.ps1`, `cliente/ocul
 Depends on: 1
 Blocked by: none
 Existing: antes del PR #8 los tres ficheros de `cliente/` existían y `server.mjs` tenía `/ingest/fabrica`, `/coste` y `/fondos`. Hoy: `git -C C:/dev/homenu-panel ls-tree -r --name-only origin/main | grep -E "enviar-fabrica|oculto|instalar-tarea"` -> sin salida; `git -C C:/dev/homenu-panel grep -n -E "ingest/fabrica|/coste|/fondos" origin/main -- server.mjs` -> sin salida.
-Not done: la tarea de Windows `HoMenu panel - enviar fabrica` la deshabilitó Pablo a mano el 23 oct 2026; ningún trozo la toca ni la borra del registro de tareas. Quitar `/coste`, `/fondos` y `/ingest/fabrica` con su código fue decisión de Pablo, no del plan. No arregla el envío viejo: se quita (clase: un lanzador que traga el código de salida; no se repetirá en el trozo 2). Lo construyó el mismo PR que el trozo 1 porque comparten `server.mjs` y `lib.mjs`.
+Not done: la tarea de Windows `HoMenu panel - enviar fabrica` la deshabilitó Pablo a mano el 23 oct 2026, según él (no consultado en el PC); ningún trozo la toca ni la borra del registro de tareas. Quitar `/coste`, `/fondos` y `/ingest/fabrica` con su código fue decisión de Pablo, no del plan. No arregla el envío viejo: se quita (clase: un lanzador que traga el código de salida; no se repetirá en el trozo 2). Lo construyó el mismo PR que el trozo 1 porque comparten `server.mjs` y `lib.mjs`.
 Done:
 ```sh
 node --test panel.test.js cockpit.test.js
@@ -165,10 +165,10 @@ Ola 1 (hecha el 1 y el 10 en un solo PR; el 3 sigue): 1, 10 y 3 a la vez (repos 
 - principio 2 | eligió: umbral de 15 min sacado de 35 393 huecos medidos con p99,9 de 9,7 min | descartó: un umbral redondo sin medir como 5 o 60 min | motivo: decidido
 - principio 3 | eligió: el lanzador de la tarea devuelve el código de node y el panel enseña la edad del último envío | descartó: copiar oculto.vbs, que da LastTaskResult 0 con 1340 fallos | motivo: decidido
 - principio 6 | eligió: envío por la red privada al servidor del panel, con la forma que tenía /ingest/fabrica | descartó: un token compartido nuevo entre PC y servidor | motivo: decidido
-- principio 6 | eligió: listo significa PR abierto sin sesión viva, esperando a tests y revisor | descartó: listo como trozo de plan desbloqueado, que exige leer planes desde el panel | motivo: decidido
+- principio 4 | eligió: listo significa PR abierto sin sesión viva, esperando a tests y revisor, dato que ya está en GitHub | descartó: listo como trozo de plan desbloqueado, que obliga al panel a leer y interpretar los planes, otra copia de qué está listo además de los PR | motivo: decidido
 - principio 4 | eligió: la rama es la llave del encargo entre ficha y PR | descartó: un número de issue escrito por cada sesión | motivo: decidido
 - principio 6 | eligió: solo viajan vocabulario cerrado, rutas relativas al repo y la línea de pregunta del agente | descartó: mandar el texto de la orden o el último mensaje del agente | motivo: decidido
-- principio 2 | eligió: qué hace sale de PostToolBatch, ya cableado | descartó: un gancho PreToolUse nuevo que cuesta unos 0,3 s por herramienta medidos | motivo: decidido
+- principio 4 | eligió: qué hace sale de PostToolBatch, ya cableado, que trae los nombres de herramienta | descartó: un gancho PreToolUse nuevo que repetiría ese mismo dato en otro gancho (y suma unos 0,3 s por herramienta, medidos arriba) | motivo: decidido
 - principio 3 | eligió: el trozo 10 quita el envío viejo del panel (cliente/enviar-fabrica.mjs, instalar-tarea.ps1, oculto.vbs), por decisión de Pablo del 23 oct 2026, y él deshabilitó su tarea de Windows a mano | descartó: dejar el envío roto en silencio (1340 fallos con LastTaskResult 0) | motivo: decidido
 - principio 4 | eligió: quitar el envío viejo porque el nuevo cubre su función (decisión de Pablo, 23 oct 2026, que de paso quitó /coste, /fondos y /ingest/fabrica) | descartó: arreglar enviar-fabrica y mantener dos envíos PC -> panel | motivo: decidido
 
@@ -183,7 +183,8 @@ Por qué te lo pregunto: es cambiar `.claude/settings.json`, que pone en marcha 
 ## Not verified
 - La forma de entrada de los ganchos se leyó del binario de Claude Code 2.1.309 (`grep -a` sobre `claude.exe`), no de la documentación; una versión nueva puede cambiarla.
 - Que los 17 huecos de más de 15 min sean esperas de permiso: solo se ve que terminan en un `tool_result`. La muestra son 36 transcripts de 2 carpetas; no hay carpetas `C--dev-fabrica-*` en `~/.claude/projects`.
-- Que los 10 `.tmp` vengan de un renombrado fallido y no de un proceso cortado.
+- Que los 10 `.tmp` de octubre vengan de un renombrado fallido y no de un proceso cortado (el estrés reproduce el síntoma, no el origen de esos ficheros).
+- Que la tarea de Windows `HoMenu panel - enviar fabrica` esté deshabilitada: lo dice Pablo; no se consultó con `Get-ScheduledTask` en el PC.
 - Quién despliega el panel (`desplegar.sh` en `/opt/panel/app` por ssh) y de qué rama tira el servidor; el Done del trozo 2 lo necesita.
 - La cuota de GitHub que ya gasta el panel (`leerIssues` hasta 20 peticiones cada 15 min) sumada a las 24 por hora del trozo 9: no medida en el servidor.
 - `gh` no tiene sesión en este PC (`gh auth status` -> «You are not logged into any GitHub hosts»): el plan no está en un issue; la API pública se leyó con `curl`.
