@@ -50,7 +50,7 @@ Files: `cliente/enviar-sesiones.mjs`, `cockpit.mjs`, `server.mjs`, `lib.mjs`, `D
 Depends on: none
 Blocked by: none
 Existing: `git -C C:/dev/homenu-panel grep -n -i "cockpit\|ingest/sesiones\|enviar-sesiones\|sin señal" origin/main` -> sin salida. Lo que se reutiliza: la forma de `POST /ingest/fabrica` y de `guardarInforme` (`server.mjs`), `banner` e `insignia` de `lib.mjs`, y `npm run sesiones -- --json` de la Fábrica, que ya existe (`scripts/sesiones.mjs:98-105`).
-Not done: usa la ficha de hoy (rama, carpeta, minutos desde `ultima`), sin qué hace ni espera (trozos 4 a 8); con solo esos datos una sesión callada más de 15 min sale «sin señal (puede estar esperándote)», y el texto lo dice. El envío ejecuta `node <fabrica>/scripts/sesiones.mjs --json` de la carpeta principal de la Fábrica y manda su salida tal cual: la forma vive en la Fábrica, el panel la valida al recibir (422 si no). No instala la tarea (trozo 2). No quita el envío viejo ni sus rutas: es el trozo 10, que el mismo PR hizo a la vez. El aviso de PC callado y el umbral de 15 min viven en `cockpit.mjs`, un solo sitio. La página entra en `SECCIONES` (grupo «Trabajo») y `cockpit.mjs` en el `Dockerfile` (lo vigila `panel.test.js:135`).
+Not done: usa la ficha de hoy (rama, carpeta, minutos desde `ultima`), sin qué hace ni espera (trozos 4 a 8); con solo esos datos una sesión callada más de 15 min sale «sin señal (puede estar esperándote)», y el texto lo dice. El envío ejecuta `node <fabrica>/scripts/sesiones.mjs --json` de la carpeta principal de la Fábrica y manda su salida tal cual: la forma vive en la Fábrica, el panel la valida al recibir (422 si no). No instala la tarea (trozo 2). No quita el envío viejo ni sus rutas: es el trozo 10, que el mismo PR hizo a la vez. El aviso de PC callado y el umbral de 15 min viven en `cockpit.mjs`, un solo sitio. La página entra en `SECCIONES` (grupo «Trabajo») y `cockpit.mjs` en el `Dockerfile` (lo vigila `panel.test.js:107-109`, en `998b965`).
 Done:
 ```sh
 node --test cockpit.test.js panel.test.js
@@ -105,7 +105,7 @@ Files: `.claude/settings.json`, `scripts/sesiones.mjs`, `test/sesiones.test.js`
 Depends on: 5
 Blocked by: A
 Existing: `PermissionRequest` y `Stop` hoy solo llaman a `intervenciones.mjs` (`.claude/settings.json`); `EVENTOS_TOCAR` admite solo `UserPromptSubmit` y `PostToolBatch` (`scripts/sesiones.mjs:72`) y rechaza cualquier otro. `git grep -n "Notification" origin/main -- .claude/settings.json` -> sin salida.
-Not done: `PermissionRequest` y `Notification` de tipo `permission_prompt` -> `espera-permiso`; los demás tipos de `Notification` se ignoran a propósito. `Stop` -> `espera-tarea` si `background_tasks` trae alguna en marcha, `espera-decision` si la última línea de `last_assistant_message` empieza por la marca de `session-states.json` (guarda esa línea como `pregunta`, recortada a 200), y si no `espera-respuesta`. Un `Stop` de subagente (`agent_id`) no cambia el estado. Nada más del mensaje se guarda. El test de `test/sesiones.test.js:256` que lee `settings.json` se amplía con los tres eventos. No toca `GATE_FILES`: ningún check de la puerta cambia. Si rompe main: revertir el PR desde una rama nueva.
+Not done: `PermissionRequest` y `Notification` de tipo `permission_prompt` -> `espera-permiso`; los demás tipos de `Notification` se ignoran a propósito. `Stop` -> `espera-tarea` si `background_tasks` trae alguna en marcha, `espera-decision` si la última línea de `last_assistant_message` empieza por la marca de `session-states.json` (guarda esa línea como `pregunta`, recortada a 200), y si no `espera-respuesta`. Un `Stop` de subagente (`agent_id`) no cambia el estado. Nada más del mensaje se guarda. El test de `test/sesiones.test.js:304` que lee `settings.json` se amplía con los tres eventos. No toca `GATE_FILES`: ningún check de la puerta cambia. Si rompe main: revertir el PR desde una rama nueva.
 Done:
 ```sh
 node --test test/sesiones.test.js
@@ -127,7 +127,7 @@ Files: `cockpit.mjs`, `server.mjs`, `cockpit.test.js`, `config/fabrica.json`
 Depends on: 1, 4, 10
 Blocked by: none
 Existing: tras el trozo 1, `cockpit.mjs` solo enseña rama y minutos. `git -C C:/dev/homenu-panel grep -n "session-states" origin/main` -> sin salida.
-Not done: lee `session-states.json` de la rama `main` de la Fábrica con `texto(...)` y la caché que ya existe (`server.mjs:79-95`); un valor que no está en el vocabulario sale como error visible en la tarjeta, nunca neutro en silencio. Urgente -> insignia `error`, aviso -> `aviso` (tonos de `estilo.mjs`, sin colores nuevos). Bocadillo «Editando · scripts/x.mjs», «Ejecutando · tests», «Necesito: <pregunta>». Antes del trozo 6 ninguna ficha trae un estado de espera, y la caja dice «Sin datos de espera: falta la decisión A» en vez de «nada te espera». Sin resultados («12/12 en verde», «HTTP 401»): no hay dato de resultado (duda 3 del informe).
+Not done: lee `session-states.json` de la rama `main` de la Fábrica con `texto(...)` y la caché que ya existe (`server.mjs:77-92` (en `998b965`)); un valor que no está en el vocabulario sale como error visible en la tarjeta, nunca neutro en silencio. Urgente -> insignia `error`, aviso -> `aviso` (tonos de `estilo.mjs`, sin colores nuevos). Bocadillo «Editando · scripts/x.mjs», «Ejecutando · tests», «Necesito: <pregunta>». Antes del trozo 6 ninguna ficha trae un estado de espera, y la caja dice «Sin datos de espera: falta la decisión A» en vez de «nada te espera». Sin resultados («12/12 en verde», «HTTP 401»): no hay dato de resultado (duda 3 del informe).
 Done:
 ```sh
 node --test cockpit.test.js
@@ -137,7 +137,7 @@ node --test cockpit.test.js
 Files: `cockpit.mjs`, `server.mjs`, `cockpit.test.js`, `config/fabrica.json`
 Depends on: 5, 8
 Blocked by: none
-Existing: el panel lee issues de MenuPlan (`leerIssues`, `server.mjs:55-77`), no PR ni ramas; `git -C C:/dev/homenu-panel grep -n "pulls" origin/main` -> sin salida.
+Existing: el panel lee issues de MenuPlan (`leerIssues`, `server.mjs:54-74` (en `998b965`)), no PR ni ramas; `git -C C:/dev/homenu-panel grep -n "pulls" origin/main` -> sin salida.
 Not done: `config/fabrica.json` gana `cockpit.repos` (hoy `factory-am89/fabrica` y `factory-am89/homenu-panel`); por repo, `pulls?state=all&per_page=50` e `issues?state=open` cada 10 min con `If-None-Match` (un 304 no gasta cuota según GitHub; sin comprobar aquí): 24 peticiones por hora como mucho. Un fallo de GitHub sale como aviso de error encima de la pizarra con la hora del último dato bueno, nunca columnas vacías. Las sesiones en `main` (coordinadoras en la carpeta principal) salen en la fila de agentes y no en la pizarra. No une issue y rama (un PR que dice `Closes #n` puede salir dos veces: duda 2 del informe). No mira checks ni el «no» del revisor (una petición más por PR).
 Done:
 ```sh
@@ -189,5 +189,5 @@ Por qué te lo pregunto: es cambiar `.claude/settings.json`, que pone en marcha 
 - Quién despliega el panel (`desplegar.sh` en `/opt/panel/app` por ssh) y de qué rama tira el servidor; el Done del trozo 2 lo necesita.
 - La cuota de GitHub que ya gasta el panel (`leerIssues` hasta 20 peticiones cada 15 min) sumada a las 24 por hora del trozo 9: no medida en el servidor.
 - `gh` no tiene sesión en este PC (`gh auth status` -> «You are not logged into any GitHub hosts»): el plan no está en un issue; la API pública se leyó con `curl`.
-- La carpeta principal de homenu-panel va 5 commits por detrás de `origin/main`; todo se leyó de `origin/main` (`61a82c8`).
+- La carpeta principal de homenu-panel va por detrás de `origin/main`; lo de antes del PR #8 se leyó de `61a82c8`, y las líneas de `server.mjs` citadas se recomprobaron en `998b965` (origin/main de hoy).
 - Que una tarea de Windows de usuario se registre sin ser administrador: la de `enviar-fabrica` existe, pero no sé quién la registró.
