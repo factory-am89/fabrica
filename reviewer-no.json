@@ -31,6 +31,11 @@
     { "source": "#148", "question": "C6", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
     { "source": "#149", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
     { "source": "#149", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
-    { "source": "#149", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" }
+    { "source": "#149", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" },
+    { "source": "#150", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#150", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#150", "question": "C14", "kind": "otro", "kind_note": "dato de produccion (lista de codigos, paso de ms a horas) escrito a mano otra vez en el test y en el codigo", "outcome": "pendiente" },
+    { "source": "#150", "question": "C9", "kind": "otro", "kind_note": "rondas siguientes del mismo PR: cifra sin comando (274-301 ms), luego una afirmacion falsa en Decisions (purgarViejas se llamaria tambien en cada tocar) y un shortstat viejo; la clave (PR, pregunta, kind) no admite repetir la fila de la primera ronda", "outcome": "pendiente" },
+    { "source": "#150", "question": "C15", "kind": "otro", "kind_note": "rondas siguientes del mismo PR: una Decision cuya alternativa descartada no incumple el principio citado, y elecciones sin apuntar (borrar el tmp en el catch, horasEntre, SUFIJO_TMP)", "outcome": "pendiente" }
   ]
 }

@@ -12,6 +12,9 @@ export const ACTIVA_H = 3;
 export const CADUCA_H = 48;
 export const CAMPOS = ['id', 'carpeta', 'rama', 'inicio', 'ultima'];
 export const SIN_RAMA = 'sin-rama';
+export const SUFIJO_TMP = '.tmp';
+
+const horasEntre = (desde, hasta) => (hasta - desde) / 36e5; // ms to hours, written once
 
 export const FORMA_ID = /^[\w-]{6,80}$/;
 export const FORMA_RAMA = /^[\w./-]{1,100}$/;
@@ -56,10 +59,32 @@ export function apuntarSesion({ id, carpeta, rama }, { dir = rutaDeSesiones(), f
   }
   const ficha = validarFicha({ id, carpeta, rama, inicio, ultima: ahora });
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const tmp = join(dir, `${id}.${process.pid}.tmp`);
-  fs.writeFileSync(tmp, `${JSON.stringify(ficha)}\n`);
-  fs.renameSync(tmp, ficheroDe(dir, id));
+  const tmp = join(dir, `${id}.${process.pid}${SUFIJO_TMP}`);
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(ficha)}\n`);
+    renombrar(fs, tmp, ficheroDe(dir, id));
+  } catch (e) {
+    fs.rmSync(tmp, { force: true }); // no leftover: the error still goes up (the hook exits 1)
+    throw e;
+  }
   return ficha;
+}
+
+// On Windows, renaming over a file another process has open fails with EPERM or EBUSY for a moment (two hooks of one session
+// touch the same file). Retried a fixed number of times; any other error, or the last one, is thrown.
+export const REINTENTOS_RENOMBRADO = 5;
+export const ESPERA_RENOMBRADO_MS = 20;
+export const CODIGOS_REINTENTABLES = ['EPERM', 'EBUSY'];
+function renombrar(fs, de, a) {
+  for (let intento = 1; ; intento++) {
+    try {
+      fs.renameSync(de, a);
+      return;
+    } catch (e) {
+      if (!CODIGOS_REINTENTABLES.includes(e?.code) || intento >= REINTENTOS_RENOMBRADO) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ESPERA_RENOMBRADO_MS);
+    }
+  }
 }
 
 // The file of a session, or null when it has none. A broken file throws (the caller decides).
@@ -93,7 +118,7 @@ export function leerSesiones({ dir = rutaDeSesiones(), fs = fsReal, reloj = Date
   for (const nombre of nombres.filter((n) => n.endsWith('.json')).sort()) {
     try {
       const f = validarFicha(JSON.parse(fs.readFileSync(join(dir, nombre), 'utf8')));
-      const horas = (ahora - Date.parse(f.ultima)) / 36e5;
+      const horas = horasEntre(Date.parse(f.ultima), ahora);
       sesiones.push({ ...f, horas, activa: horas <= ACTIVA_H });
     } catch (e) {
       if (!esFichaRota(e)) throw e;
@@ -105,9 +130,15 @@ export function leerSesiones({ dir = rutaDeSesiones(), fs = fsReal, reloj = Date
 
 // Deletes the files of sessions with no activity for more than CADUCA_H hours (a session that fell without closing).
 // Returns the ids deleted. Unreadable files are left alone: leerSesiones reports them.
+// Also deletes the `.tmp` leftovers of a write that did not finish, once older than CADUCA_H (a live write is seconds old).
 export function purgarViejas({ dir = rutaDeSesiones(), fs = fsReal, reloj = Date.now } = {}) {
   const { sesiones } = leerSesiones({ dir, fs, reloj });
   const viejas = sesiones.filter((s) => s.horas > CADUCA_H);
   for (const s of viejas) fs.rmSync(ficheroDe(dir, s.id), { force: true });
+  // leerSesiones returned with no error, so the directory exists or is missing (ENOENT, then there is nothing to purge).
+  const nombres = sesiones.length || fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  for (const nombre of nombres.filter((n) => n.endsWith(SUFIJO_TMP))) {
+    if (horasEntre(fs.statSync(join(dir, nombre)).mtimeMs, reloj()) > CADUCA_H) fs.rmSync(join(dir, nombre), { force: true });
+  }
   return viejas.map((s) => s.id);
 }
