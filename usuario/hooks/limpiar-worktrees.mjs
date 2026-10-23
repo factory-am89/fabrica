@@ -51,6 +51,10 @@ import { existsSync, lstatSync, readFileSync, readlinkSync, renameSync, rmSync, 
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+// Cuánto del mensaje de git se copia a un aviso (LARGO_ERROR) o al motivo guardado en el registro (LARGO_MOTIVO).
+const LARGO_ERROR = 200;
+const LARGO_MOTIVO = 300;
+
 /**
  * ¿Está terminada la rama de este worktree? Pura, para poder probarla.
  * `subida`: tiene upstream con su propio nombre. `contenida`: es ancestro de
@@ -146,7 +150,7 @@ export function problemaDelBorrado({ dir, rama, quitado, sigue, detalle }, ahora
     dir,
     rama,
     // El error real de git (o del borrado) va en el motivo: sin él, la causa solo se sabía reproduciendo (#725).
-    motivo: detalle ? `${base}: ${String(detalle).trim().split(/\r?\n/)[0].slice(0, 300)}` : base,
+    motivo: detalle ? `${base}: ${String(detalle).trim().split(/\r?\n/)[0].slice(0, LARGO_MOTIVO)}` : base,
     cuando: ahora.toISOString(),
   };
 }
@@ -296,7 +300,7 @@ if (esPrincipal) {
     try {
       git(["branch", opcion, rama], process.cwd());
     } catch (e) {
-      console.error(`⚠ limpiar-worktrees: no pude borrar la rama ${rama}: ${String(e?.message ?? e).slice(0, 200)}`);
+      console.error(`⚠ limpiar-worktrees: no pude borrar la rama ${rama}: ${String(e?.message ?? e).slice(0, LARGO_ERROR)}`);
     }
   };
 
@@ -315,7 +319,7 @@ if (esPrincipal) {
   try {
     git(["fetch", "-q", "--prune", "origin"], raiz);
   } catch (e) {
-    console.error(`⚠ limpiar-worktrees: git fetch --prune origin falló (${String(e?.message ?? e).slice(0, 200)}); sigo con lo que hay en local.`);
+    console.error(`⚠ limpiar-worktrees: git fetch --prune origin falló (${String(e?.message ?? e).slice(0, LARGO_ERROR)}); sigo con lo que hay en local.`);
   }
 
   // git worktree list --porcelain: bloques separados por línea vacía.
@@ -404,14 +408,20 @@ if (esPrincipal) {
   // a entrar nunca, porque arriba solo se recorren los worktrees que git lista.
   let rematadas = 0;
   {
-    const vivosAhora = worktreesVivos(intenta(() => git(["worktree", "list", "--porcelain"], raiz)));
+    // Sin la lista de worktrees vivos no se remata nada: un Set vacío haría pasar por muerto un worktree vivo.
+    let vivosAhora = null;
+    try {
+      vivosAhora = worktreesVivos(git(["worktree", "list", "--porcelain"], raiz));
+    } catch (e) {
+      console.error(`⚠ limpiar-worktrees: no pude listar los worktrees (${String(e?.message ?? e).slice(0, LARGO_ERROR)}); no remato nada.`);
+    }
     let previos = [];
     try {
       previos = leerPendientes(comun);
     } catch (e) {
       console.error(`⚠ limpiar-worktrees: no pude leer lo pendiente para rematarlo (${e.message}).`);
     }
-    for (const p of porTerminar(previos, { raiz: principal, vivos: vivosAhora })) {
+    for (const p of vivosAhora ? porTerminar(previos, { raiz: principal, vivos: vivosAhora }) : []) {
       log(`${SI ? "✓ remato" : "· remataría"} ${p.dir}${p.rama ? ` (${p.rama})` : ""}`);
       if (!SI) continue;
       const r = terminarCarpeta(p.dir);
