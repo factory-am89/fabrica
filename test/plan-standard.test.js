@@ -18,7 +18,7 @@ const EXPECTED = [M, R, R, R, R, R, M, R, M, R, R, R, R];
 
 // The reviewer questions of chunk 11 (P10 to P13): the goal of the row each has in goals.json, and the invariants that list it.
 // They have no automatic judge yet, so they are in no goal's `readers` (a reviewer question of plan.md does not resolve to a trigger).
-const CHUNK_11 = { P10: { goal: 'O1', invariants: ['I1', 'I2'] }, P11: { goal: 'O2', invariants: ['I4'] }, P12: { goal: 'O3', invariants: ['I3'] }, P13: { goal: 'O3', invariants: ['I3'] } };
+const CHUNK_11 = { P10: { goal: 'O1', invariants: ['I1', 'I2'] }, P11: { goal: 'O2', invariants: ['I4'] }, P12: { goal: 'O3', invariants: ['I3'] }, P13: { goal: 'O3', invariants: ['I3', 'I5'] } };
 const FILE_IN_BACKTICKS = /`((?:[\w.-]+\/)*[\w.-]+\.(?:mjs|json|md|js))`/g;
 
 test('plan.md has prefix P, ids 1..n in a row and the expected checkedBy per question', () => {
