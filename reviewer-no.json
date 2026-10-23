@@ -28,6 +28,10 @@
     { "source": "#144", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
     { "source": "#151", "question": "C5", "kind": "error-tragado", "outcome": "pendiente" },
     { "source": "#151", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
-    { "source": "#151", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" }
+    { "source": "#151", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#151", "question": "C7", "kind": "otro", "kind_note": "test que crea carpetas dentro del repo y choca con otro test que copia el repo entero (depende del orden)", "outcome": "pendiente" },
+    { "source": "#151", "question": "C14", "kind": "otro", "kind_note": "registro en disco copiado sin sus campos en fields.json ni excepción apuntada", "outcome": "pendiente" },
+    { "source": "#151", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#151", "question": "C17", "kind": "falta-de-rojo-antes", "outcome": "pendiente" }
   ]
 }

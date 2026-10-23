@@ -186,8 +186,9 @@ export function soltarUnion(dir) {
 export function tieneGitPropio(dir) {
   try {
     return lstatSync(join(dir, ".git")).isDirectory();
-  } catch {
-    return false; // a propósito: sin .git, o ilegible, no es un clon
+  } catch (e) {
+    if (e?.code === "ENOENT") return false; // sin .git no es un clon; cualquier otro error (EACCES, EBUSY) sube: no se adivina
+    throw e;
   }
 }
 
@@ -202,8 +203,8 @@ export function tieneGitPropio(dir) {
  */
 export function terminarCarpeta(dir, { reintentos = 5, espera = 200 } = {}) {
   if (!existsSync(dir)) return { ok: true };
-  if (tieneGitPropio(dir)) return { ok: false, motivo: "tiene un .git de carpeta (un clon, no un worktree): no se toca" };
   try {
+    if (tieneGitPropio(dir)) return { ok: false, motivo: "tiene un .git de carpeta (un clon, no un worktree): no se toca" };
     soltarUnion(dir);
     rmSync(dir, { recursive: true, force: true, maxRetries: reintentos, retryDelay: espera });
   } catch (e) {
@@ -289,6 +290,15 @@ if (esPrincipal) {
     }
   };
   const problemas = [];
+  // Borrar la rama de un worktree ya quitado: si la rama existe y git no la borra, se dice (también con --silencio).
+  const borrarRama = (rama, opcion) => {
+    if (!intenta(() => git(["rev-parse", "--verify", `refs/heads/${rama}`], process.cwd()))) return;
+    try {
+      git(["branch", opcion, rama], process.cwd());
+    } catch (e) {
+      console.error(`⚠ limpiar-worktrees: no pude borrar la rama ${rama}: ${String(e?.message ?? e).slice(0, 200)}`);
+    }
+  };
 
   // El hook es de usuario (vale en cualquier carpeta): fuera de un repo, nada.
   const comun = intenta(() => git(["rev-parse", "--path-format=absolute", "--git-common-dir"], process.cwd()));
@@ -384,7 +394,7 @@ if (esPrincipal) {
     if (problema) problemas.push(problema);
     else {
       borrados++;
-      intenta(() => git(["branch", "-D", rama], raiz));
+      borrarRama(rama, "-D");
     }
   }
   intenta(() => git(["worktree", "prune"], raiz));
@@ -408,7 +418,7 @@ if (esPrincipal) {
       if (r.ok) {
         rematadas++;
         // Solo se fuerza si la rama ya está en staging/main; si no, `-d`, que git rechaza si hay commits sin fusionar.
-        if (p.rama) intenta(() => git(["branch", contenidaEn(p.rama) ? "-D" : "-d", p.rama], raiz));
+        if (p.rama) borrarRama(p.rama, contenidaEn(p.rama) ? "-D" : "-d");
       } else if (!problemas.some((x) => normaRuta(x.dir) === normaRuta(p.dir))) {
         problemas.push({ ...p, motivo: r.motivo, cuando: new Date().toISOString() });
       }

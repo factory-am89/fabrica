@@ -13,14 +13,15 @@ import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(RAIZ, 'usuario', 'hooks', 'limpiar-worktrees.mjs');
 // El hook no toca worktrees bajo AppData/Local/Temp (son de scratchpads de otras sesiones), así que las carpetas del
-// test van dentro del repo, en .limpiar-wt-* (ignorado por git) y se borran al acabar. Solo se borra lo que el test creó.
+// test van dentro del repo, en .tmp-limpiar-wt-* (invariants.test.js salta lo que empieza por .tmp al copiar el repo; ignorado por git) y se borran al acabar. Solo se borra lo que el test creó.
+const PREFIJO = '.tmp-limpiar-wt-';
 const bases = [];
 after(() => { for (const b of bases) rmSync(b, { recursive: true, force: true }); });
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 // Un clon con un worktree cuya rama ya está fusionada en origin/main, subida y limpia.
 function escenario(conFicha) {
-  const base = mkdtempSync(path.join(RAIZ, '.limpiar-wt-'));
+  const base = mkdtempSync(path.join(RAIZ, PREFIJO));
   bases.push(base);
   const remoto = path.join(base, 'remoto.git');
   const clon = path.join(base, 'clon');
@@ -40,7 +41,7 @@ function escenario(conFicha) {
   git(wt, 'push', '-q', '-u', 'origin', 'feat/x');
   git(clon, 'merge', '-q', '--ff-only', 'feat/x');
   git(clon, 'push', '-q', 'origin', 'main');
-  if (conFicha) writeFileSync(path.join(clon, '.fabrica.json'), '{}');
+  if (conFicha) writeFileSync(path.join(clon, NOMBRE_FICHA), '{}');
   return { clon, wt };
 }
 const correr = (clon, ...extra) => spawnSync('node', [HOOK, '--si', '--silencio', ...extra], { cwd: clon, encoding: 'utf8' });
@@ -62,4 +63,8 @@ test('sin ficha borra el worktree fusionado (la regla no apaga el hook entero)',
 
 test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
   assert.ok(readFileSync(HOOK, 'utf8').includes(`join(raiz, "${NOMBRE_FICHA}")`));
+});
+
+test('.gitignore ignora el prefijo de las carpetas del test', () => {
+  assert.ok(readFileSync(path.join(RAIZ, '.gitignore'), 'utf8').split(String.fromCharCode(10)).map((l) => l.trim()).includes(`${PREFIJO}*`));
 });

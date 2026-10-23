@@ -1,4 +1,4 @@
 node_modules
 .env*
 *.pem
-.limpiar-wt-*
+.tmp-limpiar-wt-*
