@@ -2,4 +2,3 @@ node_modules
 .env*
 *.pem
 .tmp-limpiar-wt-*
-.tmp-arranque-a-la-vez-*

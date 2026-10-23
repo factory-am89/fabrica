@@ -6,14 +6,14 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-// Dentro del repo y no en AppData/Local/Temp: limpiar-worktrees se salta lo que cuelga de Temp. El prefijo está en
-// .gitignore y invariants.test.js salta lo que empieza por .tmp; solo se borra lo que el test creó.
-const PREFIJO = '.tmp-arranque-a-la-vez-';
+// Carpetas temporales del sistema; solo se borra lo que el test creó.
+const PREFIJO = 'arranque-a-la-vez-';
 const RONDAS = 10;
 const bases = [];
 after(() => { for (const b of bases) rmSync(b, { recursive: true, force: true }); });
@@ -49,7 +49,7 @@ const commit = (cwd, fichero, texto) => {
 
 // Remoto bare, un clon que publica y una principal con ficha que se queda atrás. `casa` lleva copiados los hooks de usuario.
 function montar() {
-  const base = mkdtempSync(path.join(RAIZ, PREFIJO));
+  const base = mkdtempSync(path.join(tmpdir(), PREFIJO));
   bases.push(base);
   const remoto = path.join(base, 'remoto.git');
   const otro = path.join(base, 'otro');
