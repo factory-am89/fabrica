@@ -42,7 +42,9 @@
  * Dónde está enganchado: el hook de Claude Code en el settings.json de usuario
  * de cada máquina (PostToolUse tras un merge, y SessionStart para lo que se
  * mergeó desde la web), que llama a una copia de este fichero en
- * ~/.claude/hooks/. Si cambias este, copia el nuevo allí.
+ * ~/.claude/hooks/. La fuente está versionada en usuario/hooks/ de Fábrica; tras
+ * cambiarla, `node scripts/install-pc.mjs instalar` la copia allí. En un repo con ficha
+ * (.fabrica.json) no hace nada: ese repo trae y limpia en su propio arranque.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readlinkSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
@@ -295,6 +297,9 @@ if (esPrincipal) {
   // hereda el directorio de la sesión que acaba de fusionar, y en Windows eso
   // bloquea el borrado (#725). Se mueve a la raíz del repo antes de nada.
   process.chdir(raiz);
+  // Un repo con ficha (.fabrica.json) ya trae y limpia en su propio arranque (al-dia y limpiar de
+  // scripts/al-arrancar.mjs): aquí no se toca git, para no pisar su FETCH_HEAD ni sus refs (#147).
+  if (existsSync(join(raiz, ".fabrica.json"))) process.exit(0);
   intenta(() => git(["fetch", "-q", "--prune", "origin"], raiz));
 
   // git worktree list --porcelain: bloques separados por línea vacía.
