@@ -105,4 +105,4 @@ Mal: a rule written as a sentence in a standard with no reader, a Done that call
 Quién: revisor.
 The reviewer asks whether the chunk was validated against the failure or against its own hypothesis; the machine cannot tell which chunk is born from a failure (no field of `scripts/lib/plan.mjs` says so).
 Bien: «reproduced with the two real startup hooks at once: 27 of 30 fail before, 0 of 50 after», and a list of every writer of the shared state (user and project layers, other tools), saying which command found each.
-Mal: a test that pits the fixed command against itself (PR #145 fixed al-dia against al-dia, deduced the cause without reproducing it and without listing who else wrote in `.git`, although that day's reflog already showed foreign `fetch -q --prune origin`).
+Mal: a test that pits the fixed command against itself (PR #145 fixed al-dia against al-dia, deduced the cause without reproducing it and without listing who else wrote in `.git`, although the reflog of `refs/remotes/origin/main` already had `fetch -q --prune origin` entries that were not al-dia's).
