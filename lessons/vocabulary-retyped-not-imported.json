@@ -18,6 +18,6 @@
   "reason": [
     "otro"
   ],
-  "reason_note": "el indicador test-duplication de audit cuenta (87 cadenas hoy) pero no falla ni lo dispara nada solo, y no ve copias en prosa ni entre ficheros de lib; hace falta un test que falle (plan aparte, toca audit.mjs)",
+  "reason_note": "el indicador test-duplication de audit solo cuenta y su disparador es manual (triggerOf devuelve manual), y solo compara cadenas de test/ con las de scripts/lib/, no copias en prosa ni entre ficheros de lib; hace falta un test que falle (plan aparte, toca audit.mjs)",
   "escaped": false
 }
