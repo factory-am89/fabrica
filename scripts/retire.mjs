@@ -29,7 +29,7 @@ export function retirar(nombre, { cwd = process.cwd(), consultarPR = (rama, punt
   const wt = worktrees(raiz).find((w) => norm(w.ruta) === norm(carpeta));
   if (!wt) throw new ExitError('NOT_FOUND', `No hay ninguna carpeta de trabajo «${nombre}» (${carpeta}).`);
   const remoto = tieneOrigin(raiz);
-  if (remoto) gitOk(['fetch', 'origin', 'main'], raiz);
+  if (remoto) gitOk(['fetch', '--no-write-fetch-head', 'origin', 'main'], raiz);
   const base = remoto ? 'origin/main' : 'main';
   const fusionada = (punta) => git(['merge-base', '--is-ancestor', wt.rama, base], raiz).status === 0
     || (remoto && consultarPR(wt.rama, punta));
