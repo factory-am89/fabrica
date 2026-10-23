@@ -138,6 +138,30 @@ export function guardarPendientes(comun, nuevos, { existe = existsSync, vivos = 
 }
 
 /**
+ * Apunta lo que no se pudo borrar. `listar` da `git worktree list --porcelain` y
+ * puede lanzar: sin esa lista no se apunta nada y se dice, porque un Set vacío
+ * apuntaría como pendiente un worktree vivo y el arranque mandaría borrarlo.
+ * Devuelve true si apuntó.
+ */
+export function apuntarPendientes(comun, problemas, listar, { avisar = console.error } = {}) {
+  let vivos;
+  try {
+    vivos = worktreesVivos(listar());
+  } catch (e) {
+    avisar(`⚠ limpiar-worktrees: no pude listar los worktrees (${String(e?.message ?? e).slice(0, LARGO_ERROR)}); no apunto lo pendiente.`);
+    return false;
+  }
+  try {
+    const { corrupto } = guardarPendientes(comun, problemas, { existe: existsSync, vivos });
+    if (corrupto) avisar(`⚠ limpiar-worktrees: ${ficheroPendientes(comun)} estaba corrupto (${corrupto}); lo he reescrito.`);
+  } catch (e) {
+    avisar(`⚠ limpiar-worktrees: no he podido apuntar lo pendiente (${e.message}).`);
+    return false;
+  }
+  return true;
+}
+
+/**
  * ¿Quedó algo tras intentar borrar? Se mira el disco, no lo que dice git: git
  * puede quitar el worktree de su lista y dejar la carpeta (un fichero
  * bloqueado, rutas largas en node_modules), y el `worktree prune` del final
@@ -380,7 +404,12 @@ if (esPrincipal) {
     log(`${SI ? "✓ borro" : "· borraría"} ${dir} (${rama})`);
     if (!SI) continue;
     soltarUnion(dir);
-    intenta(() => git(["checkout", "--", "."], dir));
+    // Si falla no se para: `worktree remove --force` borra igual, y si no puede, su error va a `problemas`.
+    try {
+      git(["checkout", "--", "."], dir);
+    } catch (e) {
+      console.error(`⚠ limpiar-worktrees: git checkout en ${dir} falló (${String(e?.message ?? e).slice(0, LARGO_ERROR)}); sigo con el borrado.`);
+    }
     // El error de git se guarda (antes iba a `ignore` y el motivo era genérico).
     let errorGit = "";
     const quitado = Boolean(
@@ -440,12 +469,6 @@ if (esPrincipal) {
   // Lo que no se pudo borrar se dice SIEMPRE, también en silencio, y se apunta
   // para que el arranque lo siga enseñando mientras la carpeta exista.
   // Los vivos se leen DESPUÉS del prune: una ruta que hoy es worktree no se apunta.
-  const vivos = worktreesVivos(intenta(() => git(["worktree", "list", "--porcelain"], raiz)));
-  try {
-    const { corrupto } = guardarPendientes(comun, problemas, { existe: existsSync, vivos });
-    if (corrupto) console.error(`⚠ limpiar-worktrees: ${ficheroPendientes(comun)} estaba corrupto (${corrupto}); lo he reescrito.`);
-  } catch (e) {
-    console.error(`⚠ limpiar-worktrees: no he podido apuntar lo pendiente (${e.message}).`);
-  }
+  apuntarPendientes(comun, problemas, () => git(["worktree", "list", "--porcelain"], raiz));
   process.stdout.write(salidaDeProblemas(problemas, { hook: HOOK }));
 }

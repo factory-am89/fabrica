@@ -4,9 +4,9 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 
@@ -59,6 +59,19 @@ test('sin ficha borra el worktree fusionado (la regla no apaga el hook entero)',
   const r = correr(clon);
   assert.equal(r.status, 0, r.stderr);
   assert.ok(!existsSync(wt), 'el worktree se borró');
+});
+
+test('si no puede listar los worktrees vivos no apunta nada y lo dice (un Set vacío apuntaría un worktree vivo)', async () => {
+  const { apuntarPendientes, ficheroPendientes } = await import(pathToFileURL(HOOK).href);
+  const comun = mkdtempSync(path.join(RAIZ, PREFIJO));
+  bases.push(comun);
+  const vivo = path.join(comun, 'wt-vivo');
+  mkdirSync(vivo);
+  const avisos = [];
+  const apuntado = apuntarPendientes(comun, [{ dir: vivo, rama: 'feat/x', motivo: 'm', cuando: 'c' }], () => { throw new Error('git roto'); }, { avisar: (m) => avisos.push(m) });
+  assert.equal(apuntado, false);
+  assert.ok(!existsSync(ficheroPendientes(comun)), 'no se escribió el registro de pendientes');
+  assert.match(avisos.join(' '), /no pude listar los worktrees \(git roto\)/);
 });
 
 test('el hook suelto escribe el nombre de la ficha igual que repo-card.mjs (no puede importarlo: se instala solo en ~/.claude/hooks)', () => {
