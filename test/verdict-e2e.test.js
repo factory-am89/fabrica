@@ -14,12 +14,14 @@ import { preguntas, buenas, SHA, ctx } from './apoyo/fabrica.mjs';
 // con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
 // de Pablo y con todas las respuestas en «sí». VEREDICTO_RUTA permite apuntarlo a otra copia del script.
 const BASE_SHA = 'b'.repeat(40);
+// Un check-run publicado: el POST de siempre (/check-runs) o el PATCH que cierra el check en curso (/check-runs/<id>).
+const esCheck = (p) => /\/check-runs(\/\d+)?$/.test(p.ruta);
 const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   return { r, publicado };
@@ -28,12 +30,12 @@ const corre = (extra) => {
 test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo, con todo sí, da sí y publica la aprobación', () => {
   const { r, publicado } = corre({ STANDARD: 'standards/code.md' });
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'success', r.stdout);
+  assert.equal(publicado.find((p) => esCheck(p))?.cuerpo.conclusion, 'success', r.stdout);
   assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews'))?.cuerpo.event, 'APPROVE', 'falta la aprobación de la App');
   assert.match(r.stdout, /^veredicto: sí/);
 });
 
-const check = (publicado) => publicado.find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+const check = (publicado) => publicado.find((p) => esCheck(p)).cuerpo;
 const sinRegistro = (c) => ({ title: c.output.title, summary: c.output.summary });
 
 test('veredicto de punta a punta: el check lleva el registro, con las respuestas y sin la prueba del modelo; title y summary no cambian', () => {
@@ -86,9 +88,9 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });
   const r = spawnSync(process.execPath, ['--import', precarga, path.join(raiz, 'scripts', 'veredicto.mjs')], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', SALIDA: salida, STANDARD: 'standards/p.md' },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: salida, STANDARD: 'standards/p.md' },
   });
-  const c = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10))).find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+  const c = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10))).find((p) => esCheck(p)).cuerpo;
   assert.equal(c.conclusion, 'failure', r.stderr);
   assert.deepEqual(sinRegistro(c), { title: 'Veredicto: no', summary: '- 2 ids desconocidos\n- P1: sin respuesta\n- P2: sin respuesta' });
 });
@@ -128,7 +130,7 @@ for (const [nombre, extra] of [['falta', {}], ['vacío', { STANDARD: '' }], ['co
     const { r, publicado } = corre(extra);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stderr, /STANDARD/);
-    assert.equal(publicado.find((p) => p.ruta.endsWith('/check-runs'))?.cuerpo.conclusion, 'failure');
+    assert.equal(publicado.find((p) => esCheck(p))?.cuerpo.conclusion, 'failure');
     assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews')), undefined, 'no debe aprobar');
   });
 }
@@ -140,7 +142,7 @@ const corpus = (baseJson, headJson) => ({
   CONTENIDOS_FALSOS: JSON.stringify({ [`${BASE_SHA}:${DIR}/expected.json`]: baseJson, [`${SHA}:${DIR}/expected.json`]: headJson }),
 });
 const BASE_CORPUS = { 'caso-01': { author: 'opus', expect: 'C5' }, 'caso-02': { author: 'sonnet', expect: 'clean' } };
-const fk = (publicado) => publicado.find((p) => p.ruta.endsWith('/check-runs')).cuerpo;
+const fk = (publicado) => publicado.find((p) => esCheck(p)).cuerpo;
 
 test('freno dorado de punta a punta: un PR que rebaja un caso da no con motivo cerrado, aunque todas las respuestas sean sí', () => {
   const rebajado = { ...BASE_CORPUS, 'caso-01': { author: 'opus', expect: 'clean' } };

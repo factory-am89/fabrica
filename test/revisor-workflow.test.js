@@ -56,9 +56,9 @@ test('revisor.yml usa pull_request_target, no baja el código del PR y guarda lo
     ['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited'],
     'the reviewer must rejudge when the PR body or title is edited'
   );
-  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha); ninguno trae el código del PR.
+  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha), en cada uno de los dos trabajos; ninguno trae el código del PR.
   const refs = [...texto.matchAll(/^\s*ref:\s*(.*)$/gm)].map((m) => m[1].trim());
-  assert.deepEqual(refs, ['${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR');
+  assert.deepEqual(refs, ['${{ job.workflow_sha }}', '${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR (hay dos: la Fábrica en pendiente y en juzgar)');
   assert.match(texto, /^ {4}environment: revisor$/m, 'sin environment revisor los secretos serían del repo');
 });
 
@@ -72,7 +72,7 @@ test('revisor.yml juzga el diff del SHA exacto y Claude no tiene gh pr diff', ()
 });
 
 test('revisor.yml: el paso del veredicto define STANDARD con el estándar de código', () => {
-  const pasos = Object.values(yaml.load(leer('.github/workflows/revisor.yml')).jobs).flatMap((j) => j.steps);
+  const pasos = yaml.load(leer('.github/workflows/revisor.yml')).jobs.juzgar.steps;
   const paso = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
   assert.equal(paso?.env?.STANDARD, '.fabrica/standards/code.md');
 });
@@ -80,7 +80,7 @@ test('revisor.yml: el paso del veredicto define STANDARD con el estándar de có
 // The reviewer model answers the questions of the standard named in the prompt and the judge checks
 // them against STANDARD: both must name the same file (C8).
 test('revisor.yml: el estándar del prompt es el mismo que STANDARD', () => {
-  const pasos = Object.values(yaml.load(leer('.github/workflows/revisor.yml')).jobs).flatMap((j) => j.steps);
+  const pasos = yaml.load(leer('.github/workflows/revisor.yml')).jobs.juzgar.steps;
   const standard = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'))?.env?.STANDARD;
   const prompt = pasos.map((p) => p.with?.prompt).find((x) => typeof x === 'string');
   assert.ok(standard && prompt, 'falta STANDARD o el prompt');

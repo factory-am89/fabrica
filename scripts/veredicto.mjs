@@ -1,15 +1,15 @@
 // Convierte la salida del revisor en un veredicto y lo publica como la App
 // fabrica-revisor: un check `revisor` y, si es sí, una aprobación.
 // El veredicto lo calcula este código, no el modelo: falla en alto (cualquier
-// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA, TOKEN (token de la App) y STANDARD
+// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA, TOKEN (token de la App), CHECK_RUN (el check en curso que cierra) y STANDARD
 // (obligatoria, sin valor por defecto: la ruta del estándar, p. ej. .fabrica/standards/code.md).
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
 import { checkGolden } from './lib/golden-guard.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from './lib/repo.mjs';
-import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
 // (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
@@ -188,11 +188,29 @@ async function frenoDorado({ repo, base, sha, token }) {
 const publicarCheck = (repo, sha, token, conclusion, output) =>
   api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, status: 'completed', conclusion, output });
 
+// El juicio en curso: el check `revisor` nace «in_progress» con PENDING_TITLE al empezar (MODO=pendiente) y el veredicto cierra ESE
+// check con un PATCH. Mientras está en curso GitHub no deja fusionar con un verde viejo de la misma cabeza (check obligatorio sin terminar).
+const marcarEnCurso = (repo, sha, token) =>
+  api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, status: 'in_progress', output: { title: PENDING_TITLE, summary: 'El revisor está juzgando esta cabeza.' } });
+const cerrarCheck = (repo, checkRun, token, conclusion, output) =>
+  api(token, 'PATCH', `/repos/${repo}/check-runs/${checkRun}`, { status: 'completed', conclusion, output });
+const ID_DE_CHECK = /^[1-9]\d*$/;
+const FALLO_SIN_MARCA = 'no se pudo marcar el juicio en curso';
+const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
+
+// Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
+// filter=all: sin él la API devuelve solo el último de cada nombre.
+async function revisoresDeLaApp(repo, sha, token) {
+  const { check_runs: checks } = await api(token, 'GET', `/repos/${repo}/commits/${sha}/check-runs?check_name=revisor&filter=all&per_page=100`);
+  if (!Array.isArray(checks)) throw new Error('check-runs: la API no devolvió una lista');
+  return checks.filter((c) => c.app?.slug === REVISOR_APP_SLUG).sort((a, b) => b.id - a.id);
+}
+
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
-async function publicar({ repo, pr, sha, token, veredicto, ctx, registro }) {
+async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkRun }) {
   const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
-  await publicarCheck(repo, sha, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
+  await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
   // Si Pablo aprobó esta cabeza, el «no» (ya publicado, con su registro) queda anulado por un segundo check, el último.
   const aprobacion = !veredicto.ok && ctx.sha === ctx.cabeza ? aprobacionDePablo(ctx.reviews, ctx.cabeza) : null;
   if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
@@ -203,14 +221,14 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx, registro }) {
 }
 
 // MODO=anulacion (lo lanza anulacion.yml tras una review): sin modelo. Solo si Pablo aprobó la cabeza actual y el
-// último check `revisor` de esa cabeza, publicado por la App, no está en verde, publica el check de anulación.
+// último check `revisor` de esa cabeza (de cualquier estado), publicado por la App, está completado y no en verde, publica el check de anulación; si está en curso espera: lo aplica el juicio al terminar.
 async function anular({ REPO, PR, TOKEN }) {
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: null, token: TOKEN });
   const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
   if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
-  const { check_runs: checks } = await api(TOKEN, 'GET', `/repos/${REPO}/commits/${ctx.cabeza}/check-runs?check_name=revisor`);
-  const ultimo = checks.filter((c) => c.status === 'completed' && c.app?.slug === REVISOR_APP_SLUG).sort((a, b) => b.id - a.id)[0];
+  const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN))[0];
   if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
+  if (ultimo.status !== 'completed') return console.log('anulación: hay un juicio en curso sobre esta cabeza; lo aplicará al terminar');
   if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
   if (typeof ultimo.output?.summary !== 'string' || !ultimo.output.summary.trim()) throw new Error(`el check revisor ${ultimo.id} no trae resumen: no se sabe qué hallazgos se anulan`);
   const hallazgos = ultimo.output.summary.split('\n').map((l) => l.replace(/^- /, '')).filter(Boolean);
@@ -218,14 +236,32 @@ async function anular({ REPO, PR, TOKEN }) {
   console.log(TITULO_ANULACION);
 }
 
+// MODO=pendiente (primer trabajo de revisor.yml, con su propio token de la App: Claude nunca lo ve): publica `revisor` en curso y deja
+// su id como salida del paso (GITHUB_OUTPUT) para que el veredicto cierre ESE check.
+async function pendiente({ REPO, SHA, TOKEN, GITHUB_OUTPUT }) {
+  const creado = await marcarEnCurso(REPO, SHA, TOKEN);
+  if (!ID_DE_CHECK.test(String(creado?.id))) throw new Error('la API no devolvió el id del check en curso');
+  appendFileSync(GITHUB_OUTPUT, `check_run=${creado.id}\n`);
+  console.log(`${PENDING_TITLE}: check ${creado.id}`);
+}
+
 async function main() {
   if (process.env.MODO === 'anulacion') {
     for (const k of ['REPO', 'PR', 'TOKEN']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
     return anular(process.env);
   }
-  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR } = process.env;
+  if (process.env.MODO === 'pendiente') {
+    for (const k of ['REPO', 'SHA', 'TOKEN', 'GITHUB_OUTPUT']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
+    return pendiente(process.env);
+  }
+  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, CHECK_RUN } = process.env;
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN, BASE, LECTOR })) {
     if (!v) throw new Error(`falta la variable ${k}`);
+  }
+  // Sin el check que abrió el trabajo `pendiente` no hay nada que cerrar: es un no publicado (nunca un sí ni un POST completado en silencio) y error.
+  if (!ID_DE_CHECK.test(CHECK_RUN ?? '')) {
+    await publicarCheck(REPO, SHA, TOKEN, 'failure', { title: 'Veredicto: no', summary: `- ${FALLO_SIN_MARCA}` });
+    throw new Error(`falta la variable CHECK_RUN (${FALLO_SIN_MARCA}): se publicó un no`);
   }
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
   ctx.golden = await frenoDorado({ repo: REPO, base: BASE, sha: SHA, token: LECTOR });
@@ -237,7 +273,11 @@ async function main() {
     errorEstandar = e;
   }
   // Un estándar inválido es un no publicado (nunca un sí) y el script sale con error.
-  const veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar', ...ctx.golden] } : decidir(SALIDA ?? '', preguntas, ctx);
+  let veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar', ...ctx.golden] } : decidir(SALIDA ?? '', preguntas, ctx);
+  // Un run viejo (cancelado, o relanzado) aún publica: un sí solo cierra en verde si la App no abrió otro `revisor` más nuevo en esta cabeza.
+  if (veredicto.ok && (await revisoresDeLaApp(REPO, SHA, TOKEN)).some((c) => c.id > Number(CHECK_RUN) && c.output?.title !== TITULO_ANULACION)) {
+    veredicto = { ...veredicto, ok: false, fallos: [...veredicto.fallos, FALLO_JUICIO_MAS_NUEVO] };
+  }
   // El registro nunca cambia el veredicto: si no se puede construir, el veredicto se publica igual (sin registro) y el script falla en alto.
   let registro = null;
   let errorRegistro = null;
@@ -253,7 +293,7 @@ async function main() {
   } catch (e) {
     errorRegistro = e;
   }
-  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx, registro });
+  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx, registro, checkRun: CHECK_RUN });
   console.log(veredicto.ok ? 'veredicto: sí' : `veredicto: no\n${veredicto.fallos.join('\n')}`);
   if (errorEstandar) throw errorEstandar;
   if (errorRegistro) throw errorRegistro;
