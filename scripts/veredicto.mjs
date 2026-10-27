@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
 import { checkGolden } from './lib/golden-guard.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from './lib/repo.mjs';
-import { ANSWER, ANSWERS, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWER, ANSWERS, CUT_TITLE, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
 // (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
@@ -190,8 +190,9 @@ const publicarCheck = (repo, sha, token, conclusion, output) =>
 
 // El juicio en curso: el check `revisor` nace «in_progress» con PENDING_TITLE al empezar (MODO=pendiente) y el veredicto cierra ESE
 // check con un PATCH. Mientras está en curso GitHub no deja fusionar con un verde viejo de la misma cabeza (check obligatorio sin terminar).
-const marcarEnCurso = (repo, sha, token) =>
-  api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, status: 'in_progress', output: { title: PENDING_TITLE, summary: 'El revisor está juzgando esta cabeza.' } });
+// external_id (campo propio de los check-runs de GitHub) lleva el run que lo abrió: MODO=cerrar encuentra por él el check de ESE run.
+const marcarEnCurso = (repo, sha, token, runId) =>
+  api(token, 'POST', `/repos/${repo}/check-runs`, { name: 'revisor', head_sha: sha, external_id: String(runId), status: 'in_progress', output: { title: PENDING_TITLE, summary: 'El revisor está juzgando esta cabeza.' } });
 const cerrarCheck = (repo, checkRun, token, conclusion, output) =>
   api(token, 'PATCH', `/repos/${repo}/check-runs/${checkRun}`, { status: 'completed', conclusion, output });
 const ID_DE_CHECK = /^[1-9]\d*$/;
@@ -241,11 +242,22 @@ async function anular({ REPO, PR, TOKEN }) {
 
 // MODO=pendiente (primer trabajo de revisor.yml, con su propio token de la App: Claude nunca lo ve): publica `revisor` en curso y deja
 // su id como salida del paso (GITHUB_OUTPUT) para que el veredicto cierre ESE check.
-async function pendiente({ REPO, SHA, TOKEN, GITHUB_OUTPUT }) {
-  const creado = await marcarEnCurso(REPO, SHA, TOKEN);
+async function pendiente({ REPO, SHA, TOKEN, GITHUB_OUTPUT, RUN_ID }) {
+  const creado = await marcarEnCurso(REPO, SHA, TOKEN, RUN_ID);
   if (!ID_DE_CHECK.test(String(creado?.id))) throw new Error('la API no devolvió el id del check en curso');
   appendFileSync(GITHUB_OUTPUT, `check_run=${creado.id}\n`);
   console.log(`${PENDING_TITLE}: check ${creado.id}`);
+}
+
+// MODO=cerrar (tercer trabajo de revisor.yml, corre aunque se cancele el run, con su propio token de la App): si juzgar no llegó al
+// veredicto, cierra en failure (CUT_TITLE: no en neutral, que un check obligatorio cuenta como pasado) los «juzgando» de ESE run.
+async function cerrar({ REPO, SHA, TOKEN, RUN_ID }) {
+  const abiertos = (await revisoresDeLaApp(REPO, SHA, TOKEN)).filter((c) => c.status !== 'completed' && c.external_id === RUN_ID);
+  if (abiertos.length === 0) return console.log(`cerrar: nada que cerrar del run ${RUN_ID}`);
+  for (const c of abiertos) {
+    await cerrarCheck(REPO, c.id, TOKEN, 'failure', { title: CUT_TITLE, summary: `- el juicio se cortó antes del veredicto (run ${RUN_ID})` });
+    console.log(`${CUT_TITLE}: check ${c.id}`);
+  }
 }
 
 async function main() {
@@ -254,8 +266,12 @@ async function main() {
     return anular(process.env);
   }
   if (process.env.MODO === 'pendiente') {
-    for (const k of ['REPO', 'SHA', 'TOKEN', 'GITHUB_OUTPUT']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
+    for (const k of ['REPO', 'SHA', 'TOKEN', 'GITHUB_OUTPUT', 'RUN_ID']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
     return pendiente(process.env);
+  }
+  if (process.env.MODO === 'cerrar') {
+    for (const k of ['REPO', 'SHA', 'TOKEN', 'RUN_ID']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
+    return cerrar(process.env);
   }
   const { REPO, PR, SHA, TOKEN, BASE, LECTOR, CHECK_RUN } = process.env;
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN, BASE, LECTOR })) {

@@ -56,9 +56,9 @@ test('revisor.yml usa pull_request_target, no baja el código del PR y guarda lo
     ['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited'],
     'the reviewer must rejudge when the PR body or title is edited'
   );
-  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha), en cada uno de los dos trabajos; ninguno trae el código del PR.
+  // Único `ref:` permitido: el de la Fábrica en .fabrica/ (job.workflow_sha), en cada uno de los tres trabajos; ninguno trae el código del PR.
   const refs = [...texto.matchAll(/^\s*ref:\s*(.*)$/gm)].map((m) => m[1].trim());
-  assert.deepEqual(refs, ['${{ job.workflow_sha }}', '${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR (hay dos: la Fábrica en pendiente y en juzgar)');
+  assert.deepEqual(refs, ['${{ job.workflow_sha }}', '${{ job.workflow_sha }}', '${{ job.workflow_sha }}'], 'un checkout con otro ref: podría traer el código del PR (hay tres: la Fábrica en pendiente, en juzgar y en cerrar)');
   assert.match(texto, /^ {4}environment: revisor$/m, 'sin environment revisor los secretos serían del repo');
 });
 

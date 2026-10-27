@@ -75,6 +75,9 @@
     { "source": "#161", "question": "C9", "kind": "otro", "kind_note": "segundo no del mismo PR: una medida en vivo contada en el cuerpo con ids, estados y horas pero sin el comando ni la salida literal, y «sin fusión automática armada» sin comando; la fila afirmacion-sin-prueba ya existe para la primera ronda", "outcome": "pendiente" },
     { "source": "#160", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
     { "source": "#160", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
-    { "source": "#160", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" }
+    { "source": "#160", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#164", "question": "C16", "kind": "otro", "kind_note": "decisiones de un plan que citan un principio que la alternativa descartada no rompe (P2 «demuestra» para «parar hasta reproducirlo»; P6 para «meter otros trozos»): el principio citado no es el que cuenta; en a5da303", "outcome": "pendiente" },
+    { "source": "#164", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#164", "question": "C17", "kind": "otro", "kind_note": "sin respuesta: el SALIDA del juez se cortó a los 11 de 20 turnos y acaba en C16, sin responder C17 (log de juzgar del run 40555481876, 14555f3); no es un fallo del PR, el desenlace de ruido lo decide otra sesión", "outcome": "pendiente" }
   ]
 }
