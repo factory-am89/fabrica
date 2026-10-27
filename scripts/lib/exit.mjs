@@ -14,7 +14,7 @@ export const EXIT = Object.freeze({
   NOT_FOUND: 20, // retire: there is no such work folder
   DETACHED_HEAD: 21, // retire: the folder has no branch
   INSIDE_FOLDER: 22, // retire: launched from inside the folder it would delete
-  UNSAVED_CHANGES: 23, // retire: the folder has uncommitted changes
+  UNSAVED_CHANGES: 23, // retire and prejuicio: the folder has uncommitted changes
   NOT_MERGED: 24, // retire: the branch is not merged into main
   GH_FAILED: 25, // retire: GitHub could not be asked about the merged PR
   NODE_MODULES_SHARED: 26, // retire: another folder's node_modules junction points into this one
@@ -25,6 +25,8 @@ export const EXIT = Object.freeze({
   ADOPTED_FAULTS: 41, // adopted: the project owns something it inherits (the fault codes are in the output)
   REVIEWER_NO_FAULTS: 42, // reviewer-no --debt: reviewer-no.json has at least one fault (the codes are in the output)
   REVIEWER_NO_UNREADABLE: 43, // reviewer-no --debt: a check-run of a PR the debt counts (or of no PR) has no readable record
+  PREJUICIO_NO: 44, // prejuicio: the judge says no (each «no» with its proof is in stderr)
+  PREJUICIO_FAILED: 45, // prejuicio: claude failed or its output cannot be read; no verdict exists
 });
 
 // What to do after each code. retry: YES = the same command may work if repeated as is; AFTER_FIX = only
@@ -53,6 +55,8 @@ export const RECOVERY = Object.freeze({
   LESSON_FAULTS: row(RETRY.AFTER_FIX, 'fix each fault code printed in the output and run lessons again'),
   ADOPTED_FAULTS: row(RETRY.NO, 'stop and write down the faults printed in the output; the fix belongs to the project, not to this command'),
   REVIEWER_NO_FAULTS: row(RETRY.AFTER_FIX, 'fix the file and run it again'),
+  PREJUICIO_NO: row(RETRY.AFTER_FIX, 'fix ALL the «no» printed in stderr, commit, and run it again'),
+  PREJUICIO_FAILED: row(RETRY.YES, 'claude failed or answered something unreadable: run it again; if it keeps failing, read stderr and do not open the PR without a pass'),
   REVIEWER_NO_UNREADABLE: row(RETRY.NO, 'the figure would be false: report the check-run indexes printed in stderr; the judge wrote no record there'),
 });
 

@@ -20,7 +20,9 @@
     "LESSON_FAULTS": 40,
     "ADOPTED_FAULTS": 41,
     "REVIEWER_NO_FAULTS": 42,
-    "REVIEWER_NO_UNREADABLE": 43
+    "REVIEWER_NO_UNREADABLE": 43,
+    "PREJUICIO_NO": 44,
+    "PREJUICIO_FAILED": 45
   },
   "RETIRE_RESULT": {
     "REMOVED": "removed",
@@ -111,6 +113,14 @@
     "REVIEWER_NO_FAULTS": {
       "retry": "after-fix",
       "then": "fix the file and run it again"
+    },
+    "PREJUICIO_NO": {
+      "retry": "after-fix",
+      "then": "fix ALL the «no» printed in stderr, commit, and run it again"
+    },
+    "PREJUICIO_FAILED": {
+      "retry": "yes",
+      "then": "claude failed or answered something unreadable: run it again; if it keeps failing, read stderr and do not open the PR without a pass"
     },
     "REVIEWER_NO_UNREADABLE": {
       "retry": "no",

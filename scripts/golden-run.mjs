@@ -114,7 +114,7 @@ export function resolveClaude(env = process.env) {
 }
 
 // The commit under test without the corpus, extracted once; returns the folder. Relative paths to tar: GNU tar reads "C:" as a host.
-function exportJudge(ref, dir) {
+export function exportJudge(ref, dir) {
   const tar = path.join(dir, 'judge.tar');
   const a = spawnSync('git', ['archive', '--format=tar', '-o', tar, ref, '--', '.', ...EXCLUDED.map((p) => `:(exclude)${p}`)], { cwd: RAIZ, encoding: 'utf8' });
   if (a.status !== 0) throw new Error(`git archive ${ref} failed: ${a.stderr}`);
@@ -127,7 +127,7 @@ function exportJudge(ref, dir) {
 }
 
 // One call: returns { text (the structured output), cost }. Throws on any failure of claude or of its output.
-function callClaude({ claude, reviewer, workspace }) {
+export function callClaude({ claude, reviewer, workspace }) {
   const tools = reviewer.tools.filter((t) => !t.startsWith('Bash'));
   const args = [...claude.pre, '-p', '--output-format', 'json', '--no-session-persistence', '--model', reviewer.model, '--max-turns', reviewer.maxTurns, '--allowedTools', tools.join(','), '--json-schema', reviewer.schema];
   const r = spawnSync(claude.cmd, args, { cwd: workspace, input: promptFor(reviewer.prompt, workspace), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
