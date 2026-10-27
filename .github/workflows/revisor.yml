@@ -67,6 +67,8 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
           TOKEN: ${{ steps.appmarca.outputs.token }}
+          # El run que abre el check: va como external_id y el trabajo cerrar lo encuentra por él.
+          RUN_ID: ${{ github.run_id }}
 
   juzgar:
     needs: pendiente
@@ -162,3 +164,38 @@ jobs:
           TOKEN: ${{ steps.app.outputs.token }}
           # El check «juzgando» que abrió el trabajo pendiente: el veredicto cierra ESE check (PATCH), no crea otro.
           CHECK_RUN: ${{ needs.pendiente.outputs.check_run }}
+
+  # Si juzgar no llegó al veredicto (el run se cancela al editar o empujar: juzgar se cancela en cola sin ningún paso), el check «juzgando»
+  # de pendiente quedaría abierto para siempre (issue #162). Este trabajo corre aunque se cancele el run y lo cierra en failure («juicio
+  # cortado»). Tiene su propio token de la App, creado en este runner: ningún paso de Claude lo recibe.
+  cerrar:
+    needs: [pendiente, juzgar]
+    # La misma condición que pendiente, y solo si juzgar no acabó en success (cancelado, fallado u omitido).
+    if: ${{ always() && github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft && needs.juzgar.result != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: revisor
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: factory-am89/fabrica
+          ref: ${{ job.workflow_sha }}
+          path: .fabrica
+          persist-credentials: false
+
+      - id: appcierra
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.REVISOR_CLIENT_ID }}
+          private-key: ${{ secrets.REVISOR_APP_KEY }}
+          permission-checks: write
+
+      - run: node .fabrica/scripts/veredicto.mjs
+        env:
+          MODO: cerrar
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          TOKEN: ${{ steps.appcierra.outputs.token }}
+          RUN_ID: ${{ github.run_id }}

@@ -1,4 +1,5 @@
 // lesson: required-check-stale-while-rejudged
+// lesson: in-progress-closed-by-job-that-may-not-run
 // El check obligatorio `revisor` pasa a «juzgando» (in_progress) al empezar cada juicio y el veredicto cierra ESE check (issue #155,
 // plans/revisor-pendiente.md, trozo 4). Sin eso, editar el cuerpo de un PR con un «sí» viejo dejaba fusionar mientras se volvía a juzgar.
 // VEREDICTO_RUTA apunta el script a otra copia (para ver el caso malo en rojo con el veredicto.mjs de main).
@@ -10,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { PENDING_TITLE, OVERRIDE_TITLE, extractRecord } from '../scripts/lib/record.mjs';
+import { PENDING_TITLE, OVERRIDE_TITLE, CUT_TITLE, readCheckRuns, extractRecord } from '../scripts/lib/record.mjs';
 import { TITULO } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
@@ -21,7 +22,7 @@ const corre = (extra) => {
   const salida = path.join(mkdtempSync(path.join(tmpdir(), 'pendiente-')), 'github-output');
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', GITHUB_OUTPUT: salida, ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', GITHUB_OUTPUT: salida, RUN_ID: '777', ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   const checks = publicado.filter((p) => esCheck(p));
@@ -42,6 +43,61 @@ test('MODO=pendiente: publica `revisor` in_progress con el título PENDING_TITLE
   assert.equal(checks[0].cuerpo.output.title, PENDING_TITLE);
   assert.equal(checks[0].cuerpo.conclusion, undefined, 'un check en curso no lleva conclusión');
   assert.equal(readFileSync(salida, 'utf8'), 'check_run=4242\n');
+});
+
+test('MODO=pendiente: el POST lleva external_id igual a RUN_ID, y sin RUN_ID falla en alto sin publicar', () => {
+  const { r, checks } = corre({ MODO: 'pendiente', RUN_ID: '9001' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(checks[0].cuerpo.external_id, '9001');
+  const sin = corre({ MODO: 'pendiente', RUN_ID: '' });
+  assert.equal(sin.r.status, 1);
+  assert.match(sin.r.stderr, /RUN_ID/);
+  assert.deepEqual(sin.checks, []);
+});
+
+// MODO=cerrar: lo corre el trabajo cerrar de revisor.yml cuando juzgar no llegó al veredicto; cierra en failure el «juzgando» de ESE run.
+const enCurso = (id, runId, extra = {}) => deLaApp(id, { status: 'in_progress', conclusion: null, external_id: runId, output: { title: PENDING_TITLE }, ...extra });
+const cierra = (checks, extra = {}) => corre({ MODO: 'cerrar', RUN_ID: '777', CHECKS_FALSOS: JSON.stringify(checks), ...extra });
+
+test('MODO=cerrar: hace UN solo PATCH, al juzgando de este run, en failure y con CUT_TITLE (lo que readCheckRuns cuenta como cut)', () => {
+  const { r, checks } = cierra([enCurso(10, '777'), enCurso(11, '888'), deLaApp(12, { external_id: '777' })]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].metodo, 'PATCH');
+  assert.equal(checks[0].ruta, '/repos/o/r/check-runs/10');
+  assert.equal(checks[0].cuerpo.status, 'completed');
+  assert.equal(checks[0].cuerpo.conclusion, 'failure');
+  assert.equal(checks[0].cuerpo.output.title, CUT_TITLE);
+  assert.match(checks[0].cuerpo.output.summary, /el juicio se cortó antes del veredicto \(run 777\)/);
+  const leido = readCheckRuns([{ ...checks[0].cuerpo, id: 10 }]);
+  assert.equal(leido.cut, 1, 'los lectores lo cuentan como cortado, no como unreadable');
+  assert.deepEqual(leido.unreadable, []);
+});
+
+test('MODO=cerrar: sin ningún juzgando en curso de este run no publica nada, lo dice y sale con 0', () => {
+  const { r, publicado } = cierra([enCurso(11, '888'), deLaApp(12, { external_id: '777' }), enCurso(13, '777', { app: { slug: 'otra' } })]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(publicado, []);
+  assert.match(r.stdout, /nada que cerrar/);
+});
+
+test('MODO=cerrar: sin RUN_ID falla en alto y no publica; un error de la API sale con 1', () => {
+  const sin = cierra([enCurso(10, '777')], { RUN_ID: '' });
+  assert.equal(sin.r.status, 1);
+  assert.match(sin.r.stderr, /RUN_ID/);
+  assert.deepEqual(sin.publicado, []);
+  const roto = cierra([], { CHECKS_FALSOS: '{"message":"x"}' });
+  assert.equal(roto.r.status, 1, roto.r.stdout + roto.r.stderr);
+  assert.deepEqual(roto.publicado, []);
+});
+
+test('anulación: un juicio cortado (failure, CUT_TITLE) como último de la cabeza se anula con el Approve de Pablo, en vez de esperar', () => {
+  const cortado = deLaApp(300, { conclusion: 'failure', output: { title: CUT_TITLE, summary: '- el juicio se cortó antes del veredicto (run 777)' } });
+  const aprobacion = [{ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA }];
+  const { r, checks } = corre({ MODO: 'anulacion', REVIEWS_FALSAS: JSON.stringify(aprobacion), CHECKS_FALSOS: JSON.stringify([cortado]) });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].cuerpo.output.title, OVERRIDE_TITLE);
 });
 
 test('MODO=pendiente: sin GITHUB_OUTPUT falla en alto y no publica nada', () => {
@@ -170,4 +226,32 @@ test('revisor.yml: pendiente y juzgar piden solo los permisos que usan (pendient
   assert.deepEqual(pendiente.permissions, { contents: 'read' });
   const token = pasosDe(pendiente).find((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
   assert.deepEqual(Object.keys(token.with).filter((k) => k.startsWith('permission-')), ['permission-checks']);
+});
+
+test('revisor.yml: cerrar corre tras pendiente y juzgar aunque se cancele el run, con la misma condición de repo y borrador, solo si juzgar no acabó en success', () => {
+  const { pendiente, cerrar } = wf.jobs;
+  assert.ok(cerrar, 'falta el trabajo cerrar');
+  assert.deepEqual([cerrar.needs].flat().sort(), ['juzgar', 'pendiente']);
+  assert.match(cerrar.if, /always\(\)/);
+  assert.ok(cerrar.if.includes(pendiente.if), 'cerrar y pendiente deben tener la misma condición de repo y borrador');
+  assert.match(cerrar.if, /needs\.juzgar\.result\s*!=\s*'success'/);
+  assert.equal(cerrar.environment, 'revisor');
+  assert.deepEqual(cerrar.permissions, { contents: 'read' });
+  const paso = pasosDe(cerrar).find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  assert.equal(paso?.env?.MODO, 'cerrar');
+  assert.equal(paso.env.RUN_ID, '${{ github.run_id }}');
+  assert.ok(!pasosDe(cerrar).some((p) => String(p.uses ?? '').startsWith('anthropics/')), 'en el trabajo cerrar no corre Claude');
+});
+
+test('revisor.yml: cerrar crea su propio token de la App (solo checks: write) y pendiente publica con RUN_ID', () => {
+  const { pendiente, cerrar } = wf.jobs;
+  const token = pasosDe(cerrar).find((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
+  assert.ok(token?.id, 'cerrar crea su propio token de la App');
+  assert.deepEqual(Object.keys(token.with).filter((k) => k.startsWith('permission-')), ['permission-checks']);
+  const paso = pasosDe(cerrar).find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  assert.equal(paso.env.TOKEN, '${{ steps.' + token.id + '.outputs.token }}');
+  assert.equal(pasosDe(pendiente).find((p) => p.env?.MODO === 'pendiente').env.RUN_ID, '${{ github.run_id }}');
+  for (const [nombre, job] of Object.entries(wf.jobs)) {
+    if (nombre !== 'cerrar') for (const p of pasosDe(job)) assert.ok(!usa(p, `steps.${token.id}.`), `un paso de ${nombre} recibe el token de cerrar`);
+  }
 });
