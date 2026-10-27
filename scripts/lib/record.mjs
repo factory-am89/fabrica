@@ -13,6 +13,8 @@ export const ERRORS = Object.values(ERROR);
 export const OVERRIDE_TITLE = 'override by Pablo';
 // Title of the in_progress `revisor` check-run that marks a judgment under way; it has no record yet, and it is not a round (counted in `pending`).
 export const PENDING_TITLE = 'juzgando';
+// Title of the `revisor` check-run that closes, in failure, a judgment that was cut before its verdict (run cancelled); it has no record and is not a round (counted in `cut`).
+export const CUT_TITLE = 'juicio cortado';
 export const UNANSWERED = 'sin-respuesta'; // aggregate's bucket for a question with a null answer
 const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
 
@@ -97,17 +99,23 @@ export function extractRecord(text) {
   return parseRecord(blocks[0][1]);
 }
 
-// check-runs (GitHub API objects) -> { records, overrides, pending, unreadable: [{index, reason}] }. Override check-runs and
-// in_progress check-runs titled PENDING_TITLE (a judgment not finished) are counted, not read. Nothing else is skipped silently:
-// a completed check-run without record stays unreadable.
+// check-runs (GitHub API objects) -> { records, overrides, pending, cut, unreadable: [{index, reason}] }. Override check-runs,
+// in_progress check-runs titled PENDING_TITLE (a judgment not finished) and completed/failure check-runs titled CUT_TITLE
+// (a judgment cut before its verdict) are counted, not read. Nothing else is skipped silently: any other check-run without
+// record stays unreadable (CUT_TITLE in another state or conclusion included).
 export function readCheckRuns(checkRuns) {
   const records = [];
   const unreadable = [];
   let overrides = 0;
   let pending = 0;
+  let cut = 0;
   checkRuns.forEach((c, index) => {
     if (c?.output?.title === OVERRIDE_TITLE) {
       overrides += 1;
+      return;
+    }
+    if (c?.status === 'completed' && c?.conclusion === 'failure' && c?.output?.title === CUT_TITLE) {
+      cut += 1;
       return;
     }
     if (c?.status === 'in_progress' && c?.output?.title === PENDING_TITLE) {
@@ -120,7 +128,7 @@ export function readCheckRuns(checkRuns) {
       unreadable.push({ index, reason: e.message });
     }
   });
-  return { records, overrides, pending, unreadable };
+  return { records, overrides, pending, cut, unreadable };
 }
 
 // records (and the answer and error vocabularies, ANSWERS and ERRORS by default) -> { porPr: {"repo#pr": {rondas, ok, no, <one counter per ERRORS value>}}, porPregunta: {id: {<one counter per answer>, sin-respuesta}} }
