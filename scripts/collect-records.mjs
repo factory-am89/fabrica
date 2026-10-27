@@ -91,7 +91,7 @@ export async function collect({ get, repo = REPO, since = null }) {
     if (files.length >= FILES_CAP) throw new Error(`PR #${p.number}: ${files.length} files reaches GitHub's listing cap (${FILES_CAP}); the list may be cut`);
     const commits = (await pages(get, `repos/${repo}/pulls/${p.number}/commits`)).map((c) => c.sha);
     for (const sha of commits) {
-      const res = await get(`repos/${repo}/commits/${sha}/check-runs?check_name=revisor&per_page=${PER_PAGE}`);
+      const res = await get(`repos/${repo}/commits/${sha}/check-runs?check_name=revisor&filter=all&per_page=${PER_PAGE}`); // filter=all: without it the API gives only the latest check-run of the head
       if (!Array.isArray(res?.check_runs) || res.check_runs.length !== res.total_count) {
         throw new Error(`check-runs of ${sha}: answer cut or malformed (total_count ${res?.total_count})`);
       }
