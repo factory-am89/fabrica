@@ -95,7 +95,7 @@ Ola 1: 1 y 2 en paralelo (ficheros distintos). Ola 2: 3, con A ya contestada y l
 
 ## Decisions for Pablo
 
-Contestada el 2026-10-27: Pablo autorizó tocar `revisor.yml` y `veredicto.mjs` para cerrar este hueco («Fixea esto» y luego «sigue»), opción 1. Se deja aquí porque el trozo 3 toca `.github/workflows/` y `check-plan` exige `Blocked by: A`; la fila de `intervenciones.md` va en el PR del trozo 3.
+Contestada el 2026-10-27 (cita aportada por la sesión coordinadora desde la respuesta de Pablo; sin enlace público, sin fila todavía en `intervenciones.md` y no comprobada por quien escribe este PR): Pablo autorizó tocar `revisor.yml` y `veredicto.mjs` para cerrar este hueco («Fixea esto» y luego «sigue» para #162), opción 1. La fila de `intervenciones.md:38` es de otra decisión, la A de `plans/revisor-pendiente.md` (#155), y no vale como fuente de esta. Se deja aquí porque el trozo 3 toca `.github/workflows/` y `check-plan` exige `Blocked by: A`; la fila de `intervenciones.md` va en el PR del trozo 3.
 
 ### A. ¿Dejas añadir al workflow del revisor un paso que cierre el «juzgando» cuando un juicio se corta?
 Por qué te lo pregunto: es tocar `.github/workflows/revisor.yml`, de la lista cerrada. Hoy, si un juicio se cancela (pasa al editar el cuerpo y empujar seguido), su check se queda «juzgando» para siempre: 3 veces de 18 desde ayer, sin daño porque eran cabezas viejas o ya tapadas, pero en la cabeza final bloquearía el PR y tu Approve no lo sacaría.
