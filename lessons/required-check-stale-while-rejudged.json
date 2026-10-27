@@ -1,0 +1,15 @@
+{
+  "v": 2,
+  "question": "none",
+  "sources": [
+    "#148",
+    "#156"
+  ],
+  "mechanism": "test/revisor-pendiente.test.js",
+  "origin": "constructor",
+  "signal": "machine",
+  "reason": [
+    "pregunta-pendiente"
+  ],
+  "escaped": true
+}

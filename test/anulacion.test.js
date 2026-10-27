@@ -8,7 +8,7 @@ import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
-import { buenas, SHA, leer } from './apoyo/fabrica.mjs';
+import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const VIEJA = 'b'.repeat(40);
 const review = (extra = {}) => ({ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA, ...extra });
@@ -40,10 +40,10 @@ const corre = (extra) => {
   const ruta = fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
-  return { r, checks: publicado.filter((p) => p.ruta.endsWith('/check-runs')).map((p) => p.cuerpo) };
+  return { r, checks: publicado.filter((p) => esCheck(p)).map((p) => p.cuerpo) };
 };
 const reviews = (...rs) => JSON.stringify(rs);
 const SALIDA_NO = JSON.stringify({ respuestas: buenas().map((r, i) => (i === 0 ? { ...r, respuesta: 'no' } : r)) });

@@ -31,9 +31,48 @@ concurrency:
 permissions: {}
 
 jobs:
-  juzgar:
-    # Solo PR de ramas del propio repo: un fork no recibe nuestros secretos.
+  # Marca `revisor` «en curso» (juzgando) antes de que juzgue Claude: mientras el check obligatorio no ha terminado, GitHub no
+  # fusiona con el verde viejo de la misma cabeza (issue #155). Tiene su propio token de la App, creado en este runner: Claude
+  # (trabajo juzgar) nunca lo ve, y de este trabajo solo sale el id del check, nunca el token.
+  pendiente:
+    # La misma condición que juzgar: solo PR de ramas del propio repo, no borradores.
     if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: revisor
+    permissions:
+      contents: read
+    outputs:
+      check_run: ${{ steps.marcar.outputs.check_run }}
+    steps:
+      # El script, siempre de la Fábrica y en el mismo commit de este workflow (como en juzgar). Sin código del PR.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: factory-am89/fabrica
+          ref: ${{ job.workflow_sha }}
+          path: .fabrica
+          persist-credentials: false
+
+      - id: appmarca
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.REVISOR_CLIENT_ID }}
+          private-key: ${{ secrets.REVISOR_APP_KEY }}
+          permission-checks: write
+
+      - id: marcar
+        run: node .fabrica/scripts/veredicto.mjs
+        env:
+          MODO: pendiente
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          TOKEN: ${{ steps.appmarca.outputs.token }}
+
+  juzgar:
+    needs: pendiente
+    # La misma condición que pendiente, y corre aunque pendiente falle (sin el id del check el veredicto publica un no y sale con error:
+    # falla cerrado), pero no si se cancela el run.
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Los secretos viven en el environment `revisor`, limitado a la rama main: una rama
@@ -121,3 +160,5 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           LECTOR: ${{ github.token }}
           TOKEN: ${{ steps.app.outputs.token }}
+          # El check «juzgando» que abrió el trabajo pendiente: el veredicto cierra ESE check (PATCH), no crea otro.
+          CHECK_RUN: ${{ needs.pendiente.outputs.check_run }}
