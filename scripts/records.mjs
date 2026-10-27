@@ -7,13 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { aggregate, readCheckRuns } from './lib/record.mjs';
 
 export function informe(checkRuns, { json = false } = {}) {
-  const { records, overrides, unreadable } = readCheckRuns(checkRuns);
+  const { records, overrides, pending, unreadable } = readCheckRuns(checkRuns);
   const { porPr, porPregunta } = aggregate(records);
   const prs = Object.keys(porPr).length;
   const rondasMedias = prs ? records.length / prs : null;
-  const cifras = { records: records.length, porPr, porPregunta, rondasMedias, overrides, unreadable };
+  const cifras = { records: records.length, porPr, porPregunta, rondasMedias, overrides, pending, unreadable };
   if (json) return { salida: JSON.stringify(cifras, null, 2), unreadable };
-  const lineas = [`records: ${records.length}`, `prs: ${prs}`, `rondasMedias: ${rondasMedias}`, `overrides: ${overrides}`];
+  const lineas = [`records: ${records.length}`, `prs: ${prs}`, `rondasMedias: ${rondasMedias}`, `overrides: ${overrides}`, `pending: ${pending}`];
   for (const [k, v] of Object.entries(porPr)) lineas.push(`${k}: ${JSON.stringify(v)}`);
   for (const [k, v] of Object.entries(porPregunta)) lineas.push(`${k}: ${JSON.stringify(v)}`);
   return { salida: lineas.join('\n'), unreadable };

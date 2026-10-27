@@ -8,7 +8,7 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { RUTA_ESTANDAR } from '../scripts/veredicto.mjs';
 import { CHECKED_BY, FIELDS, ID_PARTS, ID_SOURCE, readQuestions } from '../scripts/lib/questions.mjs';
-import { ANSWERS, ERRORS, answersSummary, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
+import { ANSWERS, ERRORS, PENDING_TITLE, answersSummary, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
 
 const SHA = 'a'.repeat(40);
 const base = { repo: 'o/r', pr: 2, sha: SHA, standard: 'standards/code.md', veredicto: { ok: false, fallos: ['C5: no'] }, respuestas: { answers: { C1: 'sí', C5: 'no', C6: 'no aplica', C7: null }, invalid: 0 }, run: { id: 99, attempt: 1 } };
@@ -85,6 +85,30 @@ test('readCheckRuns: a check-run without record or with a broken one is unreadab
   assert.deepEqual(unreadable.map((u) => u.index), [1, 2, 3]);
 });
 
+test('readCheckRuns: an in_progress check with PENDING_TITLE counts in pending, not in unreadable', () => {
+  const bueno = { status: 'completed', output: { text: formatBlock(expected) } };
+  const juzgando = { status: 'in_progress', output: { title: PENDING_TITLE, summary: 'x' } };
+  const r = readCheckRuns([bueno, juzgando, juzgando]);
+  assert.equal(r.records.length, 1);
+  assert.equal(r.pending, 2);
+  assert.deepEqual(r.unreadable, []);
+  assert.equal(readCheckRuns([bueno]).pending, 0);
+});
+
+test('readCheckRuns: a completed check without record stays unreadable, even with PENDING_TITLE', () => {
+  const r = readCheckRuns([{ status: 'completed', output: { title: PENDING_TITLE } }, { status: 'in_progress', output: { title: 'otro' } }, { output: {} }]);
+  assert.equal(r.pending, 0);
+  assert.deepEqual(r.unreadable.map((u) => u.index), [0, 1, 2]);
+});
+
+test('CLI: a pending check is printed apart and does not give exit 1', () => {
+  const r = cli('--file', tmp([{ output: { text: formatBlock(expected) } }, { status: 'in_progress', output: { title: PENDING_TITLE } }]), '--json');
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.pending, 1);
+  assert.equal(j.records, 1);
+});
+
 const cli = (...args) => spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'records.mjs'), ...args], { encoding: 'utf8' });
 const tmp = (obj) => {
   const f = path.join(mkdtempSync(path.join(tmpdir(), 'rec-')), 'x.json');
@@ -96,7 +120,7 @@ test('CLI: good file prints the figures and exits 0', () => {
   const r = cli('--file', path.join(import.meta.dirname, 'fixtures', 'records', 'ok.json'), '--json');
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(r.stdout);
-  assert.deepEqual(Object.keys(j).sort(), ['overrides', 'porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
+  assert.deepEqual(Object.keys(j).sort(), ['overrides', 'pending', 'porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
   assert.equal(j.records, 4);
   assert.equal(j.rondasMedias, 4 / 3);
   assert.equal(j.porPregunta.C5.no, 1);
