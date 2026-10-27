@@ -24,7 +24,8 @@ const RAIZ = path.resolve(import.meta.dirname, '..');
 export const MAX_CALLS = 96; // 32 cases of the corpus x DEFAULT_TRIALS (test/golden-workflow.test.js keeps the corpus under it)
 export const DEFAULT_TRIALS = 3;
 export const PHASES = ['all', 'collect', 'score'];
-const WORKFLOW = path.join(RAIZ, '.github', 'workflows', 'revisor.yml');
+export const WORKFLOW_REL = '.github/workflows/revisor.yml'; // where the judge's workflow lives in any checkout of the Fábrica (also the exported one)
+const WORKFLOW = path.join(RAIZ, ...WORKFLOW_REL.split('/'));
 // What the judge must not see: the corpus with its expectations, and the invariant cases (cases.json names, for each judge case, the question that must say no).
 const EXCLUDED = ['test/fixtures/golden', 'test/fixtures/invariants'];
 const FAKE_PR = '0';

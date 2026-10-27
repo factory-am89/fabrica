@@ -11,13 +11,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STANDARD } from './golden.mjs';
-import { callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
+import { WORKFLOW_REL, callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
 import { ExitError, finish, runCommand } from './lib/exit.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '..');
-const WORKFLOW = ['.github', 'workflows', 'revisor.yml'];
 export const DEFAULT_BASE = 'origin/main';
 const BODY_FLAG = '--body-file';
 const BASE_FLAG = '--base';
@@ -71,7 +70,7 @@ export function prejuicio({ bodyFile, base = DEFAULT_BASE, run = callClaude, cla
     cpSync(tree, path.join(workspace, '.fabrica'), { recursive: true });
     writeFileSync(path.join(workspace, 'pr.diff'), diff);
     writeFileSync(path.join(workspace, 'body.md'), readFileSync(bodyFile, 'utf8'));
-    const reviewer = readReviewer(path.join(tree, ...WORKFLOW));
+    const reviewer = readReviewer(path.join(tree, ...WORKFLOW_REL.split('/')));
     const preguntas = cargarPreguntas(STANDARD, tree);
     let result;
     try {

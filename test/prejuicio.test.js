@@ -2,10 +2,12 @@
 // judge are injected. The judge's files are the real ones of this checkout, so the instructions the test sees are the ones CI would use.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readReviewer } from '../scripts/golden-run.mjs';
+import { JUDGE_PATHS, STANDARD } from '../scripts/golden.mjs';
+import { WORKFLOW_REL, readReviewer } from '../scripts/golden-run.mjs';
 import { cliPrejuicio } from '../scripts/prejuicio.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
@@ -13,8 +15,10 @@ import { ANSWER } from '../scripts/lib/record.mjs';
 import { cargarPreguntas } from '../scripts/veredicto.mjs';
 
 const RAIZ = path.join(import.meta.dirname, '..');
-const JUEZ = ['.github/workflows/revisor.yml', '.claude/agents/revisor.md', 'standards/code.md'];
-const IDS = cargarPreguntas('standards/code.md', RAIZ).filter((q) => q.quien === CHECKED_BY.reviewer).map((q) => q.id);
+// What the judge of the base is made of: JUDGE_PATHS of golden.mjs (a «/**» is a folder), never a list of our own.
+const GLOB = '/**';
+const JUEZ = JUDGE_PATHS.map((p) => (p.endsWith(GLOB) ? p.slice(0, -GLOB.length) : p));
+const IDS = cargarPreguntas(STANDARD, RAIZ).filter((q) => q.quien === CHECKED_BY.reviewer).map((q) => q.id);
 const SHA = 'a'.repeat(40);
 const DIFF = 'diff --git a/x b/x\n+cambio\n';
 const BODY = '## What changes\n\ncuerpo en borrador\n';
@@ -29,7 +33,7 @@ const exportFalso = (ref, dir) => {
   const tree = path.join(dir, 'judge');
   for (const f of JUEZ) {
     mkdirSync(path.dirname(path.join(tree, f)), { recursive: true });
-    cpSync(path.join(RAIZ, f), path.join(tree, f));
+    cpSync(path.join(RAIZ, f), path.join(tree, f), { recursive: true });
   }
   return tree;
 };
@@ -43,7 +47,7 @@ function ejecutor(texto) {
     visto.reviewer = reviewer;
     visto.diff = readFileSync(path.join(workspace, 'pr.diff'), 'utf8');
     visto.body = readFileSync(path.join(workspace, 'body.md'), 'utf8');
-    visto.juez = JUEZ.every((f) => existsSync(path.join(workspace, '.fabrica', f)));
+    visto.juez = JUEZ.every((f) => existsSync(path.join(workspace, '.fabrica', f))) && existsSync(path.join(workspace, '.fabrica', ...STANDARD.split('/')));
     if (texto instanceof Error) throw texto;
     return { text: texto, cost: 0.5 };
   };
@@ -57,7 +61,7 @@ test('a clean pass: the judge gets the diff, the draft body and the judge of the
   assert.equal(r.code, EXIT.OK, r.stderr);
   assert.equal(JSON.parse(r.stdout).veredicto, ANSWER.yes);
   assert.deepEqual([e.visto.llamadas, e.visto.diff, e.visto.body, e.visto.juez], [1, DIFF, BODY, true]);
-  assert.deepEqual(e.visto.reviewer, readReviewer(path.join(RAIZ, '.github', 'workflows', 'revisor.yml')), 'same prompt, model and schema as CI');
+  assert.deepEqual(e.visto.reviewer, readReviewer(path.join(RAIZ, ...WORKFLOW_REL.split('/'))), 'same prompt, model and schema as CI');
   assert.equal(existsSync(e.visto.workspace), false);
 });
 
@@ -100,4 +104,10 @@ test('the constructor is told to run it, and the command is in package.json', ()
   const pkg = JSON.parse(readFileSync(path.join(RAIZ, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.prejuicio, 'node scripts/prejuicio.mjs');
   assert.ok(readFileSync(path.join(RAIZ, '.claude', 'agents', 'constructor.md'), 'utf8').includes('npm run prejuicio'));
+});
+
+test('the real entry (npm run prejuicio): without its body file it refuses with USAGE and calls nothing', () => {
+  const r = spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'prejuicio.mjs'), '--json'], { encoding: 'utf8', cwd: RAIZ });
+  assert.equal(r.status, EXIT.USAGE, r.stderr);
+  assert.deepEqual([JSON.parse(r.stdout).ok, JSON.parse(r.stdout).error], [false, 'USAGE']);
 });
