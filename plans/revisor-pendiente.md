@@ -93,10 +93,8 @@ Ola 1: 1, 2 y 3 en paralelo (ficheros distintos). Ola 2: 4, con A ya contestada 
 - principio 4 | eligió: el modo pendiente vive en scripts/veredicto.mjs junto a publicarCheck, y PENDING_TITLE junto a OVERRIDE_TITLE en record.mjs | descartó: un script nuevo para el check en curso, un segundo sitio que publica revisor y un fichero más de puerta | motivo: decidido
 - principio 3 | eligió: el veredicto cierra con PATCH el mismo check que abrió su trabajo pendiente | descartó: crear siempre un check completado nuevo, que deja un en curso huérfano por juicio y deja ganar a un run viejo que publica tarde | motivo: decidido
 - principio 3 | eligió: sin CHECK_RUN el veredicto publica un no y sale con error | descartó: volver en silencio al POST de hoy, un valor por defecto que esconde que el juicio no se marcó | motivo: decidido
-- principio 6 | eligió: el token de la App para el check en curso se crea en un trabajo aparte, en otro runner | descartó: crear el token antes de Claude en el mismo trabajo, que rompe la regla de revisor.yml de que Claude nunca ve el token de la App | motivo: decidido
-- principio 4 | eligió: workflow y script del arreglo en un solo PR | descartó: dos PR, que dejarían main con un check en curso que nadie cierra o con un veredicto que espera un CHECK_RUN que nadie da | motivo: decidido
+- principio 5 | eligió: el token de la App para el check en curso se crea en un trabajo aparte, en otro runner, y un test comprueba que ningún paso de juzgar lo recibe | descartó: crear el token antes de Claude en el mismo trabajo y fiar en la frase de revisor.yml de que Claude nunca lo ve, una regla escrita sin check que la ejecute | motivo: decidido
 - principio 5 | eligió: la lección required-check-stale-while-rejudged con su test como mecanismo | descartó: dejar solo la frase del issue de no editar el cuerpo con la fusión armada | motivo: decidido
-- principio 6 | eligió: tocar revisor.yml con el OK de Pablo (decisión A, opción 1, 2026-10-27) | descartó: solo desarmar la fusión automática al editar el cuerpo, y no tocar nada | motivo: decidido
 - principio 2 | eligió: contar los casos por REST con filter=all y cruzarlos con los runs de cada cabeza | descartó: dar por hecho que fue un caso suelto, como suponía el issue | motivo: decidido
 
 ## Decisions for Pablo
