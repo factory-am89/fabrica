@@ -5,14 +5,14 @@
 // schema, the model, the prompt: exported from origin/main and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
 // Cost: one call of the subscription per pass (`claude -p`, the session's own login). Fails loud: claude failing or an unreadable output is
 // PREJUICIO_FAILED, never a «sí»; a verdict «no» is PREJUICIO_NO with each «no» and its proof in stderr.
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STANDARD, WORKFLOW_REL } from './golden.mjs';
+import { STANDARD, workflowIn } from './golden.mjs';
 import { callClaude, exportJudge, layWorkspace, readReviewer, resolveClaude } from './golden-run.mjs';
 import { ExitError, finish, runCommand } from './lib/exit.mjs';
+import { gitOk } from './lib/folders.mjs';
 import { MAIN_REF } from './lib/repo.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
@@ -20,12 +20,8 @@ import { cargarPreguntas, decidir } from './veredicto.mjs';
 const REPO = path.resolve(import.meta.dirname, '..');
 const BODY_FLAG = '--body-file';
 
-export function git(args) {
-  const r = spawnSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  if (r.error || r.status !== 0) throw new ExitError('GIT_FAILED', `git ${args.join(' ')} failed: ${r.error?.message ?? r.stderr.trim()}`);
-  return r.stdout;
-}
-
+// The git questions go through gitOk (scripts/lib/folders.mjs: the one place that runs git and turns a failure into GIT_FAILED), in the folder of this checkout.
+const gitHere = (args) => gitOk(args, REPO);
 // argv without --json -> { bodyFile }; anything else is a USAGE error. There is no flag for the base: the judge of CI judges against main, and so does this.
 export function parseArgs(args) {
   const out = { bodyFile: null };
@@ -54,7 +50,7 @@ export const humanNos = (nos) => nos.map((n) => `${n.fallo}${n.pregunta ? ` | ${
 
 // Injected for the tests, which call neither claude nor the repo's git: `run` is the executor of the judge ({ claude, reviewer, workspace } -> { text, cost }),
 // `gitOut` answers the git questions (args -> stdout) and `exportTree` puts the judge of main in a folder (ref, dir -> tree). The real ones are the defaults.
-export function prejuicio({ bodyFile, run = callClaude, claude = null, gitOut = git, exportTree = exportJudge }) {
+export function prejuicio({ bodyFile, run = callClaude, claude = null, gitOut = gitHere, exportTree = exportJudge }) {
   if (!existsSync(bodyFile)) throw new ExitError('USAGE', `${BODY_FLAG}: ${bodyFile} does not exist`);
   if (gitOut(['status', '--porcelain']).trim() !== '') throw new ExitError('UNSAVED_CHANGES', 'there are uncommitted changes: the judge sees the commits only (git diff origin/main...HEAD); commit them first');
   const diff = gitOut(['diff', `${MAIN_REF}...HEAD`]);
@@ -65,8 +61,9 @@ export function prejuicio({ bodyFile, run = callClaude, claude = null, gitOut = 
     const tree = exportTree(MAIN_REF, root); // the judge of CI is the one on main: instructions, standard and workflow come from main
     const workspace = path.join(root, 'w');
     mkdirSync(workspace);
-    layWorkspace(workspace, tree, { diff, body: readFileSync(bodyFile, 'utf8') });
-    const reviewer = readReviewer(path.join(tree, ...WORKFLOW_REL.split('/')));
+    layWorkspace(workspace, tree, { diff: `${diff}
+`, body: readFileSync(bodyFile, 'utf8') });
+    const reviewer = readReviewer(workflowIn(tree));
     const preguntas = cargarPreguntas(STANDARD, tree);
     let result;
     try {

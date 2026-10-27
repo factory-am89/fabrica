@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { JUDGE_PATHS, STANDARD, WORKFLOW_REL } from '../scripts/golden.mjs';
+import { JUDGE_PATHS, STANDARD, workflowIn } from '../scripts/golden.mjs';
 import { JUDGE_DIR, readReviewer } from '../scripts/golden-run.mjs';
 import { CASE_FILE } from '../scripts/lib/golden-guard.mjs';
 import { cliPrejuicio } from '../scripts/prejuicio.mjs';
@@ -29,7 +29,8 @@ const body = path.join(casa, 'cuerpo.md');
 writeFileSync(body, BODY);
 test.after(() => rmSync(casa, { recursive: true, force: true }));
 
-const gitFalso = ({ sucio = '', diff = DIFF } = {}) => (args) => ({ status: sucio, diff, 'rev-parse': `${SHA}\n` })[args[0]];
+// gitOk trims the output, as the real one does.
+const gitFalso = ({ sucio = '', diff = DIFF.trim() } = {}) => (args) => ({ status: sucio, diff, 'rev-parse': `${SHA}\n` })[args[0]];
 const exportFalso = (ref, dir) => {
   const tree = path.join(dir, 'judge');
   for (const f of JUEZ) {
@@ -62,7 +63,7 @@ test('a clean pass: the judge gets the diff, the draft body and the judge of the
   assert.equal(r.code, EXIT.OK, r.stderr);
   assert.equal(JSON.parse(r.stdout).veredicto, ANSWER.yes);
   assert.deepEqual([e.visto.llamadas, e.visto.diff, e.visto.body, e.visto.juez], [1, DIFF, BODY, true]);
-  assert.deepEqual(e.visto.reviewer, readReviewer(path.join(RAIZ, ...WORKFLOW_REL.split('/'))), 'same prompt, model and schema as CI');
+  assert.deepEqual(e.visto.reviewer, readReviewer(workflowIn(RAIZ)), 'same prompt, model and schema as CI');
   assert.equal(existsSync(e.visto.workspace), false);
 });
 
