@@ -17,6 +17,8 @@ import { tomarTurno } from './lib/turno.mjs';
 
 // Diez minutos: un PR se fusiona en minutos y la carpeta pesa horas; más seguido solo gasta cuota de GitHub.
 export const TOPE_MS = 10 * 60 * 1000;
+// Cómo acaba una pasada (lista cerrada): limpia = corrió; tope = hecha hace poco; ocupada = otra la tiene; nada = solo la principal.
+export const ESTADO = Object.freeze({ limpia: 'limpia', tope: 'tope', ocupada: 'ocupada', nada: 'nada' });
 export const rutaDeUltima = (casa = homedir) => path.join(casa(), '.fabrica', 'limpieza-last.json');
 export const rutaDeCandado = (casa = homedir) => path.join(casa(), '.fabrica', 'limpieza.lock');
 // Sin cola (esperaMax 0): si otra pasada está en marcha, se omite. Sin suelo de memoria. Un candado de más de 5 min no es una pasada.
@@ -39,22 +41,22 @@ function ultimaPasada(ruta) {
 export function pasada({
   cwd = process.cwd(), reloj = Date.now, casa = homedir, limpiarFn = limpiar, turno = tomarTurno, listar = worktrees, tope = TOPE_MS,
 } = {}) {
-  if (listar(cwd).length < 2) return { estado: 'nada', salida: null };
+  if (listar(cwd).length < 2) return { estado: ESTADO.nada, salida: null };
   let mio;
   try {
     mio = turno({ ...TURNO, ruta: rutaDeCandado(casa) });
   } catch (e) {
-    if (e.key === 'DONE_TURN_TIMEOUT') return { estado: 'ocupada', salida: null };
+    if (e.key === 'DONE_TURN_TIMEOUT') return { estado: ESTADO.ocupada, salida: null };
     throw e;
   }
   try {
     const ruta = rutaDeUltima(casa);
     const antes = ultimaPasada(ruta);
     const ahora = reloj();
-    if (antes !== null && ahora - antes < tope) return { estado: 'tope', salida: null };
+    if (antes !== null && ahora - antes < tope) return { estado: ESTADO.tope, salida: null };
     mkdirSync(path.dirname(ruta), { recursive: true });
     writeFileSync(ruta, `${JSON.stringify({ t: new Date(ahora).toISOString() })}\n`);
-    return { estado: 'limpia', salida: limpiarFn({ cwd }) };
+    return { estado: ESTADO.limpia, salida: limpiarFn({ cwd }) };
   } finally {
     mio.soltar();
   }

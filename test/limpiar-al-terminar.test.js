@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pasada, informe, TOPE_MS, rutaDeUltima, rutaDeCandado } from '../scripts/limpiar-al-terminar.mjs';
+import { pasada, informe, ESTADO, TOPE_MS, rutaDeUltima, rutaDeCandado } from '../scripts/limpiar-al-terminar.mjs';
 import { tomarTurno } from '../scripts/lib/turno.mjs';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,7 +18,7 @@ test('limpiar-al-terminar: sin más carpetas que la principal no llama a limpiar
   const casa = casaNueva();
   const limpiarFn = contador();
   const r = pasada({ casa, limpiarFn, listar: () => [{ ruta: 'p' }] });
-  assert.equal(r.estado, 'nada');
+  assert.equal(r.estado, ESTADO.nada);
   assert.equal(limpiarFn.n, 0);
   assert.equal(existsSync(rutaDeUltima(casa)), false);
 });
@@ -28,12 +28,12 @@ test('limpiar-al-terminar: la primera pasada limpia y apunta la hora; la siguien
   const limpiarFn = contador();
   let t = Date.parse('2026-10-27T12:00:00Z');
   const args = { casa, limpiarFn, listar: DOS, reloj: () => t };
-  assert.equal(pasada(args).estado, 'limpia');
+  assert.equal(pasada(args).estado, ESTADO.limpia);
   t += TOPE_MS - 1;
-  assert.equal(pasada(args).estado, 'tope');
+  assert.equal(pasada(args).estado, ESTADO.tope);
   assert.equal(limpiarFn.n, 1);
   t += 1; // exactamente el tope: ya toca
-  assert.equal(pasada(args).estado, 'limpia');
+  assert.equal(pasada(args).estado, ESTADO.limpia);
   assert.equal(limpiarFn.n, 2);
 });
 
@@ -41,7 +41,7 @@ test('limpiar-al-terminar: si limpiar lanza, el error sube y la pasada queda apu
   const casa = casaNueva();
   const roto = () => { throw new Error('GitHub no responde'); };
   assert.throws(() => pasada({ casa, limpiarFn: roto, listar: DOS }), /GitHub no responde/);
-  assert.equal(pasada({ casa, limpiarFn: contador(), listar: DOS }).estado, 'tope');
+  assert.equal(pasada({ casa, limpiarFn: contador(), listar: DOS }).estado, ESTADO.tope);
 });
 
 test('limpiar-al-terminar: con el candado en manos de otra pasada viva se omite sin esperar y sin llamar a limpiar', () => {
@@ -49,10 +49,10 @@ test('limpiar-al-terminar: con el candado en manos de otra pasada viva se omite 
   const otra = tomarTurno({ ruta: rutaDeCandado(casa), minLibre: 0, quien: 'otra' });
   const limpiarFn = contador();
   try {
-    assert.equal(pasada({ casa, limpiarFn, listar: DOS }).estado, 'ocupada');
+    assert.equal(pasada({ casa, limpiarFn, listar: DOS }).estado, ESTADO.ocupada);
     assert.equal(limpiarFn.n, 0);
   } finally { otra.soltar(); }
-  assert.equal(pasada({ casa, limpiarFn, listar: DOS }).estado, 'limpia'); // el candado se suelta al acabar
+  assert.equal(pasada({ casa, limpiarFn, listar: DOS }).estado, ESTADO.limpia); // el candado se suelta al acabar
   assert.equal(existsSync(rutaDeCandado(casa)), false);
 });
 
@@ -71,14 +71,14 @@ test('limpiar-al-terminar: un fichero de última pasada ilegible falla en alto, 
 });
 
 test('limpiar-al-terminar: informe: nada que decir no escribe; borradas por stdout; fallos por stderr con salida 1', () => {
-  assert.deepEqual(informe({ estado: 'tope', salida: null }), { codigo: 0, stdout: [], stderr: [] });
-  const sinNovedad = informe({ estado: 'limpia', salida: resumen({ quedan: [{ carpeta: 'c', rama: 'feat/a', motivo: 'no fusionada' }] }) });
+  assert.deepEqual(informe({ estado: ESTADO.tope, salida: null }), { codigo: 0, stdout: [], stderr: [] });
+  const sinNovedad = informe({ estado: ESTADO.limpia, salida: resumen({ quedan: [{ carpeta: 'c', rama: 'feat/a', motivo: 'no fusionada' }] }) });
   assert.equal(sinNovedad.codigo, 0);
   assert.deepEqual(sinNovedad.stdout, []);
-  const borro = informe({ estado: 'limpia', salida: resumen({ borradas: [{ carpeta: 'c', rama: 'feat/a', remota: false, avisos: [] }] }) });
+  const borro = informe({ estado: ESTADO.limpia, salida: resumen({ borradas: [{ carpeta: 'c', rama: 'feat/a', remota: false, avisos: [] }] }) });
   assert.equal(borro.codigo, 0);
   assert.match(borro.stdout[0], /^limpiar borrada: c/);
-  const falla = informe({ estado: 'limpia', salida: resumen({ fallos: 1, quedan: [{ carpeta: 'c', rama: 'feat/a', motivo: 'no pude borrarla: x' }] }) });
+  const falla = informe({ estado: ESTADO.limpia, salida: resumen({ fallos: 1, quedan: [{ carpeta: 'c', rama: 'feat/a', motivo: 'no pude borrarla: x' }] }) });
   assert.equal(falla.codigo, 1);
   assert.deepEqual(falla.stdout, []);
   assert.match(falla.stderr[0], /^FÁBRICA AL TERMINAR: la limpieza dejó 1 cosas sin borrar/);
