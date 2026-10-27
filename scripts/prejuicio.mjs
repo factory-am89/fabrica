@@ -1,8 +1,8 @@
 // Prejuicio: the SAME judge as CI (the `revisor` workflow's step `claude`), run locally before opening a PR or pushing a fix, on
-// `git diff <base>...HEAD` and the draft body of the PR (a file). Prints the verdict and every «no» with its proof, so they are all fixed at once.
+// `git diff origin/main...HEAD` and the draft body of the PR (a file). Prints the verdict and every «no» with its proof, so they are all fixed at once.
 //   node scripts/prejuicio.mjs --body-file <body.md> [--json]   (output rule and exit codes: scripts/lib/exit.mjs)
 // It does not replace the revisor of CI: it is another context with the same instructions (revisor.md, standards/code.md, the
-// schema, the model, the prompt: exported from <base> and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
+// schema, the model, the prompt: exported from origin/main and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
 // Cost: one call of the subscription per pass (`claude -p`, the session's own login). Fails loud: claude failing or an unreadable output is
 // PREJUICIO_FAILED, never a «sí»; a verdict «no» is PREJUICIO_NO with each «no» and its proof in stderr.
 import { spawnSync } from 'node:child_process';
@@ -18,7 +18,6 @@ import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '..');
-export const DEFAULT_BASE = MAIN_REF;
 const BODY_FLAG = '--body-file';
 
 export function git(args) {
@@ -54,16 +53,16 @@ export function report(output, preguntas, sha) {
 export const humanNos = (nos) => nos.map((n) => `${n.fallo}${n.pregunta ? ` | ${n.pregunta}` : ''}${n.prueba ? `\n    prueba: ${n.prueba}` : ''}`).join('\n');
 
 // Injected for the tests, which call neither claude nor the repo's git: `run` is the executor of the judge ({ claude, reviewer, workspace } -> { text, cost }),
-// `gitOut` answers the git questions (args -> stdout) and `exportTree` puts the judge of <base> in a folder (ref, dir -> tree). The real ones are the defaults.
-export function prejuicio({ bodyFile, base = DEFAULT_BASE, run = callClaude, claude = null, gitOut = git, exportTree = exportJudge }) {
+// `gitOut` answers the git questions (args -> stdout) and `exportTree` puts the judge of main in a folder (ref, dir -> tree). The real ones are the defaults.
+export function prejuicio({ bodyFile, run = callClaude, claude = null, gitOut = git, exportTree = exportJudge }) {
   if (!existsSync(bodyFile)) throw new ExitError('USAGE', `${BODY_FLAG}: ${bodyFile} does not exist`);
-  if (gitOut(['status', '--porcelain']).trim() !== '') throw new ExitError('UNSAVED_CHANGES', 'there are uncommitted changes: the judge sees the commits only (git diff base...HEAD); commit them first');
-  const diff = gitOut(['diff', `${base}...HEAD`]);
-  if (diff.trim() === '') throw new ExitError('USAGE', `git diff ${base}...HEAD is empty: there is nothing to judge`);
+  if (gitOut(['status', '--porcelain']).trim() !== '') throw new ExitError('UNSAVED_CHANGES', 'there are uncommitted changes: the judge sees the commits only (git diff origin/main...HEAD); commit them first');
+  const diff = gitOut(['diff', `${MAIN_REF}...HEAD`]);
+  if (diff.trim() === '') throw new ExitError('USAGE', `git diff ${MAIN_REF}...HEAD is empty: there is nothing to judge`);
   const sha = gitOut(['rev-parse', 'HEAD']).trim();
   const root = mkdtempSync(path.join(tmpdir(), 'fabrica-prejuicio-'));
   try {
-    const tree = exportTree(base, root); // the judge of CI is the one on main: instructions, standard and workflow come from <base>
+    const tree = exportTree(MAIN_REF, root); // the judge of CI is the one on main: instructions, standard and workflow come from main
     const workspace = path.join(root, 'w');
     mkdirSync(workspace);
     layWorkspace(workspace, tree, { diff, body: readFileSync(bodyFile, 'utf8') });
@@ -75,7 +74,7 @@ export function prejuicio({ bodyFile, base = DEFAULT_BASE, run = callClaude, cla
     } catch (e) {
       throw new ExitError('PREJUICIO_FAILED', e.message);
     }
-    return { ...report(result.text, preguntas, sha), sha, base, cost: result.cost };
+    return { ...report(result.text, preguntas, sha), sha, cost: result.cost };
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

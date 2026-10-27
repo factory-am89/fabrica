@@ -3,13 +3,12 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { headMark } from './pr-body.mjs';
-import { MAIN_REF } from './repo.mjs';
 
 export class EvidenceError extends Error {}
 
 const KEPT_PREFIXES = ['ℹ tests', 'ℹ pass', 'ℹ fail', '✖'];
 const DURATION_AT_END = / \(\d+(?:\.\d+)?ms\)$/;
-const BASE = MAIN_REF;
+const BASE = 'origin/main';
 // The spec reporter is the one that prints the "ℹ tests" lines; Node's default for piped output differs between versions (TAP on 22).
 const TEST_ARGS = ['--test', '--test-reporter=spec'];
 
