@@ -51,6 +51,20 @@ test('collect asks for one check-runs page per commit and only the revisor', asy
   assert.ok(checks.every((c) => c.includes('check_name=revisor')));
 });
 
+test('collect asks for filter=all, so every round of the same head counts and not only the latest check-run', async () => {
+  const get = async (route) => {
+    const judge = judgeAnswer(REPO, route);
+    if (judge !== undefined) return judge;
+    if (route.includes('/pulls?')) return [pull(1, '2026-10-15T10:00:00Z')];
+    if (route.includes('/files?')) return [];
+    if (route.includes('/commits?')) return [{ sha: sha(1) }];
+    const all = route.includes('filter=all');
+    const rounds = all ? [run(21, 1, 1, false), run(22, 1, 1, true), run(23, 1, 1, false)] : [run(23, 1, 1, false)];
+    return { total_count: rounds.length, check_runs: rounds };
+  };
+  assert.equal((await collect({ get, repo: REPO })).checkRuns.length, 3);
+});
+
 test('collect keeps the branch (head.ref) and the files of each PR, and does not touch the check-runs', async () => {
   const { pulls, checkRuns } = await collect({ get: fakeGet(), repo: REPO });
   assert.deepEqual(pulls.map((p) => [p.number, p.head_ref, p.files]), [[2, 'fix/pr-2', ['c.js']], [1, 'fix/pr-1', ['a.js', 'b.js']], [3, 'fix/pr-3', []]]);
