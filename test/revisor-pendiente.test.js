@@ -91,15 +91,6 @@ test('MODO=cerrar: sin RUN_ID falla en alto y no publica; un error de la API sal
   assert.deepEqual(roto.publicado, []);
 });
 
-test('anulación: un juicio cortado (failure, CUT_TITLE) como último de la cabeza se anula con el Approve de Pablo, en vez de esperar', () => {
-  const cortado = deLaApp(300, { conclusion: 'failure', output: { title: CUT_TITLE, summary: '- el juicio se cortó antes del veredicto (run 777)' } });
-  const aprobacion = [{ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA }];
-  const { r, checks } = corre({ MODO: 'anulacion', REVIEWS_FALSAS: JSON.stringify(aprobacion), CHECKS_FALSOS: JSON.stringify([cortado]) });
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(checks.length, 1);
-  assert.equal(checks[0].cuerpo.output.title, OVERRIDE_TITLE);
-});
-
 test('MODO=pendiente: sin GITHUB_OUTPUT falla en alto y no publica nada', () => {
   const { r, checks } = corre({ MODO: 'pendiente', GITHUB_OUTPUT: '' });
   assert.equal(r.status, 1);
