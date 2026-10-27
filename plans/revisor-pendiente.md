@@ -21,13 +21,13 @@ Files: `plans/revisor-pendiente.md`
 Depends on: none
 Blocked by: none
 Existing: `ls plans` -> `app-admin.md cockpit.md menuplan-separation.md registro-de-no.md trabajar-solos.md`; ninguno trata #155.
-Not done: no arregla nada. La reproducción usa el PR de este mismo plan SIN fusión automática armada (no debe entrar por el hueco que mide): con `revisor` en verde, el constructor edita el cuerpo y, mientras corre `juzgar`, lee `mergeable_state`. Si sale `clean`, el hueco queda reproducido por su entrada real (editar el cuerpo) y se apunta en el cuerpo del PR. Si sale `blocked`, el mecanismo no es el de este plan y se para el trozo 4.
+Not done: no arregla nada. La reproducción usa el PR de este mismo plan SIN fusión automática armada (no debe entrar por el hueco que mide): con `revisor` en verde, el constructor edita el cuerpo y, mientras corre `juzgar`, lee `mergeable_state`. Si sale `clean` o `unstable` (fusionable: `unstable` es solo el trabajo `juzgar`, no obligatorio, sin terminar; medido en el PR #156: `unstable`), el hueco queda reproducido por su entrada real (editar el cuerpo) y se apunta en el cuerpo del PR. Si sale `blocked`, el mecanismo no es el de este plan y se para el trozo 4.
 Done:
 ```sh
 node scripts/check-plan.mjs --file plans/revisor-pendiente.md
 # en el PR del plan, con revisor en verde, tras editar el cuerpo y con juzgar en marcha (PR = numero del PR):
 node scripts/token.mjs -- gh api repos/factory-am89/fabrica/pulls/$PR --jq .mergeable_state
-# antes del arreglo debe salir: clean
+# antes del arreglo debe salir: clean o unstable (medido en #156, 2026-10-27 06:00:31Z y 06:00:52Z: unstable)
 ```
 
 ### 2. El recolector baja todas las rondas de una cabeza (`filter=all`)
@@ -75,18 +75,18 @@ Files: `.claude/skills/github/SKILL.md`
 Depends on: 1, 2, 4
 Blocked by: none
 Existing: `git grep -n "155\|juzgando\|in_progress" -- .claude/skills/github/SKILL.md` -> sin salida.
-Not done: no vuelve a contar los 142 PR viejos (la cifra de antes está arriba). Si la medida sale mal (`clean` durante el juicio), se reabre #155 y la entrada no se escribe como arreglada.
+Not done: no vuelve a contar los 142 PR viejos (la cifra de antes está arriba). Si la medida sale mal (`clean` o `unstable` durante el juicio), se reabre #155 y la entrada no se escribe como arreglada.
 Done:
 ```sh
 # en el PR de este trozo, sin fusion automatica armada, con revisor en verde, tras editar el cuerpo y con juzgar en marcha (SHA = cabeza, PR = numero):
 node scripts/token.mjs -- gh api "repos/factory-am89/fabrica/commits/$SHA/check-runs?check_name=revisor&filter=all" --jq ".check_runs[0].status"
 node scripts/token.mjs -- gh api repos/factory-am89/fabrica/pulls/$PR --jq .mergeable_state
-# debe salir: in_progress y blocked (antes, en el trozo 1: clean)
+# debe salir: in_progress y blocked (antes, en el trozo 1: unstable)
 node --test test/skills.test.js
 ```
 
 ## Build order
-Ola 1: 1, 2 y 3 en paralelo (ficheros distintos). Ola 2: 4, con A ya contestada (opción 1) y en cuanto el 1 haya reproducido el hueco (`clean`). Ola 3: 5, que necesita el 4 ya en `main`: `revisor.yml` corre la versión de `main`, así que el 4 no se puede probar en vivo en su propio PR. Hasta el 4 sigue la regla provisional del issue: no editar el cuerpo de un PR con la fusión automática armada y los dos checks en verde; desarmarla antes.
+Ola 1: 1, 2 y 3 en paralelo (ficheros distintos). Ola 2: 4, con A ya contestada (opción 1) y en cuanto el 1 haya reproducido el hueco (`unstable`, medido; `clean` también valdría). Ola 3: 5, que necesita el 4 ya en `main`: `revisor.yml` corre la versión de `main`, así que el 4 no se puede probar en vivo en su propio PR. Hasta el 4 sigue la regla provisional del issue: no editar el cuerpo de un PR con la fusión automática armada y los dos checks en verde; desarmarla antes.
 
 ## Decisions taken
 - principio 3 | eligió: publicar revisor en curso al empezar el juicio, para que el ruleset espere | descartó: dejar el verde viejo y confiar en que nadie edite el cuerpo con la fusión automática armada | motivo: decidido
