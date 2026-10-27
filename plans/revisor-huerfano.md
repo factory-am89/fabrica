@@ -90,8 +90,8 @@ Ola 1: 1 y 2 en paralelo (ficheros distintos). Ola 2: 3, con A ya contestada y l
 - principio 3 | eligió: cerrar en failure con título propio | descartó: cerrar en neutral, que el ruleset cuenta como pasado y dejaría fusionar sin juicio | motivo: decidido
 - principio 3 | eligió: buscar el check del run por external_id, un campo que GitHub ya tiene | descartó: leer la salida check_run de un trabajo cancelado, sin comprobar que GitHub la entregue | motivo: decidido
 - principio 4 | eligió: MODO=cerrar en scripts/veredicto.mjs y CUT_TITLE en record.mjs junto a PENDING_TITLE | descartó: un script nuevo que también escribe revisor, un segundo sitio de escritura y un fichero más de puerta | motivo: decidido
-- principio 2 | eligió: decidir la misma cabeza con la REST sin filtro y el statusCheckRollup con isRequired de d76a872, y confirmarlo en vivo en el trozo 1 | descartó: parar el arreglo hasta reproducirlo, cuando el diseño del trozo 3 no depende de la respuesta | motivo: decidido
-- principio 6 | eligió: dejar fuera los dos desvíos de #161, con su motivo en Dudas | descartó: meterlos como trozos de este plan, que son otras clases | motivo: decidido
+- principio 6 | eligió: decidir la misma cabeza con la REST sin filtro y el statusCheckRollup con isRequired de d76a872, y confirmarlo en vivo en el trozo 1 | descartó: parar el arreglo hasta reproducirlo, que es interrumpir donde ya hay evidencia suficiente (el principio 6 manda decidir con la que haya y apuntarlo), cuando el diseño del trozo 3 no depende de la respuesta | motivo: decidido
+- principio 5 | eligió: dejar fuera los dos desvíos de #161, con su motivo en Dudas | descartó: meterlos como trozos de este plan, que son otras clases y un fallo se arregla en su clase | motivo: decidido
 
 ## Decisions for Pablo
 
