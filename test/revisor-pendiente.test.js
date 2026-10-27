@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { PENDING_TITLE, OVERRIDE_TITLE, extractRecord } from '../scripts/lib/record.mjs';
+import { TITULO } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
@@ -27,7 +28,7 @@ const corre = (extra) => {
   return { r, publicado, checks, salida };
 };
 const juzga = (extra = {}) => corre({ STANDARD: 'standards/code.md', SALIDA: JSON.stringify({ respuestas: buenas() }), CHECK_RUN: '4242', ...extra });
-const deLaApp = (id, extra = {}) => ({ id, status: 'completed', conclusion: 'success', app: { slug: REVISOR_APP_SLUG }, output: { title: 'Veredicto: sí', summary: 'x' }, ...extra });
+const deLaApp = (id, extra = {}) => ({ id, status: 'completed', conclusion: 'success', app: { slug: REVISOR_APP_SLUG }, output: { title: TITULO.yes, summary: 'x' }, ...extra });
 const salidaNo = JSON.stringify({ respuestas: buenas().map((r, i) => (i === 0 ? { ...r, respuesta: 'no' } : r)) });
 
 test('MODO=pendiente: publica `revisor` in_progress con el título PENDING_TITLE, sin conclusión, y deja su id como salida del paso', () => {
@@ -114,7 +115,7 @@ test('veredicto: un fallo posterior a cerrar el check (el registro no se puede c
 });
 
 test('anulación: con un juicio en curso encima de un no no anula; espera a que el juicio acabe (filter=all)', () => {
-  const no = deLaApp(100, { conclusion: 'failure', output: { title: 'Veredicto: no', summary: '- C5: no' } });
+  const no = deLaApp(100, { conclusion: 'failure', output: { title: TITULO.no, summary: '- C5: no' } });
   const aprobacion = [{ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA }];
   const enCurso = deLaApp(200, { status: 'in_progress', conclusion: null, output: { title: PENDING_TITLE } });
   const con = (checks) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: JSON.stringify(aprobacion), CHECKS_FALSOS: JSON.stringify(checks) });

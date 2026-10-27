@@ -69,6 +69,7 @@
     { "source": "#159", "question": "C5", "kind": "otro", "kind_note": "un fallo del juez (API, freno dorado) antes de cerrar el check dejaba revisor «juzgando» para siempre y la anulación de Pablo esperaba a un juicio que no llegaba; no había cierre en failure del check abierto", "outcome": "pendiente" },
     { "source": "#159", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" },
     { "source": "#159", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
-    { "source": "#159", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" }
+    { "source": "#159", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#159", "question": "C14", "kind": "otro", "kind_note": "segundo no del mismo PR: la constante TITULO exportada por veredicto.mjs no la importaba el test nuevo, que volvía a escribir «Veredicto: sí» y «Veredicto: no» a mano; la fila vocabulario-copiado ya existe para la primera ronda", "outcome": "pendiente" }
   ]
 }
