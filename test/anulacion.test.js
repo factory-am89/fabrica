@@ -8,10 +8,9 @@ import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
-import { buenas, SHA, leer } from './apoyo/fabrica.mjs';
+import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const VIEJA = 'b'.repeat(40);
-const esCheck = (p) => /\/check-runs(\/\d+)?$/.test(p.ruta); // el POST de siempre o el PATCH que cierra el check en curso
 const review = (extra = {}) => ({ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA, ...extra });
 
 test('aprobacionDePablo: su aprobación sobre la cabeza actual anula; el login no distingue mayúsculas', () => {

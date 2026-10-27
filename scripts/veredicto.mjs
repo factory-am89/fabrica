@@ -196,6 +196,7 @@ const cerrarCheck = (repo, checkRun, token, conclusion, output) =>
   api(token, 'PATCH', `/repos/${repo}/check-runs/${checkRun}`, { status: 'completed', conclusion, output });
 const ID_DE_CHECK = /^[1-9]\d*$/;
 const FALLO_SIN_MARCA = 'no se pudo marcar el juicio en curso';
+export const TITULO = { yes: 'Veredicto: sí', no: 'Veredicto: no' };
 const FALLO_SIN_VEREDICTO = 'el juez falló antes de dar veredicto';
 const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 
@@ -209,7 +210,7 @@ async function revisoresDeLaApp(repo, sha, token) {
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
 async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkRun, estado }) {
-  const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
+  const titulo = veredicto.ok ? TITULO.yes : TITULO.no;
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
   await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
   estado.cerrado = true;
@@ -218,7 +219,7 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkR
   if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
   // La aprobación de la App solo si el PR sigue en el SHA juzgado.
   if (veredicto.ok && ctx.sha === ctx.cabeza) {
-    await api(token, 'POST', `/repos/${repo}/pulls/${pr}/reviews`, { commit_id: sha, event: 'APPROVE', body: 'Veredicto: sí.' });
+    await api(token, 'POST', `/repos/${repo}/pulls/${pr}/reviews`, { commit_id: sha, event: 'APPROVE', body: `${TITULO.yes}.` });
   }
 }
 
@@ -262,7 +263,7 @@ async function main() {
   }
   // Sin el check que abrió el trabajo `pendiente` no hay nada que cerrar: es un no publicado (nunca un sí ni un POST completado en silencio) y error.
   if (!ID_DE_CHECK.test(CHECK_RUN ?? '')) {
-    await publicarCheck(REPO, SHA, TOKEN, 'failure', { title: 'Veredicto: no', summary: `- ${FALLO_SIN_MARCA}` });
+    await publicarCheck(REPO, SHA, TOKEN, 'failure', { title: TITULO.no, summary: `- ${FALLO_SIN_MARCA}` });
     throw new Error(`falta la variable CHECK_RUN (${FALLO_SIN_MARCA}): se publicó un no`);
   }
   // Un fallo antes de cerrar el check (la API, el freno dorado...) no puede dejarlo «juzgando» para siempre: la anulación de Pablo
@@ -273,7 +274,7 @@ async function main() {
   } catch (e) {
     if (!estado.cerrado) {
       try {
-        await cerrarCheck(REPO, CHECK_RUN, TOKEN, 'failure', { title: 'Veredicto: no', summary: `- ${FALLO_SIN_VEREDICTO}` });
+        await cerrarCheck(REPO, CHECK_RUN, TOKEN, 'failure', { title: TITULO.no, summary: `- ${FALLO_SIN_VEREDICTO}` });
       } catch (e2) {
         console.error(`no se pudo cerrar el check ${CHECK_RUN}: ${e2.message}`);
       }

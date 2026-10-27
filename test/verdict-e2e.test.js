@@ -8,14 +8,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { extractRecord } from '../scripts/lib/record.mjs';
 import { decidir } from '../scripts/veredicto.mjs';
-import { preguntas, buenas, SHA, ctx } from './apoyo/fabrica.mjs';
+import { preguntas, buenas, SHA, ctx, esCheck } from './apoyo/fabrica.mjs';
 
 // Recorre el script entero como lo corre el workflow (variables de entorno y llamadas a la API),
 // con la API de GitHub simulada: un PR que toca .github/workflows/revisor.yml, sin ninguna review
 // de Pablo y con todas las respuestas en «sí». VEREDICTO_RUTA permite apuntarlo a otra copia del script.
 const BASE_SHA = 'b'.repeat(40);
-// Un check-run publicado: el POST de siempre (/check-runs) o el PATCH que cierra el check en curso (/check-runs/<id>).
-const esCheck = (p) => /\/check-runs(\/\d+)?$/.test(p.ruta);
 const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;

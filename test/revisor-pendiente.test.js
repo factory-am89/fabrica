@@ -12,7 +12,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { PENDING_TITLE, OVERRIDE_TITLE, extractRecord } from '../scripts/lib/record.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
-import { buenas, SHA, leer } from './apoyo/fabrica.mjs';
+import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const corre = (extra) => {
   const ruta = process.env.VEREDICTO_RUTA ?? fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
@@ -23,7 +23,7 @@ const corre = (extra) => {
     env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', GITHUB_OUTPUT: salida, ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
-  const checks = publicado.filter((p) => /\/check-runs(\/\d+)?$/.test(p.ruta));
+  const checks = publicado.filter((p) => esCheck(p));
   return { r, publicado, checks, salida };
 };
 const juzga = (extra = {}) => corre({ STANDARD: 'standards/code.md', SALIDA: JSON.stringify({ respuestas: buenas() }), CHECK_RUN: '4242', ...extra });

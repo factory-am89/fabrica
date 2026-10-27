@@ -5,6 +5,8 @@ import { decidir, leerPreguntas } from '../../scripts/veredicto.mjs';
 export const leer = (ruta) => readFileSync(new URL(`../../${ruta}`, import.meta.url), 'utf8');
 export const preguntas = leerPreguntas(leer('standards/code.md'));
 export const buenas = () => preguntas.filter((p) => p.quien === 'revisor').map((p) => ({ id: p.id, respuesta: 'sí', prueba: 'x.js:1' }));
+// Un check-run publicado en la GitHub falsa: el POST de siempre (/check-runs) o el PATCH que cierra el check en curso (/check-runs/<id>).
+export const esCheck = (p) => /\/check-runs(\/\d+)?$/.test(p.ruta);
 export const SHA = 'a'.repeat(40);
 export const ctx = (extra = {}) => ({ sha: SHA, cabeza: SHA, ...extra });
 export const juzga = (respuestas, c = ctx()) => decidir(JSON.stringify({ respuestas }), preguntas, c);
