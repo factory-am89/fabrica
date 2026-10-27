@@ -99,7 +99,7 @@ Ola 1: 1, 2 y 3 en paralelo (ficheros distintos). Ola 2: 4, con A ya contestada 
 
 ## Decisions for Pablo
 
-Contestada el 2026-10-27: Pablo eligió la opción 1 (dijo «Fixea esto» tras leer la explicación del arreglo); queda apuntada en `intervenciones.md`. Se deja aquí porque el trozo 4 apunta a ella con `Blocked by: A` (check-plan lo exige para rutas de la lista cerrada).
+Contestada el 2026-10-27: Pablo eligió la opción 1 (dijo «Fixea esto» tras leer la explicación del arreglo); se apuntará en `intervenciones.md` en el PR del trozo 4 (un PR con plan solo toca el plan). Se deja aquí porque el trozo 4 apunta a ella con `Blocked by: A` (check-plan lo exige para rutas de la lista cerrada).
 
 ### A. ¿Dejas cambiar el workflow del revisor para que, al empezar cada juicio, el check pase a «juzgando» y GitHub espere?
 Por qué te lo pregunto: es tocar `.github/workflows/revisor.yml`, que está en la lista cerrada. Hoy, si se edita el cuerpo de un PR ya aprobado, GitHub puede fusionarlo con el «sí» viejo mientras el revisor vuelve a mirar: pasó en 12 de 142 PR y en uno (#148) el revisor acabó diciendo «no». No hace falta tocar permisos de ninguna App.
