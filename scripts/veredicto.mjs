@@ -256,7 +256,7 @@ async function main() {
     for (const k of ['REPO', 'SHA', 'TOKEN', 'GITHUB_OUTPUT']) if (!process.env[k]) throw new Error(`falta la variable ${k}`);
     return pendiente(process.env);
   }
-  const { SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, CHECK_RUN } = process.env;
+  const { REPO, PR, SHA, TOKEN, BASE, LECTOR, CHECK_RUN } = process.env;
   for (const [k, v] of Object.entries({ REPO, PR, SHA, TOKEN, BASE, LECTOR })) {
     if (!v) throw new Error(`falta la variable ${k}`);
   }
