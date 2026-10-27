@@ -56,6 +56,15 @@ test('limpiar-al-terminar: con el candado en manos de otra pasada viva se omite 
   assert.equal(existsSync(rutaDeCandado(casa)), false);
 });
 
+test('limpiar-al-terminar: un candado ilegible falla en alto, no se toma por «ocupada»', () => {
+  const casa = casaNueva();
+  mkdirSync(path.dirname(rutaDeCandado(casa)), { recursive: true });
+  writeFileSync(rutaDeCandado(casa), '{');
+  const limpiarFn = contador();
+  assert.throws(() => pasada({ casa, limpiarFn, listar: DOS }), /unreadable/);
+  assert.equal(limpiarFn.n, 0);
+});
+
 test('limpiar-al-terminar: limpiar recibe el cwd de la sesión (para no borrar la carpeta en la que trabaja)', () => {
   let visto;
   pasada({ casa: casaNueva(), cwd: 'C:\\dev\\x', listar: DOS, limpiarFn: (o) => { visto = o; return resumen(); } });

@@ -46,7 +46,8 @@ export function pasada({
   try {
     mio = turno({ ...TURNO, ruta: rutaDeCandado(casa) });
   } catch (e) {
-    if (e.key === 'DONE_TURN_TIMEOUT') return { estado: ESTADO.ocupada, salida: null };
+    // Un candado que no se puede leer (escritura cortada) no es «otra pasada en marcha»: se dice, o la limpieza se pararía sin que nadie lo vea.
+    if (e.key === 'DONE_TURN_TIMEOUT' && !/unreadable/.test(e.message)) return { estado: ESTADO.ocupada, salida: null };
     throw e;
   }
   try {
