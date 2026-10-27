@@ -24,6 +24,11 @@ comprobado: 2026-10-15
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
 - **Decide el check `revisor`; solo el Approve de Pablo sobre la cabeza anula un «no»; pausar el ruleset está prohibido.**
   Regla y mecanismo: `standards/intervention.md`, «Who decides a merge». Rutas que vigila C13: `standards/code.md`.
+- **`revisor` está «juzgando» mientras se juzga (#155).** El trabajo `pendiente` de `revisor.yml` publica `revisor` en `in_progress`
+  con título `juzgando` (`PENDING_TITLE`, `scripts/lib/record.mjs`) y `juzgar` cierra ese mismo check con PATCH; editar el cuerpo,
+  reabrir o relanzar ya no deja fusionar con el «sí» viejo. Antes (#156, cabeza 13eee98): `unstable` de 06:00:31Z a 06:00:52Z.
+  Después: MEDIDA EN CURSO en este PR. Lo sostiene `test/revisor-pendiente.test.js`. (No va en «Lo que falló»: esa lista
+  rechaza una viñeta que cita una lección con test, `PROSE_DUPLICATES_TEST`, y su presupuesto de viñetas sin lección solo baja.)
 
 ## Identidad del constructor
 
