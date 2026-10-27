@@ -60,6 +60,11 @@
     { "source": "#157", "question": "C6", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" },
     { "source": "#157", "question": "C9", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" },
     { "source": "#157", "question": "C12", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" },
-    { "source": "#157", "question": "C17", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" }
+    { "source": "#157", "question": "C17", "kind": "cuerpo-de-otro-pr", "outcome": "pendiente" },
+    { "source": "#156", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#156", "question": "C16", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#156", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#156", "question": "C16", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#156", "question": "C16", "kind": "otro", "kind_note": "tercer y cuarto no del mismo PR: el Done del trozo 1 esperaba «clean» y la medida dio «unstable» (el plan no se corrigió y otras líneas daban «clean» por medido); antes, la misma afirmación falsa («queda apuntada en intervenciones.md») repetida en una ronda más; la fila afirmacion-sin-prueba ya existe para la primera", "outcome": "pendiente" }
   ]
 }
