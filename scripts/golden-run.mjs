@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { CLEAN, CORPUS, STANDARD, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
+import { CLEAN, CORPUS, STANDARD, WORKFLOW_REL, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
@@ -24,7 +24,6 @@ const RAIZ = path.resolve(import.meta.dirname, '..');
 export const MAX_CALLS = 96; // 32 cases of the corpus x DEFAULT_TRIALS (test/golden-workflow.test.js keeps the corpus under it)
 export const DEFAULT_TRIALS = 3;
 export const PHASES = ['all', 'collect', 'score'];
-export const WORKFLOW_REL = '.github/workflows/revisor.yml'; // where the judge's workflow lives in any checkout of the Fábrica (also the exported one)
 const WORKFLOW = path.join(RAIZ, ...WORKFLOW_REL.split('/'));
 // What the judge must not see: the corpus with its expectations, and the invariant cases (cases.json names, for each judge case, the question that must say no).
 const EXCLUDED = ['test/fixtures/golden', 'test/fixtures/invariants'];

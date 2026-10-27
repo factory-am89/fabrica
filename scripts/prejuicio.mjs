@@ -1,6 +1,6 @@
 // Prejuicio: the SAME judge as CI (the `revisor` workflow's step `claude`), run locally before opening a PR or pushing a fix, on
 // `git diff <base>...HEAD` and the draft body of the PR (a file). Prints the verdict and every «no» with its proof, so they are all fixed at once.
-//   node scripts/prejuicio.mjs --body-file <body.md> [--base origin/main] [--json]   (output rule and exit codes: scripts/lib/exit.mjs)
+//   node scripts/prejuicio.mjs --body-file <body.md> [--json]   (output rule and exit codes: scripts/lib/exit.mjs)
 // It does not replace the revisor of CI: it is another context with the same instructions (revisor.md, standards/code.md, the
 // schema, the model, the prompt: exported from <base> and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
 // Cost: one call of the subscription per pass (`claude -p`, the session's own login). Fails loud: claude failing or an unreadable output is
@@ -10,8 +10,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STANDARD } from './golden.mjs';
-import { WORKFLOW_REL, callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
+import { STANDARD, WORKFLOW_REL } from './golden.mjs';
+import { callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
 import { ExitError, finish, runCommand } from './lib/exit.mjs';
 import { MAIN_REF } from './lib/repo.mjs';
 import { ANSWER } from './lib/record.mjs';
@@ -20,7 +20,6 @@ import { cargarPreguntas, decidir } from './veredicto.mjs';
 const REPO = path.resolve(import.meta.dirname, '..');
 export const DEFAULT_BASE = MAIN_REF;
 const BODY_FLAG = '--body-file';
-const BASE_FLAG = '--base';
 
 export function git(args) {
   const r = spawnSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
@@ -28,13 +27,12 @@ export function git(args) {
   return r.stdout;
 }
 
-// argv without --json -> { bodyFile, base }; anything else is a USAGE error.
+// argv without --json -> { bodyFile }; anything else is a USAGE error. There is no flag for the base: the judge of CI judges against main, and so does this.
 export function parseArgs(args) {
-  const out = { bodyFile: null, base: DEFAULT_BASE };
+  const out = { bodyFile: null };
   for (let i = 0; i < args.length; i += 2) {
     if (args[i] === BODY_FLAG && args[i + 1] !== undefined) out.bodyFile = args[i + 1];
-    else if (args[i] === BASE_FLAG && args[i + 1] !== undefined) out.base = args[i + 1];
-    else throw new ExitError('USAGE', `usage: prejuicio ${BODY_FLAG} <body.md> [${BASE_FLAG} <ref>] [--json]`);
+    else throw new ExitError('USAGE', `usage: prejuicio ${BODY_FLAG} <body.md> [--json]`);
   }
   if (out.bodyFile === null) throw new ExitError('USAGE', `${BODY_FLAG} <body.md> is required: the draft body of the PR`);
   return out;
