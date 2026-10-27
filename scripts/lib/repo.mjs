@@ -12,3 +12,5 @@ export const ADMIN_APP_SLUG = 'fabrica-administrador';
 // La cuenta de GitHub de Pablo (admin de la Fábrica; comprobado con la API el 16 oct 2026). Es la única cuyas
 // aprobaciones anulan al revisor (scripts/veredicto.mjs). Un login, nunca un correo.
 export const OWNER_LOGIN = 'pabloam89';
+// La rama base de todo trabajo, tal como la ve una carpeta de trabajo tras un fetch: tarea, retire, evidence y prejuicio parten de ella.
+export const MAIN_REF = 'origin/main';

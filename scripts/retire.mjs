@@ -5,6 +5,7 @@ import { lstatSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExitError, RETIRE_RESULT, runCommand, finish } from './lib/exit.mjs';
+import { MAIN_REF } from './lib/repo.mjs';
 import { git, gitOk, norm, principal, worktrees, carpetaDe, tieneOrigin } from './lib/folders.mjs';
 import { motivoDeQuedarse, prFusionado } from './lib/can-delete.mjs';
 
@@ -30,7 +31,7 @@ export function retirar(nombre, { cwd = process.cwd(), consultarPR = (rama, punt
   if (!wt) throw new ExitError('NOT_FOUND', `No hay ninguna carpeta de trabajo «${nombre}» (${carpeta}).`);
   const remoto = tieneOrigin(raiz);
   if (remoto) gitOk(['fetch', '--no-write-fetch-head', 'origin', 'main'], raiz);
-  const base = remoto ? 'origin/main' : 'main';
+  const base = remoto ? MAIN_REF : 'main';
   const fusionada = (punta) => git(['merge-base', '--is-ancestor', wt.rama, base], raiz).status === 0
     || (remoto && consultarPR(wt.rama, punta));
   const motivo = motivoDeQuedarse(wt, { todas: worktrees(raiz), cwd, fusionada });

@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { instalarHooks } from './install-hooks.mjs';
 import { ExitError, runCommand, finish } from './lib/exit.mjs';
+import { MAIN_REF } from './lib/repo.mjs';
 import { gitOk, principal, nombreDeRama, carpetaDe, tieneOrigin } from './lib/folders.mjs';
 
 export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = false, lanzar = spawnSync } = {}) {
@@ -17,7 +18,7 @@ export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = 
   let base = 'main';
   if (tieneOrigin(raiz)) {
     gitOk(['fetch', '--no-write-fetch-head', 'origin', 'main'], raiz);
-    base = 'origin/main';
+    base = MAIN_REF;
   }
   gitOk(['worktree', 'add', '--no-track', '-b', rama, carpeta, base], raiz);
   instalarHooks(raiz); // los hooks de git que niegan commit, merge y cherry-pick en la principal

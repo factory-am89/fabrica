@@ -13,11 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { STANDARD } from './golden.mjs';
 import { WORKFLOW_REL, callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
 import { ExitError, finish, runCommand } from './lib/exit.mjs';
+import { MAIN_REF } from './lib/repo.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas, decidir } from './veredicto.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '..');
-export const DEFAULT_BASE = 'origin/main';
+export const DEFAULT_BASE = MAIN_REF;
 const BODY_FLAG = '--body-file';
 const BASE_FLAG = '--base';
 
