@@ -26,6 +26,10 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/intervenciones.mjs\" bang"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/limpiar-al-terminar.mjs\""
           }
         ]
       }
