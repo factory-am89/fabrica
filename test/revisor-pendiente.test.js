@@ -99,6 +99,20 @@ test('veredicto: un `revisor` más viejo, uno de otra App o un override no impid
   assert.deepEqual(checks.map((c) => c.cuerpo.conclusion), ['success']);
 });
 
+test('veredicto: si el juez falla antes de cerrar el check (la API de reviews no da una lista), lo cierra en failure y sale con 1: nunca queda «juzgando» para siempre', () => {
+  const { r, checks, publicado } = juzga({ REVIEWS_FALSAS: '{"message":"x"}' });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.deepEqual(checks.map((c) => [c.metodo, c.ruta, c.cuerpo.conclusion]), [['PATCH', '/repos/o/r/check-runs/4242', 'failure']]);
+  assert.match(checks[0].cuerpo.output.summary, /el juez falló antes de dar veredicto/);
+  assert.equal(publicado.find((p) => p.ruta.endsWith('/reviews')), undefined);
+});
+
+test('veredicto: un fallo posterior a cerrar el check (el registro no se puede construir) no vuelve a tocar el check ya cerrado', () => {
+  const { r, checks } = juzga({ GITHUB_RUN_ID: '555' });
+  assert.equal(r.status, 1);
+  assert.deepEqual(checks.map((c) => [c.metodo, c.cuerpo.conclusion]), [['PATCH', 'success']]);
+});
+
 test('anulación: con un juicio en curso encima de un no no anula; espera a que el juicio acabe (filter=all)', () => {
   const no = deLaApp(100, { conclusion: 'failure', output: { title: 'Veredicto: no', summary: '- C5: no' } });
   const aprobacion = [{ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA }];

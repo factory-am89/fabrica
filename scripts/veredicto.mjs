@@ -196,6 +196,7 @@ const cerrarCheck = (repo, checkRun, token, conclusion, output) =>
   api(token, 'PATCH', `/repos/${repo}/check-runs/${checkRun}`, { status: 'completed', conclusion, output });
 const ID_DE_CHECK = /^[1-9]\d*$/;
 const FALLO_SIN_MARCA = 'no se pudo marcar el juicio en curso';
+const FALLO_SIN_VEREDICTO = 'el juez falló antes de dar veredicto';
 const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 
 // Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
@@ -207,10 +208,11 @@ async function revisoresDeLaApp(repo, sha, token) {
 }
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
-async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkRun }) {
+async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkRun, estado }) {
   const titulo = veredicto.ok ? 'Veredicto: sí' : 'Veredicto: no';
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
   await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
+  estado.cerrado = true;
   // Si Pablo aprobó esta cabeza, el «no» (ya publicado, con su registro) queda anulado por un segundo check, el último.
   const aprobacion = !veredicto.ok && ctx.sha === ctx.cabeza ? aprobacionDePablo(ctx.reviews, ctx.cabeza) : null;
   if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
@@ -263,6 +265,24 @@ async function main() {
     await publicarCheck(REPO, SHA, TOKEN, 'failure', { title: 'Veredicto: no', summary: `- ${FALLO_SIN_MARCA}` });
     throw new Error(`falta la variable CHECK_RUN (${FALLO_SIN_MARCA}): se publicó un no`);
   }
+  // Un fallo antes de cerrar el check (la API, el freno dorado...) no puede dejarlo «juzgando» para siempre: la anulación de Pablo
+  // espera a un juicio en curso y no actuaría. Se cierra en failure y se relanza el error. Si el veredicto ya lo cerró, no se toca.
+  const estado = { cerrado: false };
+  try {
+    await juzgarPr(process.env, estado);
+  } catch (e) {
+    if (!estado.cerrado) {
+      try {
+        await cerrarCheck(REPO, CHECK_RUN, TOKEN, 'failure', { title: 'Veredicto: no', summary: `- ${FALLO_SIN_VEREDICTO}` });
+      } catch (e2) {
+        console.error(`no se pudo cerrar el check ${CHECK_RUN}: ${e2.message}`);
+      }
+    }
+    throw e;
+  }
+}
+
+async function juzgarPr({ SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, CHECK_RUN }, estado) {
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
   ctx.golden = await frenoDorado({ repo: REPO, base: BASE, sha: SHA, token: LECTOR });
   let preguntas;
@@ -293,7 +313,7 @@ async function main() {
   } catch (e) {
     errorRegistro = e;
   }
-  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx, registro, checkRun: CHECK_RUN });
+  await publicar({ repo: REPO, pr: PR, sha: SHA, token: TOKEN, veredicto, ctx, registro, checkRun: CHECK_RUN, estado });
   console.log(veredicto.ok ? 'veredicto: sí' : `veredicto: no\n${veredicto.fallos.join('\n')}`);
   if (errorEstandar) throw errorEstandar;
   if (errorRegistro) throw errorRegistro;
