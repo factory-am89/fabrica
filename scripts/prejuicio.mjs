@@ -1,8 +1,8 @@
 // Prejuicio: the SAME judge as CI (the `revisor` workflow's step `claude`), run locally before opening a PR or pushing a fix, on
-// `git diff origin/main...HEAD` and the draft body of the PR (a file). Prints the verdict and every «no» with its proof, so they are all fixed at once.
+// `git diff MAIN_REF...HEAD` and the draft body of the PR (a file). Prints the verdict and every «no» with its proof, so they are all fixed at once.
 //   node scripts/prejuicio.mjs --body-file <body.md> [--json]   (output rule and exit codes: scripts/lib/exit.mjs)
 // It does not replace the revisor of CI: it is another context with the same instructions (revisor.md, standards/code.md, the
-// schema, the model, the prompt: exported from origin/main and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
+// schema, the model, the prompt: exported from MAIN_REF and read by scripts/golden-run.mjs, which is the only place that knows how to call claude).
 // Cost: one call of the subscription per pass (`claude -p`, the session's own login). Fails loud: claude failing or an unreadable output is
 // PREJUICIO_FAILED, never a «sí»; a verdict «no» is PREJUICIO_NO with each «no» and its proof in stderr.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -52,7 +52,7 @@ export const humanNos = (nos) => nos.map((n) => `${n.fallo}${n.pregunta ? ` | ${
 // `gitOut` answers the git questions (args -> stdout) and `exportTree` puts the judge of main in a folder (ref, dir -> tree). The real ones are the defaults.
 export function prejuicio({ bodyFile, run = callClaude, claude = null, gitOut = gitHere, exportTree = exportJudge }) {
   if (!existsSync(bodyFile)) throw new ExitError('USAGE', `${BODY_FLAG}: ${bodyFile} does not exist`);
-  if (gitOut(['status', '--porcelain']).trim() !== '') throw new ExitError('UNSAVED_CHANGES', 'there are uncommitted changes: the judge sees the commits only (git diff origin/main...HEAD); commit them first');
+  if (gitOut(['status', '--porcelain']).trim() !== '') throw new ExitError('UNSAVED_CHANGES', `there are uncommitted changes: the judge sees the commits only (git diff ${MAIN_REF}...HEAD); commit them first`);
   const diff = gitOut(['diff', `${MAIN_REF}...HEAD`]);
   if (diff.trim() === '') throw new ExitError('USAGE', `git diff ${MAIN_REF}...HEAD is empty: there is nothing to judge`);
   const sha = gitOut(['rev-parse', 'HEAD']).trim();
