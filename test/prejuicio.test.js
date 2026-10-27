@@ -7,7 +7,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { JUDGE_PATHS, STANDARD, WORKFLOW_REL } from '../scripts/golden.mjs';
-import { BODY_FILE, DIFF_FILE, JUDGE_DIR, readReviewer } from '../scripts/golden-run.mjs';
+import { JUDGE_DIR, readReviewer } from '../scripts/golden-run.mjs';
+import { CASE_FILE } from '../scripts/lib/golden-guard.mjs';
 import { cliPrejuicio } from '../scripts/prejuicio.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
@@ -45,8 +46,8 @@ function ejecutor(texto) {
     visto.llamadas += 1;
     visto.workspace = workspace;
     visto.reviewer = reviewer;
-    visto.diff = readFileSync(path.join(workspace, DIFF_FILE), 'utf8');
-    visto.body = readFileSync(path.join(workspace, BODY_FILE), 'utf8');
+    visto.diff = readFileSync(path.join(workspace, CASE_FILE.diff), 'utf8');
+    visto.body = readFileSync(path.join(workspace, CASE_FILE.body), 'utf8');
     visto.juez = JUEZ.every((f) => existsSync(path.join(workspace, JUDGE_DIR, f))) && existsSync(path.join(workspace, JUDGE_DIR, ...STANDARD.split('/')));
     if (texto instanceof Error) throw texto;
     return { text: texto, cost: 0.5 };

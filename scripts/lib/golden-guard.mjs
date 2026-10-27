@@ -11,7 +11,9 @@ export const GOLDEN_DIR = 'test/fixtures/golden/review';
 export const EXPECTED_FILE = 'expected.json';
 export const FLOOR_FILE = 'floor.json';
 export const CLEAN = 'clean';
-export const CASE_FILES = ['pr.diff', 'body.md'];
+// The two files of a case (and of the judge's workspace): named once, here; golden-run.mjs and prejuicio.mjs read the names from CASE_FILE.
+export const CASE_FILE = Object.freeze({ diff: 'pr.diff', body: 'body.md' });
+export const CASE_FILES = Object.values(CASE_FILE);
 // The compare API lists at most 300 files; at that size the list may be cut and the brake cannot see everything.
 export const COMPARE_FILE_LIMIT = 300;
 export const FAULT = { deleted: 'caso borrado', lowered: 'expect rebajado de no a clean', floor: 'suelo rebajado', unreadable: 'no se pudo comprobar' };

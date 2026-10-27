@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import { CLEAN, CORPUS, STANDARD, WORKFLOW_REL, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
+import { CASE_FILE } from './lib/golden-guard.mjs';
 import { ANSWER } from './lib/record.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
@@ -27,10 +28,8 @@ export const PHASES = ['all', 'collect', 'score'];
 const WORKFLOW = path.join(RAIZ, ...WORKFLOW_REL.split('/'));
 // What the judge must not see: the corpus with its expectations, and the invariant cases (cases.json names, for each judge case, the question that must say no).
 const EXCLUDED = ['test/fixtures/golden', 'test/fixtures/invariants'];
-// What the judge finds in its workspace: the Fábrica under .fabrica/, the diff and the body of the PR (the names promptFor() puts in the prompt).
+// What the judge finds in its workspace: the Fábrica under .fabrica/, the diff and the body of the PR (names: CASE_FILE of scripts/lib/golden-guard.mjs, which promptFor() puts in the prompt).
 export const JUDGE_DIR = '.fabrica';
-export const DIFF_FILE = 'pr.diff';
-export const BODY_FILE = 'body.md';
 const FAKE_PR = '0';
 const FAKE_REPO = 'corpus';
 const GH_SENTENCE = 'el resto del PR, con `gh pr view`';
@@ -94,10 +93,10 @@ export function readReviewer(file = WORKFLOW) {
 export function promptFor(prompt, workspace) {
   if (!prompt.includes(GH_SENTENCE)) throw new Error(`the prompt of revisor.yml no longer contains "${GH_SENTENCE}": update golden-run.mjs`);
   const text = prompt
-    .replace(GH_SENTENCE, `el título y la descripción del PR, en ${path.join(workspace, BODY_FILE)}`)
+    .replace(GH_SENTENCE, `el título y la descripción del PR, en ${path.join(workspace, CASE_FILE.body)}`)
     .replaceAll('${{ github.event.pull_request.number }}', FAKE_PR)
     .replaceAll('${{ github.repository }}', FAKE_REPO)
-    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, DIFF_FILE));
+    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, CASE_FILE.diff));
   const left = text.match(/\$\{\{[^}]*\}\}/);
   if (left) throw new Error(`the prompt of revisor.yml has a placeholder this runner does not know: ${left[0]}`);
   return text;
@@ -120,8 +119,8 @@ export function resolveClaude(env = process.env) {
 // The workspace of one call: the judge under .fabrica/ and the two files of the PR. Used by the corpus and by scripts/prejuicio.mjs.
 export function layWorkspace(workspace, judge, { diff, body }) {
   cpSync(judge, path.join(workspace, JUDGE_DIR), { recursive: true });
-  writeFileSync(path.join(workspace, DIFF_FILE), diff);
-  writeFileSync(path.join(workspace, BODY_FILE), body);
+  writeFileSync(path.join(workspace, CASE_FILE.diff), diff);
+  writeFileSync(path.join(workspace, CASE_FILE.body), body);
 }
 
 // The commit under test without the corpus, extracted once; returns the folder. Relative paths to tar: GNU tar reads "C:" as a host.
@@ -187,7 +186,7 @@ function oneCall({ root, judge, corpus, c, t, claude, reviewer }) {
   const workspace = path.join(root, `w-${c.id}-${t}`);
   try {
     const read = (f) => readFileSync(path.join(corpus, c.id, f), 'utf8');
-    layWorkspace(workspace, judge, { diff: read(DIFF_FILE), body: read(BODY_FILE) });
+    layWorkspace(workspace, judge, { diff: read(CASE_FILE.diff), body: read(CASE_FILE.body) });
     return callClaude({ claude, reviewer, workspace });
   } catch (e) {
     throw new Error(`${c.id}/${t}: ${e.message}`, { cause: e });
