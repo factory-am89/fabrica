@@ -11,6 +11,8 @@ export const ERROR = { standardUnloadable: 'standard-unloadable', outputUnreadab
 export const ERRORS = Object.values(ERROR);
 // Title of the check-run that scripts/veredicto.mjs publishes when Pablo's approval overrides a no; it has no record (the round it overrides has its own).
 export const OVERRIDE_TITLE = 'override by Pablo';
+// Title of the in_progress `revisor` check-run that marks a judgment under way; it has no record yet, and it is not a round (counted in `pending`).
+export const PENDING_TITLE = 'juzgando';
 export const UNANSWERED = 'sin-respuesta'; // aggregate's bucket for a question with a null answer
 const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
 
@@ -95,15 +97,21 @@ export function extractRecord(text) {
   return parseRecord(blocks[0][1]);
 }
 
-// check-runs (GitHub API objects) -> { records, overrides, unreadable: [{index, reason}] }. Override check-runs are counted, not read.
-// Nothing else is skipped silently.
+// check-runs (GitHub API objects) -> { records, overrides, pending, unreadable: [{index, reason}] }. Override check-runs and
+// in_progress check-runs titled PENDING_TITLE (a judgment not finished) are counted, not read. Nothing else is skipped silently:
+// a completed check-run without record stays unreadable.
 export function readCheckRuns(checkRuns) {
   const records = [];
   const unreadable = [];
   let overrides = 0;
+  let pending = 0;
   checkRuns.forEach((c, index) => {
     if (c?.output?.title === OVERRIDE_TITLE) {
       overrides += 1;
+      return;
+    }
+    if (c?.status === 'in_progress' && c?.output?.title === PENDING_TITLE) {
+      pending += 1;
       return;
     }
     try {
@@ -112,7 +120,7 @@ export function readCheckRuns(checkRuns) {
       unreadable.push({ index, reason: e.message });
     }
   });
-  return { records, overrides, unreadable };
+  return { records, overrides, pending, unreadable };
 }
 
 // records (and the answer and error vocabularies, ANSWERS and ERRORS by default) -> { porPr: {"repo#pr": {rondas, ok, no, <one counter per ERRORS value>}}, porPregunta: {id: {<one counter per answer>, sin-respuesta}} }
