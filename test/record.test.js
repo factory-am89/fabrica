@@ -8,7 +8,7 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { RUTA_ESTANDAR } from '../scripts/veredicto.mjs';
 import { CHECKED_BY, FIELDS, ID_PARTS, ID_SOURCE, readQuestions } from '../scripts/lib/questions.mjs';
-import { ANSWERS, ERRORS, PENDING_TITLE, answersSummary, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
+import { ANSWERS, CUT_TITLE, ERRORS, PENDING_TITLE, answersSummary, RECORD_VERSION, STANDARD_SOURCE, aggregate, buildRecord, extractRecord, formatBlock, parseRecord, readCheckRuns, runFromEnv } from '../scripts/lib/record.mjs';
 
 const SHA = 'a'.repeat(40);
 const base = { repo: 'o/r', pr: 2, sha: SHA, standard: 'standards/code.md', veredicto: { ok: false, fallos: ['C5: no'] }, respuestas: { answers: { C1: 'sí', C5: 'no', C6: 'no aplica', C7: null }, invalid: 0 }, run: { id: 99, attempt: 1 } };
@@ -101,6 +101,38 @@ test('readCheckRuns: a completed check without record stays unreadable, even wit
   assert.deepEqual(r.unreadable.map((u) => u.index), [0, 1, 2]);
 });
 
+test('readCheckRuns: a completed/failure check with CUT_TITLE counts in cut, not in unreadable nor as a round', () => {
+  const bueno = { status: 'completed', conclusion: 'success', output: { text: formatBlock(expected) } };
+  const cortado = { status: 'completed', conclusion: 'failure', output: { title: CUT_TITLE, summary: 'x' } };
+  const r = readCheckRuns([bueno, cortado, cortado]);
+  assert.equal(r.records.length, 1);
+  assert.equal(r.cut, 2);
+  assert.equal(r.pending, 0);
+  assert.deepEqual(r.unreadable, []);
+  assert.equal(readCheckRuns([bueno]).cut, 0);
+});
+
+test('readCheckRuns: CUT_TITLE in any other state or conclusion stays unreadable', () => {
+  const r = readCheckRuns([
+    { status: 'in_progress', output: { title: CUT_TITLE } },
+    { status: 'completed', conclusion: 'success', output: { title: CUT_TITLE } },
+    { status: 'completed', conclusion: 'neutral', output: { title: CUT_TITLE } },
+    { status: 'completed', output: { title: CUT_TITLE } },
+  ]);
+  assert.equal(r.cut, 0);
+  assert.deepEqual(r.unreadable.map((u) => u.index), [0, 1, 2, 3]);
+});
+
+test('CLI: a cut check is printed apart and does not give exit 1', () => {
+  const corte = { status: 'completed', conclusion: 'failure', output: { title: CUT_TITLE } };
+  const r = cli('--file', tmp([{ output: { text: formatBlock(expected) } }, corte]), '--json');
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.cut, 1);
+  assert.equal(j.records, 1);
+  assert.match(cli('--file', tmp([corte])).stdout, /^cut: 1$/m);
+});
+
 test('CLI: a pending check is printed apart and does not give exit 1', () => {
   const r = cli('--file', tmp([{ output: { text: formatBlock(expected) } }, { status: 'in_progress', output: { title: PENDING_TITLE } }]), '--json');
   assert.equal(r.status, 0, r.stderr);
@@ -120,7 +152,7 @@ test('CLI: good file prints the figures and exits 0', () => {
   const r = cli('--file', path.join(import.meta.dirname, 'fixtures', 'records', 'ok.json'), '--json');
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(r.stdout);
-  assert.deepEqual(Object.keys(j).sort(), ['overrides', 'pending', 'porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
+  assert.deepEqual(Object.keys(j).sort(), ['cut', 'overrides', 'pending', 'porPr', 'porPregunta', 'records', 'rondasMedias', 'unreadable']);
   assert.equal(j.records, 4);
   assert.equal(j.rondasMedias, 4 / 3);
   assert.equal(j.porPregunta.C5.no, 1);
