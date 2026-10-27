@@ -4,6 +4,7 @@
 import { lessonIndicators } from './lesson-effect.mjs';
 import { judgeDebt } from './judge-debt.mjs';
 import { aggregate, readCheckRuns } from './record.mjs';
+import { judgeRounds } from './judge-rounds.mjs';
 
 export const BOUND = Object.freeze({ lower: 'lower', upper: 'upper' });
 export const CAVEAT = Object.freeze({
@@ -12,6 +13,7 @@ export const CAVEAT = Object.freeze({
   messagesNotPerPr: 'messages-include-those-not-about-a-pr',
   roundsMissing: 'a-round-without-a-check-run-does-not-count',
   clashesNoEnd: 'closed-without-merge-has-no-end-date',
+  judgmentsNotAnswers: 'a-judgment-is-not-always-the-answer-to-a-no',
 });
 export const REWORK_HOURS = 48;
 export const ESCAPE_DAYS = 14;
@@ -114,6 +116,7 @@ export function messages(m, mergedPrs) {
 // The ids of the data indicators; scripts/audit.mjs spreads them into INDICATORS, the closed list.
 export const DATA_IDS = Object.freeze({
   rounds: 'rounds',
+  judgeRounds: 'judge-rounds', // judgments of the revisor per merged PR: distribution, mean, share judged once (scripts/lib/judge-rounds.mjs)
   noPerQuestion: 'no-per-question',
   minutes: 'minutes',
   overrides: 'pablo-overrides',
@@ -137,6 +140,7 @@ export function dataIndicators(data, { now, lessonsEscaped, messageCounts, local
   const lesson = lessonIndicators(prs, data.checkRuns, local);
   return {
     [DATA_IDS.rounds]: { records: r.records, prs: r.prs, mean: r.mean, byPr: r.byPr, bound: r.bound, caveat: r.caveat },
+    [DATA_IDS.judgeRounds]: { ...judgeRounds(prs, readCheckRuns(data.checkRuns).records), bound: BOUND.upper, caveat: CAVEAT.judgmentsNotAnswers },
     [DATA_IDS.noPerQuestion]: r.noPerQuestion,
     [DATA_IDS.minutes]: minutes(prs),
     [DATA_IDS.overrides]: { count: r.overrides },
