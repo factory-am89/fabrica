@@ -27,6 +27,10 @@ export const PHASES = ['all', 'collect', 'score'];
 const WORKFLOW = path.join(RAIZ, ...WORKFLOW_REL.split('/'));
 // What the judge must not see: the corpus with its expectations, and the invariant cases (cases.json names, for each judge case, the question that must say no).
 const EXCLUDED = ['test/fixtures/golden', 'test/fixtures/invariants'];
+// What the judge finds in its workspace: the Fábrica under .fabrica/, the diff and the body of the PR (the names promptFor() puts in the prompt).
+export const JUDGE_DIR = '.fabrica';
+export const DIFF_FILE = 'pr.diff';
+export const BODY_FILE = 'body.md';
 const FAKE_PR = '0';
 const FAKE_REPO = 'corpus';
 const GH_SENTENCE = 'el resto del PR, con `gh pr view`';
@@ -90,10 +94,10 @@ export function readReviewer(file = WORKFLOW) {
 export function promptFor(prompt, workspace) {
   if (!prompt.includes(GH_SENTENCE)) throw new Error(`the prompt of revisor.yml no longer contains "${GH_SENTENCE}": update golden-run.mjs`);
   const text = prompt
-    .replace(GH_SENTENCE, `el título y la descripción del PR, en ${path.join(workspace, 'body.md')}`)
+    .replace(GH_SENTENCE, `el título y la descripción del PR, en ${path.join(workspace, BODY_FILE)}`)
     .replaceAll('${{ github.event.pull_request.number }}', FAKE_PR)
     .replaceAll('${{ github.repository }}', FAKE_REPO)
-    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, 'pr.diff'));
+    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, DIFF_FILE));
   const left = text.match(/\$\{\{[^}]*\}\}/);
   if (left) throw new Error(`the prompt of revisor.yml has a placeholder this runner does not know: ${left[0]}`);
   return text;
@@ -111,6 +115,13 @@ export function resolveClaude(env = process.env) {
     throw new Error('claude.exe not found next to claude.cmd on PATH; set GOLDEN_CLAUDE_BIN');
   }
   return { cmd: 'claude', pre: [] };
+}
+
+// The workspace of one call: the judge under .fabrica/ and the two files of the PR. Used by the corpus and by scripts/prejuicio.mjs.
+export function layWorkspace(workspace, judge, { diff, body }) {
+  cpSync(judge, path.join(workspace, JUDGE_DIR), { recursive: true });
+  writeFileSync(path.join(workspace, DIFF_FILE), diff);
+  writeFileSync(path.join(workspace, BODY_FILE), body);
 }
 
 // The commit under test without the corpus, extracted once; returns the folder. Relative paths to tar: GNU tar reads "C:" as a host.
@@ -175,8 +186,8 @@ export function formatVariance(v, trials) {
 function oneCall({ root, judge, corpus, c, t, claude, reviewer }) {
   const workspace = path.join(root, `w-${c.id}-${t}`);
   try {
-    cpSync(judge, path.join(workspace, '.fabrica'), { recursive: true });
-    for (const f of ['pr.diff', 'body.md']) cpSync(path.join(corpus, c.id, f), path.join(workspace, f));
+    const read = (f) => readFileSync(path.join(corpus, c.id, f), 'utf8');
+    layWorkspace(workspace, judge, { diff: read(DIFF_FILE), body: read(BODY_FILE) });
     return callClaude({ claude, reviewer, workspace });
   } catch (e) {
     throw new Error(`${c.id}/${t}: ${e.message}`, { cause: e });

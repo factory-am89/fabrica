@@ -6,12 +6,12 @@
 // Cost: one call of the subscription per pass (`claude -p`, the session's own login). Fails loud: claude failing or an unreadable output is
 // PREJUICIO_FAILED, never a «sí»; a verdict «no» is PREJUICIO_NO with each «no» and its proof in stderr.
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STANDARD, WORKFLOW_REL } from './golden.mjs';
-import { callClaude, exportJudge, readReviewer, resolveClaude } from './golden-run.mjs';
+import { callClaude, exportJudge, layWorkspace, readReviewer, resolveClaude } from './golden-run.mjs';
 import { ExitError, finish, runCommand } from './lib/exit.mjs';
 import { MAIN_REF } from './lib/repo.mjs';
 import { ANSWER } from './lib/record.mjs';
@@ -66,9 +66,7 @@ export function prejuicio({ bodyFile, base = DEFAULT_BASE, run = callClaude, cla
     const tree = exportTree(base, root); // the judge of CI is the one on main: instructions, standard and workflow come from <base>
     const workspace = path.join(root, 'w');
     mkdirSync(workspace);
-    cpSync(tree, path.join(workspace, '.fabrica'), { recursive: true });
-    writeFileSync(path.join(workspace, 'pr.diff'), diff);
-    writeFileSync(path.join(workspace, 'body.md'), readFileSync(bodyFile, 'utf8'));
+    layWorkspace(workspace, tree, { diff, body: readFileSync(bodyFile, 'utf8') });
     const reviewer = readReviewer(path.join(tree, ...WORKFLOW_REL.split('/')));
     const preguntas = cargarPreguntas(STANDARD, tree);
     let result;

@@ -7,7 +7,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { JUDGE_PATHS, STANDARD, WORKFLOW_REL } from '../scripts/golden.mjs';
-import { readReviewer } from '../scripts/golden-run.mjs';
+import { BODY_FILE, DIFF_FILE, JUDGE_DIR, readReviewer } from '../scripts/golden-run.mjs';
 import { cliPrejuicio } from '../scripts/prejuicio.mjs';
 import { EXIT } from '../scripts/lib/exit.mjs';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
@@ -24,7 +24,7 @@ const DIFF = 'diff --git a/x b/x\n+cambio\n';
 const BODY = '## What changes\n\ncuerpo en borrador\n';
 
 const casa = mkdtempSync(path.join(tmpdir(), 'prejuicio-test-'));
-const body = path.join(casa, 'body.md');
+const body = path.join(casa, 'cuerpo.md');
 writeFileSync(body, BODY);
 test.after(() => rmSync(casa, { recursive: true, force: true }));
 
@@ -45,9 +45,9 @@ function ejecutor(texto) {
     visto.llamadas += 1;
     visto.workspace = workspace;
     visto.reviewer = reviewer;
-    visto.diff = readFileSync(path.join(workspace, 'pr.diff'), 'utf8');
-    visto.body = readFileSync(path.join(workspace, 'body.md'), 'utf8');
-    visto.juez = JUEZ.every((f) => existsSync(path.join(workspace, '.fabrica', f))) && existsSync(path.join(workspace, '.fabrica', ...STANDARD.split('/')));
+    visto.diff = readFileSync(path.join(workspace, DIFF_FILE), 'utf8');
+    visto.body = readFileSync(path.join(workspace, BODY_FILE), 'utf8');
+    visto.juez = JUEZ.every((f) => existsSync(path.join(workspace, JUDGE_DIR, f))) && existsSync(path.join(workspace, JUDGE_DIR, ...STANDARD.split('/')));
     if (texto instanceof Error) throw texto;
     return { text: texto, cost: 0.5 };
   };
