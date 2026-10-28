@@ -268,9 +268,9 @@ test('ficha: incompleta, con claves de más, identidad desconocida o no JSON →
   assert.throws(con('{no es json'), /no es JSON legible/);
   assert.throws(con('[]'), /debe ser un objeto/);
   // Cada identidad del mapa: con dueño fijo, otro dueño se rechaza; sin dueño fijo, vale cualquiera.
-  for (const [nombre, { dueno }] of Object.entries(IDENTIDADES)) {
+  for (const [nombre, { duenos }] of Object.entries(IDENTIDADES)) {
     const otra = { repo: 'otro-dueno/r', base: 'main', identidad: nombre };
-    if (dueno) assert.throws(con(otra), /solo vale en repos de/, nombre);
+    if (duenos) assert.throws(con(otra), /solo vale en repos de/, nombre);
     else assert.deepEqual(con(otra)(), otra, nombre);
   }
 });
