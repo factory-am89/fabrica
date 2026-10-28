@@ -3,11 +3,14 @@
 // Sin credencial GitHub limita a 60 consultas por hora y dirección: limpiar hace una por pasada.
 import { fileURLToPath } from 'node:url';
 
-export async function consultar(ruta, fetchFn = fetch) {
+// `accept` cambia el formato de la respuesta (p. ej. application/vnd.github.diff); el error lleva el estado HTTP en `status`.
+export async function consultar(ruta, fetchFn = fetch, accept = 'application/vnd.github+json') {
   const res = await fetchFn(`https://api.github.com/${ruta.replace(/^\/+/, '')}`, {
-    headers: { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'fabrica-limpiar' },
+    headers: { accept, 'x-github-api-version': '2022-11-28', 'user-agent': 'fabrica-limpiar' },
   });
-  if (!res.ok) throw new Error(`GET ${ruta} → ${res.status}${res.status === 403 || res.status === 429 ? ' (¿límite de consultas sin credencial?)' : ''}`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`GET ${ruta} → ${res.status}${res.status === 403 || res.status === 429 ? ' (¿límite de consultas sin credencial?)' : ''}`), { status: res.status });
+  }
   return res.text();
 }
 
