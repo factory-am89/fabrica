@@ -95,9 +95,10 @@ test('retirar: pregunta por el PR al repo de la ficha y lo da por fusionado si l
 
 test('retirar: un PR fusionado en main, no en la base staging de la ficha, no cuenta', () => {
   const { principal } = ajeno();
-  const { carpeta } = conPR(principal, 'tres', 'main');
+  const { carpeta, log } = conPR(principal, 'tres', 'main');
   assert.throws(() => retirar('tres', { cwd: principal, token: FALSO }), /no está fusionada/);
   assert.ok(existsSync(carpeta));
+  assert.ok(existsSync(log), 'no llegó a preguntar a GitHub: el «no» no viene de la base');
 });
 
 test('retirar --repo: lo mismo desde otra carpeta, y sin ficha falla en alto', () => {
