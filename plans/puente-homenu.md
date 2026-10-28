@@ -243,7 +243,7 @@ Con A = 2 cambian los pasos 2 a 4: transferir el repo, reinstalar en factory-am8
 - principio 2 | eligió: HoMenu conserva su propio tests.yml como check tests | descartó: cambiarlo sin medir por el tests reutilizable de la Fábrica, que hoy rechazaría sus acciones sin fijar por SHA | motivo: decidido
 - principio 2 | eligió: el despertador «al día» pone al día un solo PR cada vez (el armado más antiguo y detrás de la base) y el coste de strict se mide con la cifra «PR por día» | descartó: poner al día a todos los PR abiertos tras cada fusión, cuyo coste (repetir `tests` y `revisor` en cada uno) no se mediría | motivo: decidido
 - principio 5 | eligió: `carpeta-principal` calcula la principal con `git worktree list` de la ruta tocada, sin lista de repos | descartó: una lista de repos escrita a mano en el hook, que se queda vieja con cada repo nuevo y nada la vigila | motivo: decidido
-- principio 2 | eligió: la cifra del trozo 1 va al issue de este plan | descartó: un fichero nuevo en el repo con la cifra, que quedaría viejo en cuanto cambie el corpus | motivo: decidido
+- principio 4 | eligió: la cifra del trozo 1 va al issue de este plan | descartó: un fichero nuevo en el repo con la cifra, que quedaría viejo en cuanto cambie el corpus | motivo: decidido
 - principio 4 | eligió: `scripts/admin/cuerpo-ruleset.mjs`, una orden que solo imprime el cuerpo del ruleset a partir de `rulesetBody` | descartó: aplicarlo desde el propio plan o escribir el JSON a mano en `PASOS-PABLO.md` | motivo: decidido
 
 ## Decisions for Pablo
