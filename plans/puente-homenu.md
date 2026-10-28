@@ -42,11 +42,11 @@ Done:
 node --test test/medir-repo.test.js
 ```
 
-### 2. (Fábrica) `tarea` y `retire` sirven para un repo ajeno: la rama base sale de su ficha y no se le ponen los hooks de git de la Fábrica
+### 2. (Fábrica) `tarea` y `retire` sirven para un repo ajeno: la rama base sale de su ficha y no se le ponen los hooks de git de la Fábrica (hecho en #178, `3108266`)
 Files: `scripts/tarea.mjs`, `scripts/retire.mjs`, `test/tarea-ficha.test.js`
 Depends on: none
 Blocked by: none
-Existing: `scripts/tarea.mjs:17-20` y `scripts/retire.mjs:32-33` fijan `origin/main`; `scripts/tarea.mjs:23` llama siempre a `instalarHooks`, que pone `core.hooksPath .githooks` en el repo (`scripts/install-hooks.mjs:11`) y en MenuPlan apagaría sus hooks de `.git/hooks`. La ficha `.fabrica.json` ya guarda `repo`, `base` e `identidad`, y la lee `clean.mjs` con `--repo <carpeta>` (`scripts/lib/repo-card.mjs:3-6`, `scripts/clean.mjs:6`). `ls test | grep tarea` -> sin salida.
+Existing: (Estado antes de #178, ya fusionado: describe el punto de partida, no el estado actual de main.) `scripts/tarea.mjs:17-20` y `scripts/retire.mjs:32-33` fijan `origin/main`; `scripts/tarea.mjs:23` llama siempre a `instalarHooks`, que pone `core.hooksPath .githooks` en el repo (`scripts/install-hooks.mjs:11`) y en MenuPlan apagaría sus hooks de `.git/hooks`. La ficha `.fabrica.json` ya guarda `repo`, `base` e `identidad`, y la lee `clean.mjs` con `--repo <carpeta>` (`scripts/lib/repo-card.mjs:3-6`, `scripts/clean.mjs:6`). `ls test | grep tarea` -> sin salida.
 Not done: reutiliza el campo `base` de la ficha y no añade ninguno (comparado con `scripts/lib/repo-card.mjs`: misma idea). La ficha no está en `entities.json` ni en `fields.json`: hueco anotado, no arreglado aquí. Los prefijos de rama siguen siendo `feat/`, `fix/` y `ops/` (MenuPlan los acepta, `CLAUDE.md:23` de MenuPlan). En la Fábrica todo sigue igual (su ficha dice `main`). Sin ficha en el repo, falla en alto como `clean.mjs`.
 Done:
 ```sh
@@ -209,7 +209,7 @@ git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" 
 
 ## Build order
 
-Ya fusionados en main: 1, 3, 4, 5, 6, 7, 8 y 9. Falta en la Fábrica el 2 (`tarea` y `retire` con la ficha), de modo que el 5 se fusionó antes que su dependencia (ver Not verified). Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
+Ya fusionados en main: del 1 al 9 (el 5, #180, se fusionó antes que su dependencia, el 2, #178). Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
 
 ## Pasos de Pablo
 
@@ -277,4 +277,3 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 - Que la App de revisor nueva de HoMenu, con los permisos del manifiesto de `fabrica-revisor`, baste para publicar el check y para `update-branch` o aprobar como lo hace `fabrica-revisor`: copia los permisos de su manifiesto, no lo he probado en HoMenu.
 - La protección clásica de `staging`: la leyó la sesión coordinadora con la sesión de Pablo; con la identidad del constructor, `gh api` da 403 y no la he repetido.
 - Que el ruleset de `staging` reconozca el check `revisor` de la App nueva por su integration id: se comprueba en el paso 6 de Pablo; no lo he probado.
-- El trozo 5 (`Depends on: 2`) se fusionó (#180) antes que el 2: `.claude/agents/constructor.md:20` ya manda `npm run tarea -- --repo <carpeta> feat/<nombre>`, pero `scripts/tarea.mjs:20` sigue fijando `base = 'origin/main'` y no hay `test/tarea-ficha.test.js` (`ls test | grep -i tarea` -> sin salida). Hasta que se fusione el 2, ese paso del rol no funciona en un repo ajeno.
