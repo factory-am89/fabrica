@@ -38,7 +38,6 @@ export function cliTarea(argv, opts = {}) {
   return runCommand(argv, {
     run: (args) => {
       const { repoDir, resto } = sacarRepo(args);
-      if (!resto[0]) throw new ExitError('USAGE', 'Falta la rama: node scripts/tarea.mjs [--repo <carpeta>] feat/nombre');
       return crearTarea(resto[0], { ...opts, ...(repoDir ? { cwd: repoDir } : {}), json: argv.includes('--json') });
     },
     human: ({ carpeta, rama, base }) => `tarea carpeta: ${carpeta} rama: ${rama} base: ${base}\nTrabaja ahí; el primer push es: git push -u origin ${rama}`,
