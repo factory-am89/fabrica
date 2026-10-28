@@ -1,7 +1,6 @@
 // Imprime (solo imprime) el cuerpo del ruleset de una rama buena, para aplicarlo a mano con un PUT
 // (plans/puente-1, trozo 8; paso 6 de Pablo). No habla con GitHub ni toca el disco: el cuerpo sale de rulesetBody.
-//   node scripts/admin/cuerpo-ruleset.mjs --app-id <id numerico de la App revisora> [--name <nombre>] [--strict] [--tests-context <check>]
-// Sin --name vale `main`; sin --strict, no exige estar al dia; sin --tests-context, `tests / tests`.
+// Uso: la constante USO de abajo. Lo que valen las opciones que se omiten lo decide rulesetBody, no este fichero.
 // This file is a gate file (scripts/lib/gate.mjs, folder scripts/admin/); the machine guard of the key scans it.
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
