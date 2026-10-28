@@ -80,6 +80,7 @@
     { "source": "#164", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
     { "source": "#164", "question": "C17", "kind": "otro", "kind_note": "sin respuesta: el SALIDA del juez se cortó a los 11 de 20 turnos y acaba en C16, sin responder C17 (log de juzgar del run 40555481876, 14555f3); no es un fallo del PR, el desenlace de ruido lo decide otra sesión", "outcome": "pendiente" },
     { "source": "#170", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
-    { "source": "#170", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" }
+    { "source": "#170", "question": "C14", "kind": "vocabulario-copiado", "outcome": "pendiente" },
+    { "source": "#175", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" }
   ]
 }
