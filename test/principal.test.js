@@ -3,11 +3,13 @@
 // lesson: git-not-from-main-folder
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, realpathSync, cpSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FICHA_FABRICA } from './apoyo/repo.mjs';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { instalarHooks } from '../scripts/install-hooks.mjs';
 
@@ -28,7 +30,8 @@ function repo(nombre = 'fabrica') {
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
+  writeFileSync(path.join(principal, NOMBRE_FICHA), FICHA_FABRICA); // tarea lee de la ficha la rama base
+  git(principal, 'add', 'a.txt', NOMBRE_FICHA);
   git(principal, 'commit', '-q', '-m', 'inicial');
   return principal;
 }
@@ -165,6 +168,7 @@ test('hooks de git: niegan commit, merge y cherry-pick en la principal y dejan p
 
 test('instalar-hooks: pone core.hooksPath en el repo, también si se lanza desde una carpeta de trabajo', () => {
   const principal = repo();
+  cpSync(path.join(RAIZ, '.githooks'), path.join(principal, '.githooks'), { recursive: true }); // tarea solo activa los hooks del repo que los trae
   const { carpeta } = tarea(principal, 'feat/diez');
   git(principal, 'config', '--local', '--unset', 'core.hooksPath');
   instalarHooks(carpeta);

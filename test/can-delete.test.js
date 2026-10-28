@@ -1,11 +1,13 @@
 // La regla «¿se puede borrar esta carpeta?» vive en un solo sitio (scripts/lib/can-delete.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FICHA_FABRICA } from './apoyo/repo.mjs';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { retirar } from '../scripts/retire.mjs';
 import { prFusionado } from '../scripts/lib/can-delete.mjs';
@@ -37,7 +39,8 @@ test('retirar: se niega si la unión de node_modules de OTRA carpeta apunta dent
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
+  writeFileSync(path.join(principal, NOMBRE_FICHA), FICHA_FABRICA); // tarea y retire leen la base de la ficha
+  git(principal, 'add', 'a.txt', NOMBRE_FICHA);
   git(principal, 'commit', '-q', '-m', 'inicial');
   const a = crearTarea('feat/a', { cwd: principal, instalar: false }).carpeta;
   const b = crearTarea('feat/b', { cwd: principal, instalar: false }).carpeta;

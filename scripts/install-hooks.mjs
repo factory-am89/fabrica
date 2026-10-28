@@ -6,6 +6,9 @@
 import { fileURLToPath } from 'node:url';
 import { gitOk, principal } from './lib/folders.mjs';
 
+// El hook que marca un repo como dueño de estos hooks: tarea solo los activa donde existe.
+export const HOOK_MARCA = '.githooks/denegar-principal.sh';
+
 export function instalarHooks(cwd = process.cwd()) {
   const raiz = principal(cwd);
   gitOk(['config', '--local', 'core.hooksPath', '.githooks'], raiz);

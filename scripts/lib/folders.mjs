@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { ExitError } from './exit.mjs';
+import { leerFicha } from './repo-card.mjs';
 
 export function git(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -50,3 +51,28 @@ export function nombreDeRama(rama) {
 export const carpetaDe = (raiz, nombre) => path.join(path.dirname(raiz), `${path.basename(raiz)}-${nombre}`);
 
 export const tieneOrigin = (cwd) => gitOk(['remote'], cwd).split(/\s+/).includes('origin');
+
+// Saca `<opcion> <valor>` de los argumentos (la única lectura de --repo y --ficha, para tarea, retire y clean).
+// Devuelve { valor, resto }, con valor null si la opción no está; una opción sin valor es un error de uso.
+export function sacarOpcion(args, opcion) {
+  const i = args.indexOf(opcion);
+  if (i === -1) return { valor: null, resto: args };
+  const v = args[i + 1];
+  if (!v || v.startsWith('--')) throw new ExitError('USAGE', `${opcion} necesita un valor`);
+  return { valor: v, resto: args.filter((_, j) => j !== i && j !== i + 1) };
+}
+
+// `--repo <carpeta>`: una carpeta cualquiera del repo ajeno (por defecto, el cwd). Devuelve { repoDir, resto }.
+export function sacarRepo(args) {
+  const { valor, resto } = sacarOpcion(args, '--repo');
+  return { repoDir: valor && path.resolve(valor), resto };
+}
+
+// La ficha del repo (.fabrica.json) dice repo, rama base e identidad, no un texto fijo; sin ficha, error en alto.
+export function fichaDe(raiz) {
+  try {
+    return leerFicha(raiz);
+  } catch (e) {
+    throw new ExitError('USAGE', e.message);
+  }
+}

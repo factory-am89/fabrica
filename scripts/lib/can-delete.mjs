@@ -32,7 +32,7 @@ export function prsFusionados(repo, token, cwd, base) {
 }
 
 // ¿Hay un PR fusionado con esta punta? Un commit posterior a la fusión no estaría en main.
-export const prFusionado = (punta, { repo = REPO, token = TOKEN, cwd = process.cwd() } = {}) => prsFusionados(repo, token, cwd).has(punta);
+export const prFusionado = (punta, { repo = REPO, token = TOKEN, cwd = process.cwd(), base } = {}) => prsFusionados(repo, token, cwd, base).has(punta);
 
 const dentro = (hijo, padre) => {
   const rel = path.relative(norm(padre), norm(hijo));
