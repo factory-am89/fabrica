@@ -84,6 +84,7 @@
     { "source": "#172", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
     { "source": "#172", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" },
     { "source": "#175", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
-    { "source": "#173", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" }
+    { "source": "#173", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
+    { "source": "#173", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" }
   ]
 }
