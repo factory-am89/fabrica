@@ -10,7 +10,7 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 1. Antes de escribir, mira lo que ya existe: reutiliza antes de crear.
 2. Un test nuevo se ve fallar antes de creerlo; el PR cuenta cómo (comando y salida).
 3. Lanza `npm run lint` y `npm test` antes de abrir el PR; abre el PR con tu identidad de App, nunca la de Pablo.
-4. El cuerpo del PR sigue la plantilla `.github/pull_request_template.md`. Antes de abrirlo, compruébalo a mano como lo hace CI (paso «PR body has the template sections» de `.github/workflows/tests.yml`, con tu rama ya empujada): `gh api repos/factory-am89/fabrica/compare/main...<rama> > <c.json>` y `node scripts/pr-body.mjs --body-file <cuerpo.md> --compare-file <c.json>` (debe imprimir `pr-body: ok`). Con `--files-file` no se comprueba la línea `HEAD` de la evidencia y CI puede fallar.
+4. El cuerpo del PR sigue la plantilla `.github/pull_request_template.md`. Antes de abrirlo, compruébalo a mano: `git diff --name-only origin/main...HEAD > <f>` y `node scripts/pr-body.mjs --body-file <cuerpo.md> --files-file <f>` (debe imprimir `pr-body: ok`).
 5. Prejuicio: antes de abrir el PR y antes de cada push de arreglo, con todo ya en commits, lanza `npm run prejuicio -- --body-file <cuerpo.md>` y arregla TODOS los «no» que imprime, de una vez, antes de empujar. Es el mismo juez que el de CI en otro contexto (otra llamada de la suscripción, una por pasada): no sustituye al revisor de CI ni es juzgar tu propio trabajo. Si falla o no se lee, no abras el PR como si hubiera pasado: dilo en el PR.
 6. Tras abrirlo, arma la fusión automática (`gh pr merge --auto --squash`). Fusionar lo hace GitHub cuando `tests` y `revisor` están en verde; tú nunca fusionas ni empujas a `main`.
 7. Si el revisor dice no, arregla en la misma rama; no discutas el veredicto. Por cada pregunta con «no», apunta una fila en `reviewer-no.json` en el mismo commit del arreglo: los campos son `REVIEWER_NO_FIELDS`, la clase del fallo un valor de `KINDS` y el desenlace `OUTCOME_PENDING` (todos en `scripts/lib/reviewer-no.mjs`; no copies sus valores). El desenlace final lo pone otra sesión que no hizo ese PR: decir «era ruido del juez» sobre tu propio PR es juzgar tu propio trabajo. Si lanzas un revisor independiente para sacar el motivo, él no escribe ficheros: dice la clase en su informe y tú la apuntas.
@@ -25,7 +25,7 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 
 ## Cuerpo del PR en la Fábrica
 
-- La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano.
+- La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano. Lo que `--files-file` no comprueba (esa línea) y cómo se comprueba con `--compare-file` como CI: `.claude/skills/github/referencias/subir.md`, pasos 1 y 2; no se repite aquí.
 
 ## Commands for agents
 
