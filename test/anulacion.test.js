@@ -150,8 +150,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
   assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
   assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
-  assert.equal(on.workflow_call.inputs['revisor-app-slug'].required, false, 'un llamador antiguo que no lo pasa sigue funcionando');
-  assert.equal(on.workflow_call.inputs['revisor-app-slug'].default, REVISOR_APP_SLUG, 'sin la entrada vale la App de la Fábrica, como antes de #182');
+  assert.equal(on.workflow_call.inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
   assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
