@@ -28,3 +28,35 @@ La tercera App, la que crea y protege repos sin ti (trozo 1 de 10 de `plans/app-
 2. Instálala en `factory-am89`, **All repositories** (el script da el enlace `…/installations/new`). No amplíes sus permisos: son exactamente los del manifiesto.
 
 Nombres que debe haber al final en `administrador`: `ADMIN_APP_KEY` y `ADMIN_CLIENT_ID`. Los secretos del revisor que esta App copiará a cada repo se te pedirán en el trozo que los use, no antes. Comprobación: `gh api repos/factory-am89/fabrica/environments/administrador/secrets --jq '.secrets[].name'`.
+
+## Puente HoMenu: la Fábrica opera `pabloam89/MenuPlan` (plan `plans/puente-homenu.md`)
+
+Tus respuestas del 28 oct 2026 (filas de `intervenciones.md`): A1 (HoMenu se queda en tu cuenta `pabloam89`), B1 (nadie se salta el revisor: Dependabot espera, mercadona-sync abre PR), C1 (OK al plan entero) y D1 (HoMenu tiene su propio revisor: una App tuya, creada por ti). Solo se hace pública `fabrica-constructor`; `fabrica-revisor` se queda privada.
+
+**Cuándo:** los pasos 1 a 3 se pueden hacer ya. Los pasos 4 a 7 van **de una sentada**, cuando los trozos 11, 13, 14 y 15 del plan estén fusionados en `staging` de MenuPlan (te lo dirá la sesión que coordina). Mientras dura la sentada, la clave del revisor está en un repo que fusiona solo con `tests`; por eso no se dejan a medias. Con el paso 6 hecho, `staging` pide PR, `tests` y `revisor`, al día. Un «no» injusto del revisor se anula con tu **Approve** sobre la cabeza del PR.
+
+Nunca escribas el valor de un secreto en un chat ni en una orden: se escribe en el aviso de `gh` o se lee desde un fichero. Aquí solo van nombres.
+
+1. **Hacer pública `fabrica-constructor`** (1 min). Abre https://github.com/organizations/factory-am89/settings/apps, entra en `fabrica-constructor` → «Advanced» (abajo del todo) → «Make public» → confirma. Solo cambia quién puede instalarla, no sus permisos. Comprobación: `curl -s -o /dev/null -w "%{http_code}" https://api.github.com/apps/fabrica-constructor` debe imprimir `200` (hoy imprime `404`).
+2. **Instalar `fabrica-constructor` en tu cuenta** (2 min). Abre https://github.com/apps/fabrica-constructor → «Install» → elige `pabloam89` → «Only select repositories» → solo `MenuPlan` → «Install». Comprobación: en https://github.com/settings/installations aparece `fabrica-constructor` con 1 repositorio (MenuPlan).
+3. **Activar «Allow auto-merge» en MenuPlan** (30 s). https://github.com/pabloam89/MenuPlan/settings → «General» → «Pull Requests» → marca «Allow auto-merge». Comprobación: `gh api repos/pabloam89/MenuPlan --jq .allow_auto_merge` imprime `true`.
+4. **Crear la App revisora de HoMenu** (unos 8 min; es tuya, en `pabloam89`, no en la organización).
+   1. En https://github.com/settings/apps/new crea una App nueva (nombre sugerido: `homenu-revisor`), sin webhook (desmarca «Active»), «Only on this account», con **exactamente** los permisos del manifiesto de `fabrica-revisor` en `apps/crear-apps.html`: **Pull requests: Read and write** y **Checks: Read and write**; ningún otro. «Create GitHub App».
+   2. Apunta dos datos: el **Client ID** (arriba de la página de la App) y el **App ID** (número, también arriba; lo usarás en el paso 6). En «Private keys» → «Generate a private key»: baja un fichero `.pem` (anota dónde queda).
+   3. En la App, «Install App» → `pabloam89` → «Only select repositories» → solo `MenuPlan`.
+   4. Crea el environment `revisor`: https://github.com/pabloam89/MenuPlan/settings/environments → «New environment» → nombre `revisor` → «Deployment branches and tags» → «Selected branches and tags» → añade la regla `staging` (solo esa).
+   5. Guarda los tres secretos en ese environment, con tu sesión de `gh` de administrador (el valor lo escribes tú cuando `gh` lo pida; la clave se lee del fichero):
+      - `gh secret set REVISOR_APP_KEY --env revisor --repo pabloam89/MenuPlan < RUTA\DEL\FICHERO.pem`
+      - `gh secret set REVISOR_CLIENT_ID --env revisor --repo pabloam89/MenuPlan` (pega el Client ID de la App nueva)
+      - `gh secret set CLAUDE_CODE_OAUTH_TOKEN --env revisor --repo pabloam89/MenuPlan` (el token que sale de `claude setup-token`)
+   6. **Borra el fichero `.pem`** del disco (y de la papelera).
+   Comprobación: `gh api repos/pabloam89/MenuPlan/environments/revisor/secrets --jq '.secrets[].name'` debe listar los tres nombres: `CLAUDE_CODE_OAUTH_TOKEN`, `REVISOR_APP_KEY`, `REVISOR_CLIENT_ID`.
+5. **Dejar a punto a Dependabot y a mercadona-sync** (solo si los trozos 13 y 14 piden una clave nueva; te lo dirá su PR). Hoy no hay nada que pulsar aquí; se deja numerado para que no se salte el orden.
+6. **Cerrar `staging`: aplicar el ruleset** (3 min). Es el paso que hace obligatorio el revisor. Con tu sesión de `gh` de administrador y desde `C:\dev\fabrica` (con `git pull --ff-only` hecho), sustituye `<APP_ID>` por el App ID del paso 4:
+   1. Mira primero lo que se va a mandar: `node scripts/admin/cuerpo-ruleset.mjs --app-id <APP_ID> --name "staging: PR, tests y revisor" --strict --tests-context tests`. Debe imprimir un JSON con `"enforcement": "active"`, `"bypass_actors": []`, `"strict_required_status_checks_policy": true` y los checks `tests` (15368) y `revisor` (con tu `<APP_ID>`, no 5332150). Si imprime `falta --app-id`, el número no está bien. La opción `--tests-context tests` es necesaria: el check de HoMenu se llama `tests`, no `tests / tests`.
+   2. Aplícalo sobre el ruleset de `staging` que ya existe: `node scripts/admin/cuerpo-ruleset.mjs --app-id <APP_ID> --name "staging: PR, tests y revisor" --strict --tests-context tests | gh api --method PUT repos/pabloam89/MenuPlan/rulesets/24770007 --input -`
+   3. Comprobación: `gh api repos/pabloam89/MenuPlan/rules/branches/staging` debe mostrar `pull_request` y `required_status_checks` con `tests` y `revisor`; `gh api repos/pabloam89/MenuPlan/rulesets/24770007 --jq '.bypass_actors'` debe imprimir `[]`. Después abre un PR de prueba pequeño a `staging`: no se puede fusionar hasta que `tests` y `revisor` estén en verde, y se fusiona solo.
+   4. Cierra la sesión de `gh` (`gh auth logout`).
+7. **Borrar la deploy key de mercadona-sync** (4 min; **irreversible**, si hiciera falta se crea otra). Solo cuando el trozo 14 (mercadona-sync abre PR) esté fusionado y haya abierto al menos un PR bueno. Abre https://github.com/pabloam89/MenuPlan/settings/keys → borra la deploy key `mercadona-sync`; borra el secreto `MERCADONA_DEPLOY_KEY` del environment `mercadona-sync` (https://github.com/pabloam89/MenuPlan/settings/environments) y guarda ahí la clave de la App con la que abrirá el PR (el nombre del secreto lo da el PR del trozo 14). Comprobación: `gh api repos/pabloam89/MenuPlan/keys --jq '.[].title'` ya no lista `mercadona-sync`, y el ruleset del paso 6 no tenía ninguna excepción.
+
+No hay un paso de «Apps de Dependabot»: `homenu-dependabot-merge` ya existe y no se toca aquí.
