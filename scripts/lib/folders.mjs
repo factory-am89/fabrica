@@ -52,14 +52,20 @@ export const carpetaDe = (raiz, nombre) => path.join(path.dirname(raiz), `${path
 
 export const tieneOrigin = (cwd) => gitOk(['remote'], cwd).split(/\s+/).includes('origin');
 
-// Saca `--repo <carpeta>` de los argumentos: una carpeta cualquiera del repo ajeno (por defecto, el cwd).
-// Devuelve { repoDir, resto }; un `--repo` sin valor es un error de uso, no se ignora.
-export function sacarRepo(args) {
-  const i = args.indexOf('--repo');
-  if (i === -1) return { repoDir: null, resto: args };
+// Saca `<opcion> <valor>` de los argumentos (la única lectura de --repo y --ficha, para tarea, retire y clean).
+// Devuelve { valor, resto }, con valor null si la opción no está; una opción sin valor es un error de uso.
+export function sacarOpcion(args, opcion) {
+  const i = args.indexOf(opcion);
+  if (i === -1) return { valor: null, resto: args };
   const v = args[i + 1];
-  if (!v || v.startsWith('--')) throw new ExitError('USAGE', '--repo necesita una carpeta del repo.');
-  return { repoDir: path.resolve(v), resto: args.filter((_, j) => j !== i && j !== i + 1) };
+  if (!v || v.startsWith('--')) throw new ExitError('USAGE', `${opcion} necesita un valor`);
+  return { valor: v, resto: args.filter((_, j) => j !== i && j !== i + 1) };
+}
+
+// `--repo <carpeta>`: una carpeta cualquiera del repo ajeno (por defecto, el cwd). Devuelve { repoDir, resto }.
+export function sacarRepo(args) {
+  const { valor, resto } = sacarOpcion(args, '--repo');
+  return { repoDir: valor && path.resolve(valor), resto };
 }
 
 // La ficha del repo (.fabrica.json) dice repo, rama base e identidad, no un texto fijo; sin ficha, error en alto.

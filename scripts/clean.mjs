@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { git, gitOk, worktrees } from './lib/folders.mjs';
+import { git, gitOk, worktrees, sacarOpcion, sacarRepo } from './lib/folders.mjs';
 import { quitarUnion } from './retire.mjs';
 import { leerFicha } from './lib/repo-card.mjs';
 import { identidadDe } from './lib/identities.mjs';
@@ -96,15 +96,13 @@ export function imprimir(s, escribir = console.log) {
 // --ensayo, --repo <carpeta>, --ficha <fichero>; cualquier otra cosa es un error (no se ignora en silencio).
 export function opciones(argv) {
   const o = { ensayo: false };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+  const { repoDir, resto: sinRepo } = sacarRepo(argv);
+  const { valor: fichero, resto } = sacarOpcion(sinRepo, '--ficha');
+  if (repoDir) o.repoDir = repoDir;
+  if (fichero) o.fichero = path.resolve(fichero);
+  for (const a of resto) {
     if (a === '--ensayo') o.ensayo = true;
-    else if (a === '--repo' || a === '--ficha') {
-      const v = argv[++i];
-      if (!v || v.startsWith('--')) throw new Error(`${a} necesita un valor`);
-      if (a === '--repo') o.repoDir = path.resolve(v);
-      else o.fichero = path.resolve(v);
-    } else throw new Error(`argumento desconocido: ${a}`);
+    else throw new Error(`argumento desconocido: ${a}`);
   }
   return o;
 }

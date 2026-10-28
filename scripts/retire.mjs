@@ -25,14 +25,14 @@ export function quitarUnion(ruta) {
   return true;
 }
 
-export function retirar(nombre, { cwd = process.cwd(), consultarPR } = {}) {
+export function retirar(nombre, { cwd = process.cwd(), consultarPR, token } = {}) {
   const raiz = principal(cwd);
+  const ficha = fichaDe(raiz); // repo, rama base e identidad salen de la ficha, no de un texto fijo
   const carpeta = carpetaDe(raiz, nombre);
   const wt = worktrees(raiz).find((w) => norm(w.ruta) === norm(carpeta));
   if (!wt) throw new ExitError('NOT_FOUND', `No hay ninguna carpeta de trabajo «${nombre}» (${carpeta}).`);
   const remoto = tieneOrigin(raiz);
-  const ficha = fichaDe(raiz); // repo, rama base e identidad salen de la ficha, no de un texto fijo
-  consultarPR ??= (rama, punta) => prFusionado(punta, { repo: ficha.repo, token: identidadDe(ficha.identidad).lanzador, cwd: raiz });
+  consultarPR ??= (rama, punta) => prFusionado(punta, { repo: ficha.repo, token: token ?? identidadDe(ficha.identidad).lanzador, cwd: raiz, base: ficha.base });
   const rama0 = ficha.base;
   if (remoto) gitOk(['fetch', '--no-write-fetch-head', 'origin', rama0], raiz);
   const base = remoto ? `origin/${rama0}` : rama0;

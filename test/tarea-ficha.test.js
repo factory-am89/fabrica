@@ -1,12 +1,16 @@
 // tarea y retire sirven para un repo ajeno: la rama base sale de su ficha y no se le ponen los hooks de la Fábrica.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { crearTarea, cliTarea } from '../scripts/tarea.mjs';
 import { retirar, cliRetirar } from '../scripts/retire.mjs';
+import { HOOK_MARCA } from '../scripts/install-hooks.mjs';
 import { git, repo } from './apoyo/repo.mjs';
+
+const FALSO = fileURLToPath(new URL('./fixtures/token-falso.mjs', import.meta.url));
 
 const FICHA_AJENA = '{"repo":"pabloam89/MenuPlan","base":"staging","identidad":"ninguna"}\n';
 
@@ -45,7 +49,7 @@ test('tarea: sin .githooks/ en el repo no toca core.hooksPath; con ellos, sí', 
   assert.notEqual(r.status, 0, `puso core.hooksPath: ${r.stdout}`);
   const propio = repo();
   mkdirSync(path.join(propio.principal, '.githooks'));
-  writeFileSync(path.join(propio.principal, '.githooks', 'denegar-principal.sh'), '#!/bin/sh\n');
+  writeFileSync(path.join(propio.principal, HOOK_MARCA), '#!/bin/sh\n');
   crearTarea('feat/uno', { cwd: propio.principal, instalar: false });
   assert.equal(git(propio.principal, 'config', '--local', 'core.hooksPath'), '.githooks');
 });
@@ -64,31 +68,45 @@ test('tarea --repo: trabaja sobre el repo de esa carpeta, desde otro cwd', () =>
   assert.equal(cliTarea(['--repo'], { instalar: false }).code, 2);
 });
 
-test('retirar: la base es la de la ficha; fusionada en staging se borra, y consulta el repo de la ficha', () => {
-  const { principal } = ajeno();
-  const { carpeta } = crearTarea('feat/dos', { cwd: principal, instalar: false });
-  writeFileSync(path.join(carpeta, 'c.txt'), 'c\n');
-  git(carpeta, 'add', 'c.txt');
+// Una carpeta con un commit subido, en un repo ajeno cuya base es staging; `prs` es lo que GitHub (falso) devuelve.
+function conPR(principal, nombre, base, fusionado = true) {
+  const { carpeta } = crearTarea(`feat/${nombre}`, { cwd: principal, instalar: false });
+  writeFileSync(path.join(carpeta, `${nombre}.txt`), 'x\n');
+  git(carpeta, 'add', '-A');
   git(carpeta, 'commit', '-q', '-m', 'trabajo');
-  let consultado = null;
-  assert.throws(() => retirar('dos', { cwd: principal, consultarPR: (rama) => { consultado = rama; return false; } }), /no está fusionada/);
-  assert.equal(consultado, 'feat/dos');
-  git(principal, 'checkout', '-q', 'staging');
-  git(principal, 'merge', '-q', '--no-ff', '-m', 'fusiona', 'feat/dos');
-  git(principal, 'push', '-q', 'origin', 'staging');
-  git(principal, 'checkout', '-q', 'main');
-  const r = cliRetirar(['--repo', principal, 'dos']);
-  assert.equal(r.code, 0, r.stderr);
+  const punta = git(carpeta, 'rev-parse', 'HEAD');
+  const prs = path.join(path.dirname(principal), 'prs.json');
+  const log = path.join(path.dirname(principal), 'llamadas.log');
+  writeFileSync(prs, JSON.stringify([{ number: 7, merged_at: fusionado ? '2026-10-28T10:00:00Z' : null, head: { ref: `feat/${nombre}`, sha: punta }, base: { ref: base } }]));
+  process.env.FALSO_PRS = prs;
+  process.env.FALSO_LOG = log;
+  delete process.env.FALSO_FALLA;
+  return { carpeta, log };
+}
+
+test('retirar: pregunta por el PR al repo de la ficha y lo da por fusionado si lo fue en su base', () => {
+  const { principal } = ajeno();
+  const { carpeta, log } = conPR(principal, 'dos', 'staging');
+  const r = retirar('dos', { cwd: principal, token: FALSO });
+  assert.equal(r.rama, 'feat/dos');
   assert.ok(!existsSync(carpeta));
+  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), ['api repos/pabloam89/MenuPlan/pulls?state=closed&per_page=100']);
 });
 
-test('retirar: fusionada en main pero no en staging, se queda', () => {
+test('retirar: un PR fusionado en main, no en la base staging de la ficha, no cuenta', () => {
   const { principal } = ajeno();
-  const { carpeta } = crearTarea('feat/tres', { cwd: principal, instalar: false });
-  writeFileSync(path.join(carpeta, 'd.txt'), 'd\n');
-  git(carpeta, 'add', 'd.txt');
-  git(carpeta, 'commit', '-q', '-m', 'trabajo');
-  git(principal, 'merge', '-q', '--no-ff', '-m', 'a main', 'feat/tres');
-  git(principal, 'push', '-q', 'origin', 'main');
-  assert.throws(() => retirar('tres', { cwd: principal, consultarPR: () => false }), /no está fusionada/);
+  const { carpeta } = conPR(principal, 'tres', 'main');
+  assert.throws(() => retirar('tres', { cwd: principal, token: FALSO }), /no está fusionada/);
+  assert.ok(existsSync(carpeta));
+});
+
+test('retirar --repo: lo mismo desde otra carpeta, y sin ficha falla en alto', () => {
+  const { principal } = ajeno();
+  const { carpeta } = conPR(principal, 'cuatro', 'staging');
+  const r = cliRetirar(['--repo', principal, 'cuatro'], { token: FALSO });
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(!existsSync(carpeta));
+  const sin = ajeno({ ficha: null });
+  assert.equal(cliRetirar(['--repo', sin.principal, 'nada']).code, 2);
+  assert.equal(cliRetirar(['--repo']).code, 2);
 });
