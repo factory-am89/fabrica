@@ -165,7 +165,7 @@ test('anulación: con un juicio en curso encima de un no no anula; espera a que 
   const no = deLaApp(100, { conclusion: 'failure', output: { title: TITULO.no, summary: '- C5: no' } });
   const aprobacion = [{ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA }];
   const enCurso = deLaApp(200, { status: 'in_progress', conclusion: null, output: { title: PENDING_TITLE } });
-  const con = (checks) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: JSON.stringify(aprobacion), CHECKS_FALSOS: JSON.stringify(checks) });
+  const con = (checks) => corre({ MODO: 'anulacion', REVISOR_APP_SLUG, REVIEWS_FALSAS: JSON.stringify(aprobacion), CHECKS_FALSOS: JSON.stringify(checks) });
   const esperando = con([no, enCurso]);
   assert.equal(esperando.r.status, 0, esperando.r.stderr);
   assert.deepEqual(esperando.checks, []);
