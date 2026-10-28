@@ -89,6 +89,7 @@
     { "source": "#171", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
     { "source": "#171", "question": "C16", "kind": "otro", "kind_note": "las reglas nuevas de los trozos 11, 12, 13, 14 y 16 del plan no decían su lector ni su disparador (P12 de plan.md)", "outcome": "pendiente" },
     { "source": "#173", "question": "C15", "kind": "forma-del-cuerpo", "outcome": "pendiente" },
-    { "source": "#173", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" }
+    { "source": "#173", "question": "C9", "kind": "afirmacion-sin-prueba", "outcome": "pendiente" },
+    { "source": "#171", "question": "C8", "kind": "vocabulario-copiado", "outcome": "pendiente" }
   ]
 }
