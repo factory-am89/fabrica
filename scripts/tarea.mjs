@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { instalarHooks } from './install-hooks.mjs';
+import { instalarHooks, HOOK_MARCA } from './install-hooks.mjs';
 import { ExitError, runCommand, finish } from './lib/exit.mjs';
 import { gitOk, principal, sacarRepo, fichaDe, nombreDeRama, carpetaDe, tieneOrigin } from './lib/folders.mjs';
 
@@ -25,7 +25,7 @@ export function crearTarea(rama, { cwd = process.cwd(), instalar = true, json = 
   }
   gitOk(['worktree', 'add', '--no-track', '-b', rama, carpeta, base], raiz);
   // los hooks de git que niegan commit, merge y cherry-pick en la principal: solo donde el repo los trae
-  if (existsSync(path.join(raiz, '.githooks', 'denegar-principal.sh'))) instalarHooks(raiz);
+  if (existsSync(path.join(raiz, HOOK_MARCA))) instalarHooks(raiz);
   if (instalar) {
     const r = lanzar('npm', ['ci'], { cwd: carpeta, stdio: ['ignore', json ? 2 : 'inherit', 'inherit'], shell: process.platform === 'win32' });
     if (r.status !== 0) throw new ExitError('INSTALL_FAILED', `npm ci falló en ${carpeta}; la carpeta y la rama existen, arréglalo ahí.`);

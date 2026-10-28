@@ -6,6 +6,9 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+// La ficha .fabrica.json de los repos de prueba: tarea y retire leen de ella la rama base.
+export const FICHA_FABRICA = '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n';
+
 // Runs git and asserts it succeeded; returns trimmed stdout.
 export const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -23,7 +26,7 @@ export function repo({ lockfile = false } = {}) {
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
   // la ficha: tarea y retire leen de ella la rama base (sin ficha fallan en alto)
-  writeFileSync(path.join(principal, '.fabrica.json'), '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n');
+  writeFileSync(path.join(principal, '.fabrica.json'), FICHA_FABRICA);
   git(principal, 'add', 'a.txt', '.fabrica.json');
   if (lockfile) {
     writeFileSync(path.join(principal, 'package.json'), '{"name":"x","version":"1.0.0"}\n');
