@@ -15,13 +15,14 @@ export function cuerpoDesdeArgumentos(argv) {
     options: {
       'app-id': { type: 'string' },
       name: { type: 'string' },
-      strict: { type: 'boolean', default: false },
+      strict: { type: 'boolean' },
       'tests-context': { type: 'string' },
     },
     strict: true,
   });
   if (values['app-id'] === undefined || !/^[0-9]+$/.test(values['app-id'])) throw new Error(`falta --app-id con el numero de la App revisora. ${USO}`);
-  const opciones = { revisorAppId: Number(values['app-id']), strict: values.strict };
+  const opciones = { revisorAppId: Number(values['app-id']) };
+  if (values.strict !== undefined) opciones.strict = values.strict;
   if (values.name !== undefined) opciones.name = values.name;
   if (values['tests-context'] !== undefined) opciones.testsContext = values['tests-context'];
   return `${JSON.stringify(rulesetBody(opciones), null, 2)}\n`;
