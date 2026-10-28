@@ -80,6 +80,9 @@ test('juicio: un sí no publica ningún override aunque Pablo haya aprobado', ()
 const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'failure', app: { slug: 'fabrica-revisor' }, output: { title: 'Veredicto: no', summary: '- C5: no\n- C9: sin prueba' }, ...extra });
 const anula = (reviewsFalsas, checksFalsos) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos) });
 
+const anulaCon = (reviewsFalsas, checksFalsos, slug) =>
+  corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos), ...(slug === undefined ? {} : { REVISOR_APP_SLUG: slug }) });
+
 test('anulación (tras una review): su aprobación sobre la cabeza convierte el último rojo de la App en verde, con los hallazgos', () => {
   const { r, checks } = anula(reviews(review()), [previo()]);
   assert.equal(r.status, 0, r.stderr);
@@ -113,6 +116,16 @@ test('anulación: lo que cuenta es el último check de la App, no uno viejo en v
   assert.equal(checks.length, 1);
 });
 
+test('anulación: con la App propia de otro repo (REVISOR_APP_SLUG) anula su rojo y no el de la App de la Fábrica', () => {
+  const propia = previo({ app: { slug: 'homenu-revisor' } });
+  assert.equal(anulaCon(reviews(review()), [propia], 'homenu-revisor').checks.length, 1);
+  assert.deepEqual(anulaCon(reviews(review()), [propia]).checks, [], 'sin el slug, la App ajena no cuenta');
+  assert.deepEqual(anulaCon(reviews(review()), [previo()], 'homenu-revisor').checks, [], 'con el slug de HoMenu, la App de la Fábrica no cuenta');
+  const vacio = anulaCon(reviews(review()), [propia], '  ');
+  assert.equal(vacio.r.status, 1);
+  assert.match(vacio.r.stderr, /REVISOR_APP_SLUG/);
+});
+
 test('anulación: sin TOKEN falla en alto', () => {
   const { r } = corre({ MODO: 'anulacion', TOKEN: '' });
   assert.equal(r.status, 1);
@@ -126,7 +139,9 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   const on = doc.on ?? doc[true];
   assert.deepEqual(Object.keys(on).sort(), ['workflow_call', 'workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
-  assert.deepEqual(Object.keys(on.workflow_call), ['secrets'], 'sin inputs: nada del llamador decide qué se baja');
+  assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
+  assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
+  assert.equal(on.workflow_call.inputs['revisor-app-slug'].default, REVISOR_APP_SLUG);
   assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
@@ -142,6 +157,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   const juez = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
   assert.equal(juez.run, 'node .fabrica/scripts/veredicto.mjs');
   assert.equal(juez.env.MODO, 'anulacion');
+  assert.match(juez.env.REVISOR_APP_SLUG, /inputs\.revisor-app-slug/, 'veredicto.mjs cuenta los check de la App del llamador');
 });
 
 test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout, sin código del PR', () => {

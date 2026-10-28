@@ -203,10 +203,16 @@ const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 
 // Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
 // filter=all: sin él la API devuelve solo el último de cada nombre.
+// El slug es el de la Fábrica salvo que el repo que llama tenga su propia App de revisor (REVISOR_APP_SLUG en el entorno).
+function slugDeLaApp() {
+  const slug = process.env.REVISOR_APP_SLUG ?? REVISOR_APP_SLUG;
+  if (!slug.trim()) throw new Error('REVISOR_APP_SLUG está vacío: no se sabe de qué App son los check `revisor`');
+  return slug;
+}
 async function revisoresDeLaApp(repo, sha, token) {
   const { check_runs: checks } = await api(token, 'GET', `/repos/${repo}/commits/${sha}/check-runs?check_name=revisor&filter=all&per_page=100`);
   if (!Array.isArray(checks)) throw new Error('check-runs: la API no devolvió una lista');
-  return checks.filter((c) => c.app?.slug === REVISOR_APP_SLUG).sort((a, b) => b.id - a.id);
+  return checks.filter((c) => c.app?.slug === slugDeLaApp()).sort((a, b) => b.id - a.id);
 }
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
