@@ -209,7 +209,7 @@ git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" 
 
 ## Build order
 
-Ya fusionados en main: 1, 3, 4, 5, 6, 7, 8 y 9. El 2 (`tarea` y `retire` con la ficha) va en #178; el 5 se fusionó antes que su dependencia (ver Not verified) y hasta que #178 se fusione ese paso del rol no funciona en un repo ajeno. Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
+Ya fusionados en main: 1, 3, 4, 5, 6, 7, 8 y 9. Falta en la Fábrica el 2 (`tarea` y `retire` con la ficha), de modo que el 5 se fusionó antes que su dependencia (ver Not verified). Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
 
 ## Pasos de Pablo
 
