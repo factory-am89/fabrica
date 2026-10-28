@@ -95,6 +95,44 @@ test('hook: no se deja engañar por Set-Location, subshells, prefijos, env, comm
   for (const [cwd, orden] of vale) assert.equal(hook(cwd, 'Bash', orden), null, orden);
 });
 
+// El hook de verdad con una herramienta de edición: sesión en un repo, ruta en otro.
+function hookEdicion(cwd, herramienta, ruta) {
+  const r = spawnSync('node', [HOOK], { cwd, input: JSON.stringify({ cwd, tool_name: herramienta, tool_input: { file_path: ruta } }), encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim() ? JSON.parse(r.stdout).hookSpecificOutput.permissionDecision : null;
+}
+
+// La clase: una regla de carpeta que solo mira el repo de la sesión. Aquí la sesión vive en un repo
+// y toca otro (como una sesión de la Fábrica en MenuPlan), sin lista de repos.
+test('hook: niega la carpeta principal de otro repo y deja pasar sus carpetas de tarea', () => {
+  const miRepo = repo();
+  const otroPadre = realpathSync(mkdtempSync(path.join(tmpdir(), 'otro-')));
+  const otro = path.join(otroPadre, 'MenuPlan');
+  mkdirSync(otro);
+  git(otro, 'init', '-q', '-b', 'main');
+  for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(otro, 'config', k, v);
+  writeFileSync(path.join(otro, 'a.txt'), 'a\n');
+  git(otro, 'add', 'a.txt');
+  git(otro, 'commit', '-q', '-m', 'inicial');
+  const { carpeta } = tarea(otro, 'feat/hermana');
+
+  for (const h of ['Write', 'Edit', 'MultiEdit']) {
+    assert.equal(hookEdicion(miRepo, h, path.join(otro, 'prueba.txt')), 'deny', `${h} en la principal ajena`);
+    assert.equal(hookEdicion(miRepo, h, path.join(otro, 'src', 'nueva', 'x.js')), 'deny', `${h} en carpeta ajena que aún no existe`);
+    assert.equal(hookEdicion(miRepo, h, path.join(otro, 'a.txt')), 'deny', `${h} en un fichero que ya existe de la principal ajena`);
+    assert.equal(hookEdicion(miRepo, h, path.join(carpeta, 'a.txt')), null, `${h} en un fichero que ya existe de la carpeta de tarea ajena`);
+    assert.equal(hookEdicion(miRepo, h, path.join(carpeta, 'prueba.txt')), null, `${h} en la carpeta de tarea ajena`);
+    assert.equal(hookEdicion(miRepo, h, path.join(miRepo, 'prueba.txt')), 'deny', `${h} en la principal propia`);
+  }
+  assert.equal(hookEdicion(miRepo, 'Write', path.join(otroPadre, 'suelto.txt')), null, 'fuera de cualquier repo no opina');
+  // la orden de git sobre la principal ajena, desde la sesión de otro repo
+  const barras = otro.replace(/\\/g, '/');
+  assert.equal(hook(miRepo, 'Bash', `git -C ${barras} commit -m x`), 'deny');
+  assert.equal(hook(miRepo, 'Bash', `cd ${barras} && git merge otra`), 'deny');
+  assert.equal(hook(miRepo, 'Bash', `git -C ${carpeta.replace(/\\/g, '/')} commit -m x`), null);
+  assert.equal(hook(miRepo, 'Bash', `git -C ${barras} status`), null);
+});
+
 // La barrera que no depende de cómo se escriba la orden: los hooks de git, solo en la principal.
 test('hooks de git: niegan commit, merge y cherry-pick en la principal y dejan pasar a las carpetas de trabajo', () => {
   const principal = repo();
