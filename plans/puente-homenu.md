@@ -31,11 +31,11 @@ Cada trozo dice en el título en qué repo se construye; sus `Files` son relativ
 
 ## Chunks
 
-### 1. (Fábrica) Medir antes: el juez de la Fábrica sobre los últimos PR fusionados de HoMenu, en local y sin secretos en HoMenu
+### 1. (Fábrica) Medir antes: el juez de la Fábrica sobre los últimos PR fusionados de HoMenu, en local y sin secretos en HoMenu (hecho en #173, `8c90f88`)
 Files: `scripts/medir-repo.mjs`, `test/medir-repo.test.js`
 Depends on: none
 Blocked by: none
-Existing: `scripts/golden-run.mjs:2` ya juzga en local un corpus de casos (`pr.diff` y `body.md`) con `--corpus DIR --phase collect`, con el mismo prompt y modelo que `revisor.yml`, pero su fase `score` exige `expected.json` y nada construye un corpus desde los PR reales de otro repo: `git grep -n -i "medir-repo\|pabloam89/MenuPlan" -- scripts test` -> sin salida.
+Existing: (Estado antes de #173, ya fusionado: describe el punto de partida, no el estado actual de main.) `scripts/golden-run.mjs:2` ya juzga en local un corpus de casos (`pr.diff` y `body.md`) con `--corpus DIR --phase collect`, con el mismo prompt y modelo que `revisor.yml`, pero su fase `score` exige `expected.json` y nada construye un corpus desde los PR reales de otro repo: `git grep -n -i "medir-repo\|pabloam89/MenuPlan" -- scripts test` -> sin salida.
 Not done: no corre en CI ni toca HoMenu; lee los PR por la API pública (identidad `ninguna`, `scripts/lib/identities.mjs:15`) y llama a `golden-run.mjs` en fase `collect`, sin copiar su forma de llamar a claude. No cambia el estándar ni el juez. La cifra (cuántos de los últimos 20 PR recibirían «no» y en qué preguntas) va al issue de este plan, no a un fichero. No reproduce el checkout de la base que tiene el juez de CI: el espacio de trabajo local solo trae `.fabrica/`, el diff y el cuerpo. Los fallos de las evals de Lola no se tocan. El test usa el claude falso (`GOLDEN_CLAUDE_BIN`, `test/fixtures/claude-falso.mjs`) y una respuesta de GitHub grabada.
 Done:
 ```sh
@@ -75,11 +75,11 @@ Done:
 node --test test/principal.test.js
 ```
 
-### 5. (Fábrica) El constructor sabe trabajar en un repo que la Fábrica opera
+### 5. (Fábrica) El constructor sabe trabajar en un repo que la Fábrica opera (hecho en #180, `72e82e7`)
 Files: `.claude/agents/constructor.md`
 Depends on: 2
 Blocked by: none
-Existing: `.claude/agents/constructor.md` solo habla de `origin/main`, `npm run lint`, `npm test`, `pr-body.mjs` y `prejuicio` de la Fábrica (`grep -n "origin/main\|npm test" .claude/agents/constructor.md` -> líneas 8, 12 y 13); `grep -n -- "--repo" .claude/agents/constructor.md` -> sin salida.
+Existing: (Estado antes de #180, ya fusionado: describe el punto de partida, no el estado actual de main.) `.claude/agents/constructor.md` solo habla de `origin/main`, `npm run lint`, `npm test`, `pr-body.mjs` y `prejuicio` de la Fábrica (`grep -n "origin/main\|npm test" .claude/agents/constructor.md` -> líneas 8, 12 y 13); `grep -n -- "--repo" .claude/agents/constructor.md` -> sin salida.
 Not done: dice: carpeta hermana del repo con `tarea --repo`; antes de escribir, leer el `CLAUDE.md` y `.claude/rules/` del repo; los tests del repo (en MenuPlan, `npx vitest run` con los ficheros tocados, y la suite solo antes del PR); token con `FABRICA_REPO`; cuerpo del PR con la plantilla de la Fábrica más la línea `Jueces: …, seguridad` cuando el repo la pide (`CLAUDE.md:32` de MenuPlan). `prejuicio` no sirve fuera de la Fábrica (`scripts/prejuicio.mjs:56` juzga `git diff MAIN_REF...HEAD` de su propio checkout): se dice, no se arregla aquí. Lector: la sesión constructora, que lee el rol al empezar; disparador: `arranque`. No toca la skill `github` (tope de 120 líneas; `plans/menuplan-separation.md`, trozo 3).
 Done:
 ```sh
@@ -209,7 +209,7 @@ git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" 
 
 ## Build order
 
-Ola 1 (Fábrica, sin Pablo): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tras C; 3 y 9 tras A. Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
+Ola 1 (Fábrica, sin Pablo; 1, 5 y 8 ya fusionados): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tras C; 3 y 9 tras A. Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
 
 ## Pasos de Pablo
 
