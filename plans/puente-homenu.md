@@ -2,7 +2,7 @@
 
 Verdict: viable, pero hoy no arranca: las tres Apps de la Fábrica son privadas y solo pueden vivir en factory-am89, y en cuanto `revisor` sea obligatorio en `staging` se paran los PR de homenu-sesiones, Dependabot y mercadona-sync si no se cambian antes; la clave del revisor que reciba HoMenu exige que `staging` quede tan cerrado como `main` de la Fábrica, y hoy no lo está (tiene una excepción) (A, B y C son de Pablo; D, el revisor propio de HoMenu, también y está contestada).
 
-Fecha: 28 oct 2026. Base leída: Fábrica en `d62c85e` (main); MenuPlan en `origin/staging` = `579627be` (leído con `git show origin/staging:<ruta>`, sin checkout ni pull; ver Not verified sobre el fetch).
+Fecha: 28 oct 2026. Base leída: Fábrica en `d62c85e` (main), puesta al día con `da83ca9` (#170, trozo 6 ya fusionado); MenuPlan en `origin/staging` = `579627be` (leído con `git show origin/staging:<ruta>`, sin checkout ni pull; ver Not verified sobre el fetch).
 
 Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. Fuera de este plan: el puente 2 (Álvaro usando la Fábrica) y convertir los fallos de las evals de Lola en tests deterministas.
 
@@ -10,13 +10,13 @@ Cada trozo dice en el título en qué repo se construye; sus `Files` son relativ
 
 - **Las Apps de la Fábrica no llegan a HoMenu.** `fabrica-revisor`, `fabrica-constructor` y `fabrica-administrador` son privadas (con la decisión D el revisor de HoMenu es una App nueva de Pablo, que sí puede vivir en pabloam89; sigue haciendo falta publicar `fabrica-constructor`): `curl -s -o /dev/null -w "%{http_code}" https://api.github.com/apps/SLUG` -> `404` para las tres, y `200` para `homenu-sesiones`. El manifiesto lo dice: `"public":false` (`apps/crear-apps.html:13,18,23`). Una App privada solo se instala en la cuenta que la posee (según la documentación de GitHub, https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private; no lo he probado: ver Not verified) (factory-am89); MenuPlan es de la cuenta personal (`gh api repos/pabloam89/MenuPlan --jq .owner.type` -> `User`). Precedente: `homenu-sesiones` es de factory-am89 (`gh api apps/homenu-sesiones --jq .owner.login` -> `factory-am89`), es pública y ya trabaja en MenuPlan.
 - **La clave del revisor exige un `staging` cerrado.** La clave del revisor guardada en HoMenu protege tanto como lo cerrado que esté `staging`; hoy no lo está: el ruleset de `staging` solo pide `tests` y tiene una excepción (`gh api repos/pabloam89/MenuPlan/rulesets/24770007 --jq .bypass_actors` -> una excepción). Por eso el revisor de HoMenu es una App propia (decisión D, en `intervenciones.md`) y no la de la Fábrica: una clave filtrada de HoMenu no puede poner verde nada de la Fábrica. El check `revisor` de la Fábrica lo publica la App 5332150 (`gh api repos/factory-am89/fabrica/rules/branches/main` -> `{"context":"revisor","integration_id":5332150}`).
-- **Romper el flujo de hoy es el riesgo real.** De los 40 últimos PR fusionados, 36 los abrió y fusionó `homenu-sesiones`, 3 Dependabot (fusionados por `github-actions`) y 1 Pablo (`gh pr list --repo pabloam89/MenuPlan --state merged --limit 40 --json author,mergedBy`). El juez reutilizable solo acepta los bots `fabrica-constructor,fabrica-administrador` (`.github/workflows/revisor.yml:122`), así que un PR de `homenu-sesiones` recibiría «no» siempre; un PR de Dependabot no ve secretos de Actions y el revisor ni llega a publicar; mercadona-sync empuja directo a `staging` con la deploy key (`.github/workflows/mercadona-sync.yml:23-31` de MenuPlan).
-- **El estándar de la Fábrica se aplicará a medias.** En HoMenu el check `tests` es el suyo (vitest, lint con línea base, build; `.github/workflows/tests.yml` de MenuPlan), no el de la Fábrica: las preguntas de máquina C1 a C4 de `standards/code.md` no corren allí (MenuPlan usa `actions/checkout@v7` sin fijar por SHA, lo que C4 rechazaría). El revisor solo contesta las preguntas de «Quién: revisor». Cambiar `tests` por el de la Fábrica pondría en rojo todos los PR de hoy; queda fuera.
+- **Romper el flujo de hoy es el riesgo real.** De los 40 últimos PR fusionados, 36 los abrió y fusionó `homenu-sesiones`, 3 Dependabot (fusionados por `github-actions`) y 1 Pablo (`gh pr list --repo pabloam89/MenuPlan --state merged --limit 40 --json author,mergedBy`). El juez reutilizable acepta por defecto solo los bots `fabrica-constructor,fabrica-administrador` (`.github/workflows/revisor.yml`, `allowed_bots`; desde #170 se le pueden sumar más con la entrada `bots`), así que un PR de `homenu-sesiones` recibiría «no» siempre; un PR de Dependabot no ve secretos de Actions y el revisor ni llega a publicar; mercadona-sync empuja directo a `staging` con la deploy key (`.github/workflows/mercadona-sync.yml:23-31` de MenuPlan).
+- **El estándar de la Fábrica se aplicará a medias.** En HoMenu el check `tests` es el suyo (vitest, lint con línea base, build; `.github/workflows/tests.yml` de MenuPlan), no el de la Fábrica: las preguntas de máquina C1 a C4 de `standards/code.md` no corren allí (MenuPlan usa `actions/checkout@v7` sin fijar por SHA (`git show origin/staging:.github/workflows/tests.yml | grep -n checkout` -> línea 33), lo que C4 rechazaría). El revisor solo contesta las preguntas de «Quién: revisor». Cambiar `tests` por el de la Fábrica pondría en rojo todos los PR de hoy; queda fuera.
 - **Hoy no fusiona GitHub.** `gh api repos/pabloam89/MenuPlan --jq .allow_auto_merge` -> `false`: fusiona la propia sesión (`CLAUDE.md:21` de MenuPlan, «Ese PR lo fusiona la propia sesión»).
 
 ## Estado medido
 
-- Rama buena `staging`; `main` es producción con dos rulesets propios («main: PR y tests», «main: solo Pablo fusiona»), que este plan no toca.
+- Rama buena `staging`; `main` es producción con dos rulesets propios («main: PR y tests», «main: solo Pablo fusiona»; `gh api repos/pabloam89/MenuPlan/rulesets --jq "[.[]|.name]"` -> esos dos y «staging: tests obligatorios»), que este plan no toca.
 - Ruleset de `staging` (24770007): solo `required_status_checks` con `tests` (integración 15368), `strict_required_status_checks_policy: false`, sin `pull_request`, con bypass de deploy key. Protección clásica (`gh api repos/pabloam89/MenuPlan/branches/staging/protection`): `enforce_admins` true, sin force push ni borrado. La leyó la sesión coordinadora; la identidad del constructor recibe 403, ver Not verified.
 - Environments de MenuPlan: `dependabot-auto` (secreto `DEPENDABOT_APP_KEY`), `mercadona-sync` (`MERCADONA_DEPLOY_KEY`), `vigia` y los de Vercel; no hay `revisor` (`gh api repos/pabloam89/MenuPlan/environments`).
 - Workflows en `staging`: bot-semanal, dependabot-auto, ios-testflight, mercadona-sync, salud-despliegue, tests, vigia-lola (`git ls-tree --name-only origin/staging .github/workflows/`). Sin revisor.
@@ -86,26 +86,26 @@ Done:
 node --test test/principles-and-roles.test.js test/contrato.test.js && git grep -q -- "--repo" .claude/agents/constructor.md
 ```
 
-### 6. (Fábrica) El juez reutilizable acepta los bots que le pase el repo que lo llama
+### 6. (Fábrica) El juez reutilizable acepta los bots que le pase el repo que lo llama (hecho en #170, `da83ca9`)
 Files: `.github/workflows/revisor.yml`, `test/revisor-workflow.test.js`
 Depends on: none
 Blocked by: C
-Existing: `allowed_bots` es fijo: `grep -n "allowed_bots\|inputs:" .github/workflows/revisor.yml` -> `122: allowed_bots: fabrica-constructor,fabrica-administrador`, sin `inputs:`. `test/revisor-workflow.test.js:38` ya exige `workflow_call`.
+Existing: antes de #170 `allowed_bots` era fijo (`122: allowed_bots: fabrica-constructor,fabrica-administrador`, sin `inputs:`); ahora `grep -n "bots:" .github/workflows/revisor.yml` da la entrada `bots` en `workflow_call` (líneas 18-24; los secretos del llamador, en las 25-31), que se suma a `allowed_bots`, con su test en `test/revisor-workflow.test.js`. No queda nada por construir en este trozo; se deja para que los demás lo citen. `test/revisor-workflow.test.js:38` ya exige `workflow_call`.
 Not done: una entrada `bots` de `workflow_call` que se suma a la lista fija; en la propia Fábrica la lista no cambia. Comparado con `fields.json` y `entities.json` (`git grep -n -i "bots" -- fields.json entities.json` -> sin salida): `bots` es una entrada de `workflow_call`, no un campo de entidad, y no hay otra equivalente que reutilizar. No añade ni quita ninguna pregunta ni paso del juez (C13: amplía quién puede despertar al juez solo en el repo que llama); si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
 node --test test/revisor-workflow.test.js test/workflows.test.js test/gate-files.test.js
 ```
 
-### 7. (Fábrica) La anulación por Pablo también se puede llamar desde otro repo
-Files: `.github/workflows/anulacion.yml`, `test/anulacion.test.js`
+### 7. (Fábrica) La señal de review y la anulación por Pablo también se pueden llamar desde otro repo
+Files: `.github/workflows/senal-review.yml`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`
 Depends on: none
 Blocked by: C
-Existing: `grep -n "workflow_call\|repository: factory-am89" .github/workflows/anulacion.yml` -> sin salida; corre el `veredicto.mjs` del checkout del propio repo, no de `.fabrica/`. `test/anulacion.test.js:124` exige «solo workflow_run».
-Not done: añade `workflow_call` y baja el juez de la Fábrica a `.fabrica/` en `job.workflow_sha`, como `revisor.yml`. La regla de `aprobacionDePablo` (`OWNER_LOGIN`, cabeza actual, última review decisiva) no cambia, y el test sigue exigiendo todo lo demás (C13). Si rompe, se revierte desde una rama nueva.
+Existing: `grep -n "workflow_call\|repository: factory-am89" .github/workflows/anulacion.yml` -> sin salida; corre el `veredicto.mjs` del checkout del propio repo, no de `.fabrica/`. `test/anulacion.test.js:124` exige «solo workflow_run». `grep -n "workflow_call|^on:" -A3 .github/workflows/senal-review.yml` -> solo `pull_request_review` (`on:` en la línea 6), sin `workflow_call`; `grep -ln "senal-review" test/*.js scripts/lib/*.mjs` -> `test/anulacion.test.js`, `test/gate-files.test.js` y `scripts/lib/gate.mjs` (es fichero de la puerta, `BASE`), sin test propio.
+Not done: añade `workflow_call` a `senal-review.yml` y a `anulacion.yml` con el mismo tratamiento (credenciales del llamador; `senal-review.yml` sigue sin secretos ni permisos y solo despierta a `anulacion.yml`), cubierto por `test/anulacion.test.js`; en `anulacion.yml` baja el juez de la Fábrica a `.fabrica/` en `job.workflow_sha`, como `revisor.yml`. La regla de `aprobacionDePablo` (`OWNER_LOGIN`, cabeza actual, última review decisiva) no cambia, y el test sigue exigiendo todo lo demás (C13: ninguno de los dos workflows pierde una condición, solo se añade quién los puede llamar). Si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
-node --test test/anulacion.test.js test/workflows.test.js
+node --test test/anulacion.test.js test/workflows.test.js test/gate-files.test.js
 ```
 
 ### 8. (Fábrica) El cuerpo del ruleset sirve para la rama buena de HoMenu: strict y nombre como parámetros, y una orden que lo imprime
@@ -143,10 +143,10 @@ npm run clean -- --ensayo --repo C:/dev/MenuPlan
 
 ### 11. (MenuPlan) Workflow `revisor.yml` que llama al juez de la Fábrica, solo en PR a `staging`
 Files: `.github/workflows/revisor.yml`, `ops/revisor-fabrica.test.js`
-Depends on: 6
+Depends on: 6, 10
 Blocked by: A, B, C
 Existing: `git ls-tree --name-only origin/staging .github/workflows/` -> 7 ficheros, ninguno `revisor.yml`; `git ls-tree --name-only origin/staging ops/` no tiene `revisor-fabrica.test.js`.
-Not done: parte de la plantilla `apps/proyecto-nuevo/revisor.yml` de la Fábrica, con `branches: [staging]` y la entrada `bots` con `homenu-sesiones,homenu-dependabot-merge`. No hace el check obligatorio (paso 6 de Pablo) ni crea el environment ni sus secretos (paso 4). A este PR no lo juzga el revisor (corre con `pull_request_target` desde la base, que aún no tiene el fichero); lleva `Jueces: …, seguridad` porque toca un workflow (`CLAUDE.md:32` de MenuPlan). Con D = 1 el juez reutilizable no cambia: ya recibe `REVISOR_CLIENT_ID` y `REVISOR_APP_KEY` como secretos del llamador (`.github/workflows/revisor.yml:19-24`, `create-github-app-token` en las líneas 57-60, 141-144 y 189-192), así que HoMenu le pasa los de su App; el trozo 6 solo añade `bots`. Es puerta (define el check `revisor` de HoMenu): añade un check y no quita ni afloja ninguno (C13); si rompe, se revierte desde una rama nueva.
+Not done: parte de la plantilla `apps/proyecto-nuevo/revisor.yml` de la Fábrica, con `branches: [staging]` y la entrada `bots` con `homenu-sesiones,homenu-dependabot-merge`. No hace el check obligatorio (paso 6 de Pablo) ni crea el environment ni sus secretos (paso 4). A este PR no lo juzga el revisor (corre con `pull_request_target` desde la base, que aún no tiene el fichero); lleva `Jueces: …, seguridad` porque toca un workflow (`CLAUDE.md:32` de MenuPlan). Con D = 1 el juez reutilizable no cambia: ya recibe `REVISOR_CLIENT_ID` y `REVISOR_APP_KEY` como secretos del llamador (`.github/workflows/revisor.yml:25-31`, `create-github-app-token` en las líneas 63-66, 147-150 y 195-198), así que HoMenu le pasa los de su App; el trozo 6 solo añade `bots`. Es puerta (define el check `revisor` de HoMenu): añade un check y no quita ni afloja ninguno (C13); si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
 npx vitest run ops/revisor-fabrica.test.js
@@ -209,7 +209,7 @@ git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" 
 
 ## Build order
 
-Ola 1 (Fábrica, sin Pablo): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tras C; 3 y 9 tras A. Ola 3 (MenuPlan, tras A, B y C): 10 y 11; luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
+Ola 1 (Fábrica, sin Pablo): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tras C; 3 y 9 tras A. Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
 
 ## Pasos de Pablo
 
@@ -234,7 +234,7 @@ Con A = 2 cambian los pasos 2 a 4 (con D = 1 la App de revisor nueva se crea igu
 
 ## Decisions taken
 - principio 2 | eligió: medir en local con el juez de la Fábrica cuántos de los últimos PR de HoMenu recibirían «no» antes de hacer obligatorio el revisor | descartó: hacer obligatorio el revisor en HoMenu sin esa cifra | motivo: decidido
-- principio 2 | eligió: al día antes de fusionar (strict) con un despertador que pone al día un PR cada vez | descartó: la cola de fusión de GitHub, que el revisor no alimenta porque solo corre con pull_request_target y workflow_call (`.github/workflows/revisor.yml:15-25`): una fusión por cola saldría sin su juicio, sin evidencia | motivo: decidido
+- principio 2 | eligió: al día antes de fusionar (strict) con un despertador que pone al día un PR cada vez | descartó: la cola de fusión de GitHub, que el revisor no alimenta porque solo corre con pull_request_target y workflow_call (`.github/workflows/revisor.yml:15-31`): una fusión por cola saldría sin su juicio, sin evidencia | motivo: decidido
 - principio 4 | eligió: la rama base de HoMenu sale del campo base de su ficha .fabrica.json, que ya lee clean.mjs | descartó: fijar staging en tarea y retire, o un segundo fichero con la rama | motivo: decidido
 - principio 4 | eligió: los bots de HoMenu los pasa su revisor.yml como entrada del juez reutilizable | descartó: añadir homenu-sesiones y homenu-dependabot-merge a la lista fija de la Fábrica | motivo: decidido
 - principio 4 | eligió: el cuerpo del ruleset de HoMenu sale de rulesetBody con strict y nombre como parámetros | descartó: un JSON del ruleset escrito a mano para HoMenu | motivo: decidido
@@ -272,7 +272,7 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 
 ## Not verified
 
-- Que la cola de fusión no exista para repos de una cuenta personal: lo dice la documentación de GitHub, no lo he probado. No cambia la recomendación: el revisor no corre en `merge_group` (`.github/workflows/revisor.yml:15-25`).
+- Que la cola de fusión no exista para repos de una cuenta personal: lo dice la documentación de GitHub, no lo he probado. No cambia la recomendación: el revisor no corre en `merge_group` (`.github/workflows/revisor.yml:15-31`).
 - Que `claude-code-action` rechace un PR de `homenu-sesiones` por no estar en `allowed_bots`: es el mismo mecanismo que obligó a añadir `fabrica-administrador` (`plans/app-admin.md`, Not verified 4); no lo he visto en HoMenu.
 - Que un PR tocado por la App `homenu-dependabot-merge` dispare `pull_request_target` con los secretos del environment, y que esa App pueda hacer `update-branch` y abrir PR: `gh api apps/homenu-dependabot-merge` -> 404 (no sé su dueño ni sus permisos). Si le falta un permiso, ampliarlo es de Pablo.
 - Que un PR de Dependabot no vea los secretos del environment `revisor`: es lo que dice la documentación de GitHub para eventos de Dependabot (el comentario de `.github/workflows/dependabot-auto.yml` de MenuPlan duda de lo mismo); no lo he probado.
