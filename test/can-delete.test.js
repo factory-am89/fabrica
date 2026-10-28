@@ -37,7 +37,8 @@ test('retirar: se niega si la unión de node_modules de OTRA carpeta apunta dent
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
+  writeFileSync(path.join(principal, '.fabrica.json'), '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n'); // tarea y retire leen la base de la ficha
+  git(principal, 'add', 'a.txt', '.fabrica.json');
   git(principal, 'commit', '-q', '-m', 'inicial');
   const a = crearTarea('feat/a', { cwd: principal, instalar: false }).carpeta;
   const b = crearTarea('feat/b', { cwd: principal, instalar: false }).carpeta;

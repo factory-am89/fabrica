@@ -1,7 +1,7 @@
 // La limpieza mira el PR fusionado en GitHub (no la ascendencia): squash, punta, sucia, unión, GitHub caído.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -43,7 +43,8 @@ function mundo(ramas, { ficha = FICHA, conStaging = false } = {}) {
   git(principal, 'remote', 'add', 'origin', remoto);
   git(principal, 'push', '-q', 'origin', 'main');
   if (conStaging) git(principal, 'push', '-q', 'origin', 'main:staging');
-  if (ficha) writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(ficha));
+  // tarea lee la rama base de la ficha: las carpetas se crean con la ficha común y después se pone la que se prueba
+  writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(FICHA));
   const carpetas = {};
   for (const rama of ramas) {
     const { carpeta } = crearTarea(rama, { cwd: principal, instalar: false });
@@ -53,6 +54,8 @@ function mundo(ramas, { ficha = FICHA, conStaging = false } = {}) {
     git(carpeta, 'push', '-q', 'origin', rama);
     carpetas[rama] = { carpeta, punta: git(carpeta, 'rev-parse', 'HEAD') };
   }
+  if (ficha) writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(ficha));
+  else rmSync(path.join(principal, '.fabrica.json'));
   return { padre, principal, remoto, carpetas };
 }
 
