@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import yaml from 'js-yaml';
 import { leer } from './apoyo/fabrica.mjs';
 
@@ -39,7 +40,16 @@ test('el juez falla en alto con el nombre del secreto que llega vacío', () => {
   const paso = yaml.load(leer('.github/workflows/revisor.yml')).jobs.juzgar.steps.find((p) => p.name === 'Comprobar secretos');
   assert.ok(paso, 'falta el paso «Comprobar secretos» en juzgar');
   assert.deepEqual(Object.keys(paso.env).sort(), TRES);
-  assert.match(paso.run, /exit 1/);
+  // El script del paso, ejecutado de verdad con bash (el shell del runner) con cada secreto vacío, uno a uno.
+  for (const vacio of TRES) {
+    const env = { ...process.env, ...Object.fromEntries(TRES.map((n) => [n, n === vacio ? '' : 'valor'])) };
+    const r = spawnSync('bash', ['-c', paso.run], { env, encoding: 'utf8' });
+    assert.equal(r.status, 1, `con ${vacio} vacío el paso debe salir con 1: ${r.stdout}${r.stderr}`);
+    assert.ok(r.stdout.includes(vacio), `el error no nombra ${vacio}: ${r.stdout}`);
+    for (const otro of TRES.filter((n) => n !== vacio)) assert.ok(!r.stdout.includes(otro), `el error nombra ${otro}, que sí llegó`);
+  }
+  const bien = spawnSync('bash', ['-c', paso.run], { env: { ...process.env, ...Object.fromEntries(TRES.map((n) => [n, 'valor'])) }, encoding: 'utf8' });
+  assert.equal(bien.status, 0, `con los tres presentes no debe fallar: ${bien.stdout}${bien.stderr}`);
 });
 
 test('Claude solo carga la configuración de usuario, no la del proyecto que se juzga', () => {
