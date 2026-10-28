@@ -2,7 +2,7 @@
 
 Verdict: viable, pero hoy no arranca: las tres Apps de la Fábrica son privadas y solo pueden vivir en factory-am89, y en cuanto `revisor` sea obligatorio en `staging` se paran los PR de homenu-sesiones, Dependabot y mercadona-sync si no se cambian antes; la clave del revisor que reciba HoMenu exige que `staging` quede tan cerrado como `main` de la Fábrica, y hoy no lo está (tiene una excepción) (A, B y C son de Pablo; D, el revisor propio de HoMenu, también y está contestada).
 
-Fecha: 28 oct 2026. Base leída: Fábrica en `d62c85e` (main), puesta al día con `da83ca9` (#170, trozo 6 ya fusionado); MenuPlan en `origin/staging` = `579627be` (leído con `git show origin/staging:<ruta>`, sin checkout ni pull; ver Not verified sobre el fetch).
+Fecha: 28 oct 2026. Base leída: Fábrica en `d62c85e` (main), puesta al día con `8c90f88` (#173; trozos 1, 3, 4, 5, 6, 7, 8 y 9 ya fusionados); MenuPlan en `origin/staging` = `579627be` (leído con `git show origin/staging:<ruta>`, sin checkout ni pull; ver Not verified sobre el fetch).
 
 Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. Fuera de este plan: el puente 2 (Álvaro usando la Fábrica) y convertir los fallos de las evals de Lola en tests deterministas.
 
@@ -209,21 +209,11 @@ git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" 
 
 ## Build order
 
-Ola 1 (Fábrica, sin Pablo; 1, 5 y 8 ya fusionados): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tras C; 3 y 9 tras A. Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
+Ya fusionados en main: 1, 3, 4, 5, 6, 7, 8 y 9. Falta en la Fábrica el 2 (`tarea` y `retire` con la ficha), de modo que el 5 se fusionó antes que su dependencia (ver Not verified). Ola 3 (MenuPlan, tras A, B y C, y con 2 y 3 ya fusionados): 10, y 11 tras 10 (el constructor necesita la ficha y la identidad para trabajar en MenuPlan); luego 12, 13, 14, 15 y 16. Los pasos 4 a 7 de Pablo van de una sentada cuando 11, 13, 14 y 15 estén en `staging`. El 1 va primero: su cifra dice si hay que ajustar algo antes de que el revisor sea obligatorio.
 
 ## Pasos de Pablo
 
-Solo lo que la lista cerrada de `standards/intervention.md` le reserva (permisos, secretos, la puerta, lo irreversible). Para la opción recomendada de A:
-
-1. Las decisiones del plan (sus respuestas están en `intervenciones.md`).
-2. En los ajustes de `fabrica-constructor` en GitHub, «Make public» (unos 1 min); `fabrica-revisor` ya no hace falta publicarla (D). Cambia quién puede instalarlas, no sus permisos.
-3. Instalar `fabrica-constructor` en la cuenta pabloam89, «Only select repositories», solo MenuPlan (unos 2 min).
-4. Crear la App de revisor de HoMenu (propia de la cuenta pabloam89, con los permisos del manifiesto de `fabrica-revisor` en `apps/crear-apps.html`), instalarla solo en MenuPlan, generar su clave, crear el environment `revisor` de MenuPlan limitado a la rama `staging` y guardar los tres secretos `REVISOR_APP_KEY` (la clave de la App nueva, leyendo el fichero por la entrada), `REVISOR_CLIENT_ID` (el de la App nueva) y `CLAUDE_CODE_OAUTH_TOKEN` (de `claude setup-token`) en ese environment; borrar el fichero de la clave (unos 8 min).
-5. En MenuPlan, activar «Allow auto-merge» (unos 30 s).
-6. Aplicar el ruleset de `staging` con la salida de `node scripts/admin/cuerpo-ruleset.mjs` (trozo 8), con un PUT a `repos/pabloam89/MenuPlan/rulesets/24770007`: PR obligatorio, `tests` y `revisor` (el integration id de la App nueva de HoMenu, no 5332150), al día y sin excepciones. Luego cerrar la sesión de `gh` (unos 3 min).
-7. Con B = 1 y el trozo 14 ya fusionado: borrar la deploy key `mercadona-sync` y el secreto `MERCADONA_DEPLOY_KEY` (irreversible; si hiciera falta se crea otra) y guardar en el environment `mercadona-sync` la clave de la App con la que abrirá el PR (unos 4 min).
-
-Con A = 2 cambian los pasos 2 a 4 (con D = 1 la App de revisor nueva se crea igual, en factory-am89): transferir el repo, reinstalar en factory-am89 lo que hoy cuelga de pabloam89 (Vercel, `homenu-dependabot-merge`), y los secretos los escribe `administrar.yml` tras enseñarle la rama `staging`.
+Los clics de Pablo viven en un solo sitio: `PASOS-PABLO.md`, sección «Puente HoMenu» (trozo 9, hecho en #177). Este plan no los copia, para que no se desincronicen. Los siete pasos son, por clase: contestar las decisiones (hecho, en `intervenciones.md`), hacer pública `fabrica-constructor` e instalarla solo en MenuPlan, crear la App de revisor de HoMenu con sus secretos y el environment `revisor`, activar «Allow auto-merge», aplicar el ruleset de `staging` con la salida de `scripts/admin/cuerpo-ruleset.mjs` y, con el trozo 14 fusionado, borrar la deploy key de mercadona-sync. Van de una sentada cuando 11, 13, 14 y 15 estén en `staging`.
 
 ## Cifras antes y después
 
@@ -287,3 +277,4 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 - Que la App de revisor nueva de HoMenu, con los permisos del manifiesto de `fabrica-revisor`, baste para publicar el check y para `update-branch` o aprobar como lo hace `fabrica-revisor`: copia los permisos de su manifiesto, no lo he probado en HoMenu.
 - La protección clásica de `staging`: la leyó la sesión coordinadora con la sesión de Pablo; con la identidad del constructor, `gh api` da 403 y no la he repetido.
 - Que el ruleset de `staging` reconozca el check `revisor` de la App nueva por su integration id: se comprueba en el paso 6 de Pablo; no lo he probado.
+- El trozo 5 (`Depends on: 2`) se fusionó (#180) antes que el 2: `.claude/agents/constructor.md:20` ya manda `npm run tarea -- --repo <carpeta> feat/<nombre>`, pero `scripts/tarea.mjs:20` sigue fijando `base = 'origin/main'` y no hay `test/tarea-ficha.test.js` (`ls test | grep -i tarea` -> sin salida). Hasta que se fusione el 2, ese paso del rol no funciona en un repo ajeno.
