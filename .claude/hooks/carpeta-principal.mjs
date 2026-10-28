@@ -1,10 +1,13 @@
-// Hook PreToolUse: la carpeta principal (C:\dev\fabrica) no se edita ni se commitea; el trabajo va
-// en una carpeta por sesión (`npm run tarea -- feat/nombre`). Es la única regla de este hook.
+// Hook PreToolUse: la carpeta principal de cualquier repo (C:\dev\fabrica, C:\dev\MenuPlan…) no se
+// edita ni se commitea; el trabajo va en una carpeta por sesión (`npm run tarea -- feat/nombre`).
+// La principal se calcula desde la ruta tocada (su `git worktree list`), no desde el repo de la
+// sesión ni desde una lista de repos. Es la única regla de este hook.
 // Entrada (JSON por stdin): { tool_name, tool_input, cwd }. Salida: un «deny» o nada.
 // Es la primera barrera y mira cómo está escrita la orden; la que no depende de eso son los hooks
 // de git de `.githooks/` (los activa `npm run tarea` o `npm run instalar-hooks`).
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { existsSync, statSync } from 'node:fs';
 import { absoluta, norm, worktrees } from '../../scripts/lib/folders.mjs';
 
 const EDICION = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -170,17 +173,39 @@ export function carpetaDeCommit(orden, cwd, profundidad = 0) {
   return hallada;
 }
 
+// Las carpetas de trabajo del repo que contiene la ruta (la primera es la principal), o [] si la
+// ruta no está en ningún repo. Sube hasta la carpeta (no fichero) existente más cercana. Lanza si git falla.
+export function carpetasDeRuta(ruta) {
+  let dir = absoluta(ruta);
+  while (!(existsSync(dir) && statSync(dir).isDirectory()) && path.dirname(dir) !== dir) dir = path.dirname(dir);
+  try {
+    return worktrees(dir).map((w) => w.ruta);
+  } catch (e) {
+    if (/not a git repository/i.test(e.message)) return [];
+    throw e;
+  }
+}
+
+// `carpetas` es la lista de carpetas de un repo, o una función ruta → lista.
+const listaPara = (carpetas, ruta) => (typeof carpetas === 'function' ? carpetas(ruta) : carpetas);
+
 // Devuelve el motivo de la negativa, o null si se deja pasar.
 export function decidir(entrada, carpetas) {
   const { tool_name: herramienta, tool_input: datos = {}, cwd = process.cwd() } = entrada;
   if (EDICION.has(herramienta)) {
     const ruta = datos.file_path ?? datos.notebook_path;
-    return ruta && enPrincipal(resolver(cwd, ruta), carpetas) ? `${MOTIVO} (no edito ${ruta})` : null;
+    if (!ruta) return null;
+    const destino = resolver(cwd, ruta);
+    return destino !== DESCONOCIDA && enPrincipal(destino, listaPara(carpetas, destino)) ? `${MOTIVO} (no edito ${ruta})` : null;
   }
   if (TERMINAL.has(herramienta) && typeof datos.command === 'string') {
     const donde = carpetaDeCommit(datos.command, cwd);
-    if (donde === DESCONOCIDA) return `${MOTIVO} (no sé a qué carpeta va esa orden de git: un cd con variable o subshell, popd o cd -; usa una ruta literal o git -C <ruta>)`;
-    return donde && enPrincipal(donde, carpetas) ? `${MOTIVO} (esa orden de git iba a la principal)` : null;
+    if (donde === DESCONOCIDA) {
+      // fuera de un repo no hay principal que proteger
+      if (listaPara(carpetas, cwd).length === 0) return null;
+      return `${MOTIVO} (no sé a qué carpeta va esa orden de git: un cd con variable o subshell, popd o cd -; usa una ruta literal o git -C <ruta>)`;
+    }
+    return donde && enPrincipal(donde, listaPara(carpetas, donde)) ? `${MOTIVO} (esa orden de git iba a la principal)` : null;
   }
   return null;
 }
@@ -196,14 +221,12 @@ function main(texto) {
   } catch (e) {
     return negar(`carpeta-principal no entendió lo que le pasó Claude Code (${e.message}); por seguridad niega.`);
   }
-  let carpetas;
+  let motivo;
   try {
-    carpetas = worktrees(entrada.cwd ?? process.cwd()).map((w) => w.ruta);
+    motivo = decidir({ ...entrada, cwd: entrada.cwd ?? process.cwd() }, carpetasDeRuta);
   } catch (e) {
-    if (/not a git repository/i.test(e.message)) return;
     return negar(`carpeta-principal no pudo mirar las carpetas de trabajo (${e.message}); por seguridad niega.`);
   }
-  const motivo = decidir(entrada, carpetas);
   if (motivo) negar(motivo);
 }
 
