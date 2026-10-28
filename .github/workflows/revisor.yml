@@ -16,6 +16,12 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_call:
+    inputs:
+      # Bots extra que pueden despertar al juez (lista separada por comas); se suman a la lista fija de allowed_bots.
+      bots:
+        type: string
+        required: false
+        default: ''
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -119,7 +125,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
-          allowed_bots: fabrica-constructor,fabrica-administrador
+          allowed_bots: fabrica-constructor,fabrica-administrador${{ inputs.bots && format(',{0}', inputs.bots) || '' }}
           prompt: |
             Eres el revisor: sigue .fabrica/.claude/agents/revisor.md y juzga el PR número ${{ github.event.pull_request.number }}
             del repo ${{ github.repository }} contra .fabrica/standards/code.md (los dos están en tu carpeta de trabajo).

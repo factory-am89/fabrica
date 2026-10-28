@@ -91,3 +91,22 @@ test('revisor.yml: el estándar del prompt es el mismo que STANDARD', () => {
 test('revisor.yml: el json-schema limita el id a C<número>', () => {
   assert.match(leer('.github/workflows/revisor.yml'), /"id":\{"type":"string","pattern":"\^C\[0-9\]\+\$"\}/);
 });
+
+// Los bots que despiertan al juez: la lista fija de la Fábrica más los que pase el repo que llama (entrada `bots`).
+test('revisor.yml: la entrada bots de workflow_call se suma a la lista fija de allowed_bots y no llega a ningún run', () => {
+  const texto = leer('.github/workflows/revisor.yml');
+  const doc = yaml.load(texto);
+  const entrada = doc.on.workflow_call.inputs?.bots;
+  assert.ok(entrada, 'falta la entrada bots en workflow_call');
+  assert.equal(entrada.type, 'string');
+  assert.equal(entrada.required, false, 'bots opcional: la Fábrica no la pasa');
+  const pasos = doc.jobs.juzgar.steps;
+  const allowed = pasos.map((p) => p.with?.allowed_bots).find((x) => typeof x === 'string');
+  assert.ok(allowed?.startsWith('fabrica-constructor,fabrica-administrador'), 'la lista fija debe seguir delante');
+  assert.match(allowed, /inputs\.bots/, 'allowed_bots no suma la entrada bots');
+  assert.equal(allowed.replace(/\$\{\{.*?\}\}/g, ''), 'fabrica-constructor,fabrica-administrador', 'solo la expresión de bots se añade a la lista fija');
+  // Una entrada del repo que llama nunca va a un script de shell (inyección): solo a `with:`.
+  for (const [nombre, job] of Object.entries(doc.jobs)) {
+    for (const p of job.steps ?? []) assert.doesNotMatch(String(p.run ?? ''), /inputs\./, `${nombre}: inputs.* en un run`);
+  }
+});
