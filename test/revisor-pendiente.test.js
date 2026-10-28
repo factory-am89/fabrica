@@ -284,10 +284,10 @@ test('veredicto y cerrar: sin REVISOR_APP_SLUG fallan en alto en un repo ajeno y
   assert.equal(enFabrica.checks.length, 1);
 });
 
-test('revisor.yml: workflow_call pide el slug de la App (obligatorio) y juzgar y cerrar lo pasan como REVISOR_APP_SLUG; pendiente no filtra y no lo recibe', () => {
+test('revisor.yml: workflow_call pide el slug de la App (opcional, por defecto el de la Fábrica) y juzgar y cerrar lo pasan como REVISOR_APP_SLUG; pendiente no filtra y no lo recibe', () => {
   const inputs = wf.on.workflow_call.inputs;
-  assert.equal(inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
-  assert.equal(inputs['revisor-app-slug'].default, undefined);
+  assert.equal(inputs['revisor-app-slug'].required, false, 'homenu-panel llama @main sin esta entrada y no puede cambiarlo (ruleset sin bypass)');
+  assert.equal(inputs['revisor-app-slug'].default, REVISOR_APP_SLUG, 'sin la entrada vale la App de la Fábrica, como antes de #182');
   const veredicto = (job) => pasosDe(job).find((p) => String(p.run ?? '').includes('veredicto.mjs'));
   for (const nombre of ['juzgar', 'cerrar']) {
     assert.equal(veredicto(wf.jobs[nombre]).env.REVISOR_APP_SLUG, '${{ inputs.revisor-app-slug }}', nombre);

@@ -31,11 +31,12 @@ on:
         required: false
         default: ''
       # Slug de la App de revisor del repo que llama: veredicto.mjs solo cuenta los check `revisor` de esa App (juicio y
-      # `cerrar`). Obligatorio al llamar: sin él veredicto.mjs falla en alto. Solo en la propia Fábrica (pull_request_target,
-      # sin inputs) vale la constante de scripts/lib/repo.mjs.
+      # `cerrar`). Opcional, con el valor de REVISOR_APP_SLUG (scripts/lib/repo.mjs), que es lo que hacía el juez antes de #182:
+      # un llamador que fija @main y no lo pasa (homenu-panel) seguiría roto. Quien tenga App propia debe pasarlo.
       revisor-app-slug:
         type: string
-        required: true
+        required: false
+        default: fabrica-revisor
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
