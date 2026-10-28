@@ -201,18 +201,19 @@ export const TITULO = { yes: 'Veredicto: sí', no: 'Veredicto: no' };
 const FALLO_SIN_VEREDICTO = 'el juez falló antes de dar veredicto';
 const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 
-// Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
-// filter=all: sin él la API devuelve solo el último de cada nombre.
-// La anulación cuenta solo los check de la App del repo que llama (REVISOR_APP_SLUG, lo pasa anulacion.yml). Sin él no se
-// sabe qué App es y se lanza; solo en la propia Fábrica vale la constante de repo.mjs. (El juicio y `cerrar` siguen con
-// la App de la Fábrica por defecto: la plantilla apps/proyecto-nuevo/revisor.yml no pasa ningún slug.)
-function slugDeLaAnulacion(repo) {
+// Todo lo que filtra por App (anulación, juicio y `cerrar`) cuenta solo los check de la App del repo que llama (REVISOR_APP_SLUG, lo
+// pasan los workflows). Sin él no se sabe qué App es y se lanza; solo en la propia Fábrica vale la constante de repo.mjs.
+function slugDeLaApp(repo) {
   const slug = process.env.REVISOR_APP_SLUG?.trim();
   if (slug) return slug;
   if (repo === REPO_FABRICA) return REVISOR_APP_SLUG;
   throw new Error(`REVISOR_APP_SLUG falta: no se sabe de qué App son los check \`revisor\` de ${repo}`);
 }
-async function revisoresDeLaApp(repo, sha, token, slug = REVISOR_APP_SLUG) {
+
+// Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
+// filter=all: sin él la API devuelve solo el último de cada nombre.
+async function revisoresDeLaApp(repo, sha, token) {
+  const slug = slugDeLaApp(repo);
   const { check_runs: checks } = await api(token, 'GET', `/repos/${repo}/commits/${sha}/check-runs?check_name=revisor&filter=all&per_page=100`);
   if (!Array.isArray(checks)) throw new Error('check-runs: la API no devolvió una lista');
   return checks.filter((c) => c.app?.slug === slug).sort((a, b) => b.id - a.id);
@@ -239,7 +240,7 @@ async function anular({ REPO, PR, TOKEN }) {
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: null, token: TOKEN });
   const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
   if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
-  const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN, slugDeLaAnulacion(REPO)))[0];
+  const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN))[0];
   if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
   if (ultimo.status !== 'completed') return console.log('anulación: hay un juicio en curso sobre esta cabeza; lo aplicará al terminar');
   if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
