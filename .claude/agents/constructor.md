@@ -15,6 +15,19 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 6. Tras abrirlo, arma la fusión automática (`gh pr merge --auto --squash`). Fusionar lo hace GitHub cuando `tests` y `revisor` están en verde; tú nunca fusionas ni empujas a `main`.
 7. Si el revisor dice no, arregla en la misma rama; no discutas el veredicto. Por cada pregunta con «no», apunta una fila en `reviewer-no.json` en el mismo commit del arreglo: los campos son `REVIEWER_NO_FIELDS`, la clase del fallo un valor de `KINDS` y el desenlace `OUTCOME_PENDING` (todos en `scripts/lib/reviewer-no.mjs`; no copies sus valores). El desenlace final lo pone otra sesión que no hizo ese PR: decir «era ruido del juez» sobre tu propio PR es juzgar tu propio trabajo. Si lanzas un revisor independiente para sacar el motivo, él no escribe ficheros: dice la clase en su informe y tú la apuntas.
 
+## Repo ajeno (uno que la Fábrica opera, p. ej. MenuPlan)
+
+- Carpeta: `npm run tarea -- --repo <carpeta del repo> feat/<nombre>` crea la carpeta hermana del repo, desde `origin/<base>`; la base es el campo `base` de su ficha `.fabrica.json` (sin ficha, error). Al fusionar: `npm run retire -- --repo <carpeta del repo> <nombre>`.
+- Antes de escribir, lee el `CLAUDE.md` y `.claude/rules/` de ese repo: mandan sobre lo que aquí se supone.
+- Tests del repo, no los de la Fábrica: los ficheros que tocas mientras trabajas y la suite entera solo antes del PR (en MenuPlan, `npx vitest run <ficheros>`).
+- Token y PR: `FABRICA_REPO=<dueño>/<repo>` cambia el repo del token (skill `github`). El cuerpo sigue la plantilla de la Fábrica, más la línea `Jueces: …, seguridad` cuando el `CLAUDE.md` del repo la pide.
+- `npm run prejuicio` no sirve fuera de la Fábrica: juzga el `git diff` de su propio checkout. Dilo en el PR; no se arregla aquí.
+
+## Cuerpo del PR en la Fábrica
+
+- La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano.
+- Comprueba el cuerpo como CI: `gh api repos/factory-am89/fabrica/compare/main...HEAD > <c.json>` y `node scripts/pr-body.mjs --body-file <cuerpo.md> --compare-file <c.json>`. Con `--files-file` solo dice ok y CI puede fallar.
+
 ## Commands for agents
 
 Run these without a human; they never ask anything.
