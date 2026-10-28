@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
-import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
@@ -40,7 +40,7 @@ const corre = (extra) => {
   const ruta = fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', REVISOR_APP_SLUG, PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   return { r, checks: publicado.filter((p) => esCheck(p)).map((p) => p.cuerpo) };
@@ -77,8 +77,11 @@ test('juicio: un sí no publica ningún override aunque Pablo haya aprobado', ()
   assert.deepEqual(checks.map((c) => c.output.title), ['Veredicto: sí']);
 });
 
-const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'failure', app: { slug: 'fabrica-revisor' }, output: { title: 'Veredicto: no', summary: '- C5: no\n- C9: sin prueba' }, ...extra });
+const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'failure', app: { slug: REVISOR_APP_SLUG }, output: { title: 'Veredicto: no', summary: '- C5: no\n- C9: sin prueba' }, ...extra });
 const anula = (reviewsFalsas, checksFalsos) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos) });
+
+const anulaCon = (reviewsFalsas, checksFalsos, slug) =>
+  corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos), REVISOR_APP_SLUG: slug ?? '' });
 
 test('anulación (tras una review): su aprobación sobre la cabeza convierte el último rojo de la App en verde, con los hallazgos', () => {
   const { r, checks } = anula(reviews(review()), [previo()]);
@@ -113,6 +116,25 @@ test('anulación: lo que cuenta es el último check de la App, no uno viejo en v
   assert.equal(checks.length, 1);
 });
 
+test('anulación: con la App propia de otro repo (REVISOR_APP_SLUG) anula su rojo y no el de la App de la Fábrica', () => {
+  const propia = previo({ app: { slug: 'homenu-revisor' } });
+  assert.equal(anulaCon(reviews(review()), [propia], 'homenu-revisor').checks.length, 1);
+  assert.deepEqual(anulaCon(reviews(review()), [previo()], 'homenu-revisor').checks, [], 'con el slug de HoMenu, la App de la Fábrica no cuenta');
+  assert.deepEqual(anulaCon(reviews(review()), [propia], REVISOR_APP_SLUG).checks, [], 'la App ajena no cuenta con el slug de la Fábrica');
+});
+
+test('anulación: sin REVISOR_APP_SLUG falla en alto en un repo ajeno y vale la App de la Fábrica en la propia Fábrica', () => {
+  for (const vacio of [undefined, '', '  ']) {
+    const { r, checks } = anulaCon(reviews(review()), [previo()], vacio);
+    assert.equal(r.status, 1, JSON.stringify(vacio));
+    assert.match(r.stderr, /REVISOR_APP_SLUG/);
+    assert.deepEqual(checks, []);
+  }
+  const propia = corre({ MODO: 'anulacion', REPO, REVIEWS_FALSAS: reviews(review()), CHECKS_FALSOS: JSON.stringify([previo()]) });
+  assert.equal(propia.r.status, 0, propia.r.stderr);
+  assert.equal(propia.checks.length, 1);
+});
+
 test('anulación: sin TOKEN falla en alto', () => {
   const { r } = corre({ MODO: 'anulacion', TOKEN: '' });
   assert.equal(r.status, 1);
@@ -121,25 +143,38 @@ test('anulación: sin TOKEN falla en alto', () => {
 
 const cargar = (f) => ({ texto: leer(`.github/workflows/${f}`), doc: yaml.load(leer(`.github/workflows/${f}`)) });
 
-test('anulacion.yml: solo workflow_run, desde main, sin bajar nunca el código del PR', () => {
+test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código del PR y con el juez de la Fábrica', () => {
   const { texto, doc } = cargar('anulacion.yml');
   const on = doc.on ?? doc[true];
-  assert.deepEqual(Object.keys(on), ['workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
+  assert.deepEqual(Object.keys(on).sort(), ['workflow_call', 'workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
-  assert.doesNotMatch(texto, /^\s*ref:/m, 'un checkout con ref: podría traer el código del PR');
-  assert.doesNotMatch(texto, /^\s*repository:/m);
+  assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
+  assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
+  assert.equal(on.workflow_call.inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
+  assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
-  assert.equal(pasos.filter((p) => String(p.uses ?? '').startsWith('actions/checkout')).length, 1);
+  const checkouts = pasos.filter((p) => String(p.uses ?? '').startsWith('actions/checkout'));
+  assert.equal(checkouts.length, 1);
+  assert.equal(checkouts[0].with.repository, REPO);
+  assert.equal(checkouts[0].with.ref, '${{ job.workflow_sha }}', 'el juez, en el commit de este workflow');
+  assert.equal(checkouts[0].with.path, '.fabrica');
   assert.equal(Object.values(doc.jobs)[0].environment, 'revisor');
-  assert.equal(pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs')).env.MODO, 'anulacion');
+  const app = pasos.find((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
+  assert.equal(app.with['client-id'], '${{ secrets.REVISOR_CLIENT_ID }}');
+  assert.equal(app.with['private-key'], '${{ secrets.REVISOR_APP_KEY }}');
+  const juez = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  assert.equal(juez.run, 'node .fabrica/scripts/veredicto.mjs');
+  assert.equal(juez.env.MODO, 'anulacion');
+  assert.equal(juez.env.REVISOR_APP_SLUG, '${{ inputs.revisor-app-slug }}', 'veredicto.mjs cuenta los check de la App del llamador');
 });
 
 test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout, sin código del PR', () => {
   const { texto, doc } = cargar('senal-review.yml');
   assert.deepEqual(doc.permissions, {});
   assert.doesNotMatch(texto, /secrets|environment|checkout|uses:/);
-  assert.deepEqual(Object.keys(doc.on ?? doc[true]), ['pull_request_review']);
+  assert.deepEqual(Object.keys(doc.on ?? doc[true]).sort(), ['pull_request_review', 'workflow_call']);
+  assert.equal((doc.on ?? doc[true]).workflow_call, null, 'workflow_call sin secretos ni inputs');
 });
 
 test('records: un check «override by Pablo» se cuenta aparte y no es un registro ilegible', () => {
