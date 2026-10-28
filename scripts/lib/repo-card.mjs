@@ -28,9 +28,9 @@ export function leerFicha(raiz, fichero = path.join(raiz, NOMBRE_FICHA)) {
   for (const k of CLAVES) if (typeof f[k] !== 'string' || !f[k].trim()) throw new Error(`La ficha ${fichero} no tiene «${k}» (texto no vacío).`);
   if (!/^[\w.-]+\/[\w.-]+$/.test(f.repo)) throw new Error(`La ficha ${fichero}: «repo» debe ser owner/name, y es «${f.repo}».`);
   if (!NOMBRES_IDENTIDAD.includes(f.identidad)) throw new Error(`La ficha ${fichero}: «identidad» debe ser una de ${NOMBRES_IDENTIDAD.join(', ')}, y es «${f.identidad}».`);
-  const { dueno } = IDENTIDADES[f.identidad];
-  if (dueno && f.repo.split('/')[0].toLowerCase() !== dueno.toLowerCase()) {
-    throw new Error(`La ficha ${fichero}: la identidad ${f.identidad} solo vale en repos de ${dueno}; ${f.repo} no vale.`);
+  const { duenos } = IDENTIDADES[f.identidad];
+  if (duenos && !duenos.some((d) => d.toLowerCase() === f.repo.split('/')[0].toLowerCase())) {
+    throw new Error(`La ficha ${fichero}: la identidad ${f.identidad} solo vale en repos de ${duenos.join(', ')}; ${f.repo} no vale.`);
   }
   return { repo: f.repo, base: f.base, identidad: f.identidad };
 }
