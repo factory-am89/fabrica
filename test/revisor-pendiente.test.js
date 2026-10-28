@@ -13,7 +13,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { PENDING_TITLE, OVERRIDE_TITLE, CUT_TITLE, readCheckRuns, extractRecord } from '../scripts/lib/record.mjs';
 import { TITULO } from '../scripts/veredicto.mjs';
-import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const corre = (extra) => {
@@ -22,7 +22,7 @@ const corre = (extra) => {
   const salida = path.join(mkdtempSync(path.join(tmpdir(), 'pendiente-')), 'github-output');
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', GITHUB_OUTPUT: salida, RUN_ID: '777', ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', REVISOR_APP_SLUG, PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', GITHUB_OUTPUT: salida, RUN_ID: '777', ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   const checks = publicado.filter((p) => esCheck(p));
@@ -245,4 +245,57 @@ test('revisor.yml: cerrar crea su propio token de la App (solo checks: write) y 
   for (const [nombre, job] of Object.entries(wf.jobs)) {
     if (nombre !== 'cerrar') for (const p of pasosDe(job)) assert.ok(!usa(p, `steps.${token.id}.`), `un paso de ${nombre} recibe el token de cerrar`);
   }
+});
+
+// El slug de la App de revisor (REVISOR_APP_SLUG): el juicio y `cerrar` filtran los check por la App del repo que llama, como la anulación.
+const propia = 'otra-app-de-revisor';
+const hom = (extra = {}) => ({ app: { slug: propia }, ...extra });
+
+test('MODO=cerrar: con REVISOR_APP_SLUG de otra App cierra el juzgando de esa App y no el de la App de la Fábrica', () => {
+  const checks = [enCurso(10, '777', hom()), enCurso(11, '777')];
+  const suyo = cierra(checks, { REVISOR_APP_SLUG: propia });
+  assert.equal(suyo.r.status, 0, suyo.r.stderr);
+  assert.deepEqual(suyo.checks.map((c) => c.ruta), ['/repos/o/r/check-runs/10']);
+  const fabrica = cierra(checks);
+  assert.deepEqual(fabrica.checks.map((c) => c.ruta), ['/repos/o/r/check-runs/11'], 'sin pasar otro slug, vale el de la Fábrica');
+});
+
+test('veredicto: un sí con un `revisor` más nuevo de la App del llamador (REVISOR_APP_SLUG) se cierra en failure; el de la App de la Fábrica no cuenta', () => {
+  const nuevo = (extra) => JSON.stringify([deLaApp(5000, { status: 'in_progress', conclusion: null, output: { title: PENDING_TITLE }, ...extra })]);
+  const cuenta = juzga({ REVISOR_APP_SLUG: propia, CHECKS_FALSOS: nuevo(hom()) });
+  assert.deepEqual(cuenta.checks.map((c) => c.cuerpo.conclusion), ['failure']);
+  const ajeno = juzga({ REVISOR_APP_SLUG: propia, CHECKS_FALSOS: nuevo() });
+  assert.deepEqual(ajeno.checks.map((c) => c.cuerpo.conclusion), ['success']);
+});
+
+test('veredicto y cerrar: sin REVISOR_APP_SLUG fallan en alto en un repo ajeno y en la propia Fábrica valen la constante', () => {
+  for (const vacio of [undefined, '', '  ']) {
+    const c = cierra([enCurso(10, '777')], { REVISOR_APP_SLUG: vacio });
+    assert.equal(c.r.status, 1, JSON.stringify(vacio));
+    assert.match(c.r.stderr, /REVISOR_APP_SLUG/);
+    assert.deepEqual(c.checks, []);
+    const j = juzga({ REVISOR_APP_SLUG: vacio });
+    assert.equal(j.r.status, 1, JSON.stringify(vacio));
+    assert.match(j.r.stderr, /REVISOR_APP_SLUG/);
+    assert.ok(!j.checks.some((x) => x.cuerpo.conclusion === 'success'), 'nunca un sí sin saber qué App es la del llamador');
+  }
+  const enFabrica = cierra([enCurso(10, '777')], { REPO, REVISOR_APP_SLUG: '' });
+  assert.equal(enFabrica.r.status, 0, enFabrica.r.stderr);
+  assert.equal(enFabrica.checks.length, 1);
+});
+
+test('revisor.yml: workflow_call pide el slug de la App (obligatorio) y juzgar y cerrar lo pasan como REVISOR_APP_SLUG; pendiente no filtra y no lo recibe', () => {
+  const inputs = wf.on.workflow_call.inputs;
+  assert.equal(inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
+  assert.equal(inputs['revisor-app-slug'].default, undefined);
+  const veredicto = (job) => pasosDe(job).find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  for (const nombre of ['juzgar', 'cerrar']) {
+    assert.equal(veredicto(wf.jobs[nombre]).env.REVISOR_APP_SLUG, '${{ inputs.revisor-app-slug }}', nombre);
+  }
+  assert.equal(veredicto(wf.jobs.pendiente).env.REVISOR_APP_SLUG, undefined);
+});
+
+test('la plantilla apps/proyecto-nuevo/revisor.yml pasa el slug de la App que crea la Fábrica', () => {
+  const plantilla = yaml.load(leer('apps/proyecto-nuevo/revisor.yml'));
+  assert.deepEqual(plantilla.jobs.revisor.with, { 'revisor-app-slug': REVISOR_APP_SLUG });
 });
