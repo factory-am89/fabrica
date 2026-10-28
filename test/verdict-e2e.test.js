@@ -19,7 +19,7 @@ const corre = (extra) => {
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', REVISOR_APP_SLUG: 'app-de-prueba', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: JSON.stringify({ respuestas: buenas() }), ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   return { r, publicado };
@@ -86,7 +86,7 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });
   const r = spawnSync(process.execPath, ['--import', precarga, path.join(raiz, 'scripts', 'veredicto.mjs')], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: salida, STANDARD: 'standards/p.md' },
+    env: { PATH: process.env.PATH, REPO: 'o/r', REVISOR_APP_SLUG: 'app-de-prueba', PR: '2', SHA, BASE: BASE_SHA, TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', SALIDA: salida, STANDARD: 'standards/p.md' },
   });
   const c = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10))).find((p) => esCheck(p)).cuerpo;
   assert.equal(c.conclusion, 'failure', r.stderr);
