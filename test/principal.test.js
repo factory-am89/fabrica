@@ -28,7 +28,8 @@ function repo(nombre = 'fabrica') {
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
+  writeFileSync(path.join(principal, '.fabrica.json'), '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n'); // tarea lee de la ficha la rama base
+  git(principal, 'add', 'a.txt', '.fabrica.json');
   git(principal, 'commit', '-q', '-m', 'inicial');
   return principal;
 }
@@ -165,6 +166,7 @@ test('hooks de git: niegan commit, merge y cherry-pick en la principal y dejan p
 
 test('instalar-hooks: pone core.hooksPath en el repo, también si se lanza desde una carpeta de trabajo', () => {
   const principal = repo();
+  cpSync(path.join(RAIZ, '.githooks'), path.join(principal, '.githooks'), { recursive: true }); // tarea solo activa los hooks del repo que los trae
   const { carpeta } = tarea(principal, 'feat/diez');
   git(principal, 'config', '--local', '--unset', 'core.hooksPath');
   instalarHooks(carpeta);

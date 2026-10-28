@@ -22,7 +22,9 @@ export function repo({ lockfile = false } = {}) {
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  git(principal, 'add', 'a.txt');
+  // la ficha: tarea y retire leen de ella la rama base (sin ficha fallan en alto)
+  writeFileSync(path.join(principal, '.fabrica.json'), '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n');
+  git(principal, 'add', 'a.txt', '.fabrica.json');
   if (lockfile) {
     writeFileSync(path.join(principal, 'package.json'), '{"name":"x","version":"1.0.0"}\n');
     writeFileSync(path.join(principal, 'package-lock.json'), '{"name":"x","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"x","version":"1.0.0"}}}\n');

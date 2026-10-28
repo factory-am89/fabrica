@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { ExitError } from './exit.mjs';
+import { leerFicha } from './repo-card.mjs';
 
 export function git(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -50,3 +51,22 @@ export function nombreDeRama(rama) {
 export const carpetaDe = (raiz, nombre) => path.join(path.dirname(raiz), `${path.basename(raiz)}-${nombre}`);
 
 export const tieneOrigin = (cwd) => gitOk(['remote'], cwd).split(/\s+/).includes('origin');
+
+// Saca `--repo <carpeta>` de los argumentos: una carpeta cualquiera del repo ajeno (por defecto, el cwd).
+// Devuelve { repoDir, resto }; un `--repo` sin valor es un error de uso, no se ignora.
+export function sacarRepo(args) {
+  const i = args.indexOf('--repo');
+  if (i === -1) return { repoDir: null, resto: args };
+  const v = args[i + 1];
+  if (!v || v.startsWith('--')) throw new ExitError('USAGE', '--repo necesita una carpeta del repo.');
+  return { repoDir: path.resolve(v), resto: args.filter((_, j) => j !== i && j !== i + 1) };
+}
+
+// La ficha del repo (.fabrica.json) dice repo, rama base e identidad, no un texto fijo; sin ficha, error en alto.
+export function fichaDe(raiz) {
+  try {
+    return leerFicha(raiz);
+  } catch (e) {
+    throw new ExitError('USAGE', e.message);
+  }
+}
