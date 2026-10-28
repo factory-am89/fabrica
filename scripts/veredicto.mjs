@@ -205,7 +205,7 @@ const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 // filter=all: sin él la API devuelve solo el último de cada nombre.
 // La anulación cuenta solo los check de la App del repo que llama (REVISOR_APP_SLUG, lo pasa anulacion.yml). Sin él no se
 // sabe qué App es y se lanza; solo en la propia Fábrica vale la constante de repo.mjs. (El juicio y `cerrar` siguen con
-// la App de la Fábrica por defecto: los repos que llaman a revisor.yml hoy usan fabrica-revisor.)
+// la App de la Fábrica por defecto: los repos que llaman a revisor.yml hoy usan la App de la Fábrica.)
 function slugDeLaAnulacion(repo) {
   const slug = process.env.REVISOR_APP_SLUG?.trim();
   if (slug) return slug;

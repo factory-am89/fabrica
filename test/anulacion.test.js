@@ -77,7 +77,7 @@ test('juicio: un sí no publica ningún override aunque Pablo haya aprobado', ()
   assert.deepEqual(checks.map((c) => c.output.title), ['Veredicto: sí']);
 });
 
-const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'failure', app: { slug: 'fabrica-revisor' }, output: { title: 'Veredicto: no', summary: '- C5: no\n- C9: sin prueba' }, ...extra });
+const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'failure', app: { slug: REVISOR_APP_SLUG }, output: { title: 'Veredicto: no', summary: '- C5: no\n- C9: sin prueba' }, ...extra });
 const anula = (reviewsFalsas, checksFalsos) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos) });
 
 const anulaCon = (reviewsFalsas, checksFalsos, slug) =>

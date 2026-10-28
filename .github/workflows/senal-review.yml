@@ -6,8 +6,8 @@ name: senal-review
 #
 # También es reutilizable (workflow_call): otro repo lo llama con
 #   factory-am89/fabrica/.github/workflows/senal-review.yml@main (como `uses`)
-# desde un workflow suyo con `on: pull_request_review` llamado también `senal-review` (anulacion.yml espera ese
-# nombre). No declara secretos ni inputs: no usa credenciales de nadie, ni de la Fábrica ni del repo que llama.
+# desde un workflow suyo con `on: pull_request_review`; el `workflow_run` de su propio anulacion.yml debe nombrar
+# ese workflow suyo (en un workflow llamado el `on:` de este fichero no cuenta). No declara secretos ni inputs: no usa credenciales de nadie, ni de la Fábrica ni del repo que llama.
 on:
   pull_request_review:
     types: [submitted]
