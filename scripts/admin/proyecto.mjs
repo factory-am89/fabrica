@@ -74,10 +74,13 @@ export function parseProject(json, { fileName } = {}) {
 
 // ---------- ruleset of main ----------
 // The only copy of the body. No `update` rule and no bypass: nobody skips it. Always `active`.
-export function rulesetBody({ revisorAppId, testsContext = 'tests / tests' } = {}) {
+// `strict` (al dia antes de fusionar) y `name` son parametros para la rama buena de otro repo (HoMenu: staging); por defecto, el de main de siempre.
+export function rulesetBody({ revisorAppId, testsContext = 'tests / tests', strict = false, name = 'main' } = {}) {
   if (!Number.isInteger(revisorAppId) || revisorAppId <= 0) fail('rulesetBody: falta revisorAppId (el App ID numerico de la App revisora)');
+  if (typeof strict !== 'boolean') fail('rulesetBody: strict tiene que ser true o false');
+  if (typeof name !== 'string' || name.trim() === '') fail('rulesetBody: name tiene que ser un texto no vacio');
   return {
-    name: 'main',
+    name,
     target: 'branch',
     enforcement: 'active',
     conditions: { ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] } },
@@ -91,7 +94,7 @@ export function rulesetBody({ revisorAppId, testsContext = 'tests / tests' } = {
         required_review_thread_resolution: false,
       } },
       { type: 'required_status_checks', parameters: {
-        strict_required_status_checks_policy: false,
+        strict_required_status_checks_policy: strict,
         required_status_checks: [
           { context: testsContext, integration_id: ACTIONS_APP_ID },
           { context: 'revisor', integration_id: revisorAppId },
