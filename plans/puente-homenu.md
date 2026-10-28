@@ -53,22 +53,22 @@ Done:
 node --test test/tarea-ficha.test.js test/folders.test.js test/principal.test.js
 ```
 
-### 3. (Fábrica) La identidad `fabrica-constructor` vale también en repos de pabloam89
+### 3. (Fábrica) La identidad `fabrica-constructor` vale también en repos de pabloam89 (hecho en #174, `d5f3c29`)
 Files: `scripts/lib/identities.mjs`, `test/identidades-dueno.test.js`
 Depends on: none
 Blocked by: A
-Existing: `scripts/lib/identities.mjs:13` limita `fabrica-constructor` a un solo dueño (factory-am89, sacado de `REPO`), y `leerFicha` rechaza una ficha de `pabloam89/MenuPlan` con esa identidad (`scripts/lib/repo-card.mjs:30-33`). `token.mjs` ya canjea para otro dueño, sin caché (`scripts/token.mjs:215-223`). `ls test | grep -i identit` -> sin salida. Campos nuevos: ninguno en `fields.json`; `dueno` es una clave de la constante `IDENTIDADES` de código, no un campo de entidad, y `git grep -n -i "dueno" -- fields.json entities.json` -> sin salida (ninguna fila equivalente que reutilizar).
+Existing: (Estado antes de #174, ya fusionado: describe el punto de partida, no el estado actual de main.) `scripts/lib/identities.mjs:13` limita `fabrica-constructor` a un solo dueño (factory-am89, sacado de `REPO`), y `leerFicha` rechaza una ficha de `pabloam89/MenuPlan` con esa identidad (`scripts/lib/repo-card.mjs:30-33`). `token.mjs` ya canjea para otro dueño, sin caché (`scripts/token.mjs:215-223`). `ls test | grep -i identit` -> sin salida. Campos nuevos: ninguno en `fields.json`; `dueno` es una clave de la constante `IDENTIDADES` de código, no un campo de entidad, y `git grep -n -i "dueno" -- fields.json entities.json` -> sin salida (ninguna fila equivalente que reutilizar).
 Not done: solo si A es la opción 1; con la 2 sobra y no se construye. `dueno` pasa de un texto a una lista cerrada de dueños, nunca a «cualquiera». No añade caché por dueño: hoy cada llamada fuera de factory-am89 lee 1Password, con tope de 60 lecturas por hora (`scripts/token.mjs:152`); si el constructor lo agota, otro trozo.
 Done:
 ```sh
 node --test test/identidades-dueno.test.js test/clean.test.js
 ```
 
-### 4. (Fábrica) `carpeta-principal` niega la carpeta principal de cualquier repo, no solo la del repo de la sesión
+### 4. (Fábrica) `carpeta-principal` niega la carpeta principal de cualquier repo, no solo la del repo de la sesión (hecho en #176, `0d90f00`)
 Files: `.claude/hooks/carpeta-principal.mjs`, `test/principal.test.js`
 Depends on: none
 Blocked by: C
-Existing: `.claude/hooks/carpeta-principal.mjs:201` saca las carpetas de `entrada.cwd`, así que solo conoce el repo de la sesión; la prueba de «Estado medido» deja pasar un `Write` en `C:/dev/MenuPlan/prueba.txt`. Fallo reproducido por la entrada real del hook (stdin JSON de `PreToolUse`, `cwd` de una carpeta de la Fábrica, `node .claude/hooks/carpeta-principal.mjs`): con `C:/dev/MenuPlan/prueba.txt` -> sin salida (no niega); con `C:/dev/fabrica/prueba.txt` -> `deny`; con la carpeta de la propia sesión -> sin salida. Cifra antes: 1 de 2 carpetas principales protegidas; después (criterio del test): 2 de 2. Quién más lee o escribe la misma regla de carpeta, buscado con `git grep -l "carpeta-principal\|folders.mjs" -- . ":!plans" ":!test"` (14 ficheros): `.claude/settings.json` (dispara el hook), `scripts/clean.mjs`, `scripts/retire.mjs`, `scripts/tarea.mjs`, `scripts/install-hooks.mjs`, `scripts/pull-main.mjs`, `scripts/sesiones.mjs`, `scripts/limpiar-al-terminar.mjs`, `scripts/prejuicio.mjs`, `scripts/lib/can-delete.mjs`, y como texto `CLAUDE.md`, `.claude/skills/github/referencias/subir.md` e `intervenciones.md`; los hooks de git (`.githooks/denegar-principal.sh`) son otra capa, no leen el hook.
+Existing: (Estado antes de #176, ya fusionado: describe el punto de partida, no el estado actual de main.) `.claude/hooks/carpeta-principal.mjs:201` saca las carpetas de `entrada.cwd`, así que solo conoce el repo de la sesión; la prueba de «Estado medido» deja pasar un `Write` en `C:/dev/MenuPlan/prueba.txt`. Fallo reproducido por la entrada real del hook (stdin JSON de `PreToolUse`, `cwd` de una carpeta de la Fábrica, `node .claude/hooks/carpeta-principal.mjs`): con `C:/dev/MenuPlan/prueba.txt` -> sin salida (no niega); con `C:/dev/fabrica/prueba.txt` -> `deny`; con la carpeta de la propia sesión -> sin salida. Cifra antes: 1 de 2 carpetas principales protegidas; después (criterio del test): 2 de 2. Quién más lee o escribe la misma regla de carpeta, buscado con `git grep -l "carpeta-principal\|folders.mjs" -- . ":!plans" ":!test"` (14 ficheros): `.claude/settings.json` (dispara el hook), `scripts/clean.mjs`, `scripts/retire.mjs`, `scripts/tarea.mjs`, `scripts/install-hooks.mjs`, `scripts/pull-main.mjs`, `scripts/sesiones.mjs`, `scripts/limpiar-al-terminar.mjs`, `scripts/prejuicio.mjs`, `scripts/lib/can-delete.mjs`, y como texto `CLAUDE.md`, `.claude/skills/github/referencias/subir.md` e `intervenciones.md`; los hooks de git (`.githooks/denegar-principal.sh`) son otra capa, no leen el hook.
 Not done: clase: una regla de carpeta que solo mira el repo de la sesión. Calcula la principal desde la ruta tocada (su `git worktree list`), sin lista de repos. Lector: el propio hook; disparador: `PreToolUse` de `.claude/settings.json`; el test lo prueba por la entrada real (stdin del hook) con un caso en rojo sobre otro repo. No toca los hooks de git de `.githooks/` ni la guardia de MenuPlan. Endurece un check (C13); si rompe, se revierte el PR desde una rama nueva.
 Done:
 ```sh
@@ -97,33 +97,33 @@ Done:
 node --test test/revisor-workflow.test.js test/workflows.test.js test/gate-files.test.js
 ```
 
-### 7. (Fábrica) La señal de review y la anulación por Pablo también se pueden llamar desde otro repo
+### 7. (Fábrica) La señal de review y la anulación por Pablo también se pueden llamar desde otro repo (hecho en #175, `3129af9`)
 Files: `.github/workflows/senal-review.yml`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`
 Depends on: none
 Blocked by: C
-Existing: `grep -n "workflow_call\|repository: factory-am89" .github/workflows/anulacion.yml` -> sin salida; corre el `veredicto.mjs` del checkout del propio repo, no de `.fabrica/`. `test/anulacion.test.js:124` exige «solo workflow_run». `grep -n "workflow_call|^on:" -A3 .github/workflows/senal-review.yml` -> solo `pull_request_review` (`on:` en la línea 6), sin `workflow_call`; `grep -ln "senal-review" test/*.js scripts/lib/*.mjs` -> `test/anulacion.test.js`, `test/gate-files.test.js` y `scripts/lib/gate.mjs` (es fichero de la puerta, `BASE`), sin test propio.
+Existing: (Estado antes de #175, ya fusionado: describe el punto de partida, no el estado actual de main.) `grep -n "workflow_call\|repository: factory-am89" .github/workflows/anulacion.yml` -> sin salida; corre el `veredicto.mjs` del checkout del propio repo, no de `.fabrica/`. `test/anulacion.test.js:124` exige «solo workflow_run». `grep -n "workflow_call|^on:" -A3 .github/workflows/senal-review.yml` -> solo `pull_request_review` (`on:` en la línea 6), sin `workflow_call`; `grep -ln "senal-review" test/*.js scripts/lib/*.mjs` -> `test/anulacion.test.js`, `test/gate-files.test.js` y `scripts/lib/gate.mjs` (es fichero de la puerta, `BASE`), sin test propio.
 Not done: añade `workflow_call` a `senal-review.yml` y a `anulacion.yml` con el mismo tratamiento (credenciales del llamador; `senal-review.yml` sigue sin secretos ni permisos y solo despierta a `anulacion.yml`), cubierto por `test/anulacion.test.js`; en `anulacion.yml` baja el juez de la Fábrica a `.fabrica/` en `job.workflow_sha`, como `revisor.yml`. La regla de `aprobacionDePablo` (`OWNER_LOGIN`, cabeza actual, última review decisiva) no cambia, y el test sigue exigiendo todo lo demás (C13: ninguno de los dos workflows pierde una condición, solo se añade quién los puede llamar). Si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
 node --test test/anulacion.test.js test/workflows.test.js test/gate-files.test.js
 ```
 
-### 8. (Fábrica) El cuerpo del ruleset sirve para la rama buena de HoMenu: strict y nombre como parámetros, y una orden que lo imprime
+### 8. (Fábrica) El cuerpo del ruleset sirve para la rama buena de HoMenu: strict y nombre como parámetros, y una orden que lo imprime (hecho en #172, `af33b8e`)
 Files: `scripts/admin/proyecto.mjs`, `scripts/admin/cuerpo-ruleset.mjs`, `test/admin-proyecto.test.js`
 Depends on: none
 Blocked by: none
-Existing: `scripts/admin/proyecto.mjs:80` fija el nombre `main` y `scripts/admin/proyecto.mjs:94` `strict_required_status_checks_policy: false`; la condición ya es `~DEFAULT_BRANCH`, que en MenuPlan es `staging`. `ls scripts/admin` -> `aplicar.mjs crear.mjs humo.mjs leer-plan.mjs proyecto.mjs secretos.mjs`; ninguno imprime el cuerpo.
+Existing: (Estado antes de #172, ya fusionado: describe el punto de partida, no el estado actual de main.) `scripts/admin/proyecto.mjs:80` fija el nombre `main` y `scripts/admin/proyecto.mjs:94` `strict_required_status_checks_policy: false`; la condición ya es `~DEFAULT_BRANCH`, que en MenuPlan es `staging`. `ls scripts/admin` -> `aplicar.mjs crear.mjs humo.mjs leer-plan.mjs proyecto.mjs secretos.mjs`; ninguno imprime el cuerpo.
 Not done: por defecto todo queda igual (homenu-panel no cambia). La orden solo imprime JSON; aplicarlo es el paso 6 de Pablo. Sin campos nuevos en `fields.json` ni `entities.json` (`git grep -n -i "strict_required" -- fields.json entities.json` -> sin salida): `strict` y el nombre son parámetros de una función de código, no campos de entidad. Mantiene `bypass_actors` vacío y `enforcement` en `active` (lo siguen vigilando `test/ruleset-never-paused.test.js` y `test/administrador.test.js`). Toca la puerta (`scripts/admin/`, `ADMIN_GATE_FILES` de `scripts/lib/gate.mjs`) sin aflojar nada: solo añade strict donde se pide (C13); si rompe, se revierte desde una rama nueva. No enseña a `administrar.yml` la rama `staging` (si A es 2, otro trozo: `scripts/admin/proyecto.mjs:172` y el PR de humo fijan `main`).
 Done:
 ```sh
 node --test test/admin-proyecto.test.js test/ruleset-never-paused.test.js test/administrador.test.js
 ```
 
-### 9. (Fábrica) `PASOS-PABLO.md` lleva los clics del puente HoMenu
+### 9. (Fábrica) `PASOS-PABLO.md` lleva los clics del puente HoMenu (hecho en #177, `eaf0934`)
 Files: `PASOS-PABLO.md`
 Depends on: 8
 Blocked by: A
-Existing: `grep -n -i "pabloam89/MenuPlan" PASOS-PABLO.md` -> sin salida; su sección de proyectos solo cubre repos de factory-am89 (`PASOS-PABLO.md:10`).
+Existing: (Estado antes de #177, ya fusionado: describe el punto de partida, no el estado actual de main.) `grep -n -i "pabloam89/MenuPlan" PASOS-PABLO.md` -> sin salida; su sección de proyectos solo cubre repos de factory-am89 (`PASOS-PABLO.md:10`).
 Not done: copia la lista «Pasos de Pablo» de este plan según la respuesta a A y apunta a `scripts/admin/cuerpo-ruleset.mjs`; ningún valor de secreto. Las respuestas a A, B y C van como filas de `intervenciones.md` en el PR que las recoja, no aquí.
 Done:
 ```sh
