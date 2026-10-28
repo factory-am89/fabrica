@@ -118,3 +118,18 @@ test('retirar --repo: lo mismo desde otra carpeta, y sin ficha falla en alto', (
 test('la ficha de los repos de prueba es la de esta Fábrica', () => {
   assert.deepEqual(JSON.parse(FICHA_FABRICA), leerFicha(path.join(import.meta.dirname, '..')));
 });
+
+test('retirar --repo: no borra la carpeta en la que estás aunque el repo se dé aparte', () => {
+  const { principal } = ajeno();
+  const { carpeta } = conPR(principal, 'cinco', 'staging');
+  const antes = process.cwd();
+  process.chdir(carpeta);
+  try {
+    const r = cliRetirar(['--repo', principal, 'cinco'], { token: FALSO });
+    assert.notEqual(r.code, 0);
+    assert.match(r.stderr + r.stdout, /Estás dentro de/);
+  } finally {
+    process.chdir(antes);
+  }
+  assert.ok(existsSync(carpeta));
+});

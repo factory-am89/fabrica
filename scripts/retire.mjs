@@ -25,8 +25,9 @@ export function quitarUnion(ruta) {
   return true;
 }
 
-export function retirar(nombre, { cwd = process.cwd(), consultarPR, token } = {}) {
-  const raiz = principal(cwd);
+// `cwd`: dónde estoy (no se retira la carpeta que lo contenga). `repoDir`: una carpeta cualquiera del repo (por defecto, cwd).
+export function retirar(nombre, { cwd = process.cwd(), repoDir = cwd, consultarPR, token } = {}) {
+  const raiz = principal(repoDir);
   const ficha = fichaDe(raiz); // repo, rama base e identidad salen de la ficha, no de un texto fijo
   const carpeta = carpetaDe(raiz, nombre);
   const wt = worktrees(raiz).find((w) => norm(w.ruta) === norm(carpeta));
@@ -52,7 +53,7 @@ export function cliRetirar(argv, opts = {}) {
     run: (args) => {
       const { repoDir, resto: [nombre] } = sacarRepo(args);
       if (!nombre) throw new ExitError('USAGE', 'Falta el nombre de la carpeta: node scripts/retire.mjs [--repo <carpeta>] <nombre>');
-      return { result: RETIRE_RESULT.REMOVED, ...retirar(nombre, { ...opts, ...(repoDir ? { cwd: repoDir } : {}) }) };
+      return { result: RETIRE_RESULT.REMOVED, ...retirar(nombre, { ...opts, ...(repoDir ? { repoDir } : {}) }) };
     },
     human: ({ carpeta, rama, union }) => `retirar carpeta: ${carpeta} rama: ${rama} union-quitada: ${union}`,
     refused: { result: RETIRE_RESULT.REFUSED },
