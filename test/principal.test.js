@@ -21,9 +21,9 @@ const git = (cwd, ...args) => {
 };
 const crudo = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 
-function repo() {
+function repo(nombre = 'fabrica') {
   const padre = realpathSync(mkdtempSync(path.join(tmpdir(), 'principal-')));
-  const principal = path.join(padre, 'fabrica');
+  const principal = path.join(padre, nombre);
   mkdirSync(principal);
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
@@ -106,14 +106,8 @@ function hookEdicion(cwd, herramienta, ruta) {
 // y toca otro (como una sesión de la Fábrica en MenuPlan), sin lista de repos.
 test('hook: niega la carpeta principal de otro repo y deja pasar sus carpetas de tarea', () => {
   const miRepo = repo();
-  const otroPadre = realpathSync(mkdtempSync(path.join(tmpdir(), 'otro-')));
-  const otro = path.join(otroPadre, 'MenuPlan');
-  mkdirSync(otro);
-  git(otro, 'init', '-q', '-b', 'main');
-  for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(otro, 'config', k, v);
-  writeFileSync(path.join(otro, 'a.txt'), 'a\n');
-  git(otro, 'add', 'a.txt');
-  git(otro, 'commit', '-q', '-m', 'inicial');
+  const otro = repo('MenuPlan');
+  const otroPadre = path.dirname(otro);
   const { carpeta } = tarea(otro, 'feat/hermana');
 
   for (const h of ['Write', 'Edit', 'MultiEdit']) {
