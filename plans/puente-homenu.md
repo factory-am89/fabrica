@@ -46,7 +46,7 @@ node --test test/medir-repo.test.js
 Files: `scripts/tarea.mjs`, `scripts/retire.mjs`, `test/tarea-ficha.test.js`
 Depends on: none
 Blocked by: none
-Existing: `scripts/tarea.mjs:17-20` y `scripts/retire.mjs:32-33` fijan `origin/main`; `scripts/tarea.mjs:23` llama siempre a `instalarHooks`, que pone `core.hooksPath .githooks` en el repo (`scripts/install-hooks.mjs:11`) y en MenuPlan apagaría sus hooks de `.git/hooks`. La ficha `.fabrica.json` ya guarda `repo`, `base` e `identidad`, y la lee `clean.mjs` con `--repo <carpeta>` (`scripts/lib/repo-card.mjs:3-6`, `scripts/clean.mjs:6`). `ls test | grep tarea` -> sin salida.
+Existing: (Estado antes de #178, ya fusionado: describe el punto de partida, no el estado actual de main.) `scripts/tarea.mjs:17-20` y `scripts/retire.mjs:32-33` fijan `origin/main`; `scripts/tarea.mjs:23` llama siempre a `instalarHooks`, que pone `core.hooksPath .githooks` en el repo (`scripts/install-hooks.mjs:11`) y en MenuPlan apagaría sus hooks de `.git/hooks`. La ficha `.fabrica.json` ya guarda `repo`, `base` e `identidad`, y la lee `clean.mjs` con `--repo <carpeta>` (`scripts/lib/repo-card.mjs:3-6`, `scripts/clean.mjs:6`). `ls test | grep tarea` -> sin salida.
 Not done: reutiliza el campo `base` de la ficha y no añade ninguno (comparado con `scripts/lib/repo-card.mjs`: misma idea). La ficha no está en `entities.json` ni en `fields.json`: hueco anotado, no arreglado aquí. Los prefijos de rama siguen siendo `feat/`, `fix/` y `ops/` (MenuPlan los acepta, `CLAUDE.md:23` de MenuPlan). En la Fábrica todo sigue igual (su ficha dice `main`). Sin ficha en el repo, falla en alto como `clean.mjs`.
 Done:
 ```sh
