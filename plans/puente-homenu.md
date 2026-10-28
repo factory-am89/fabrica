@@ -57,7 +57,7 @@ node --test test/tarea-ficha.test.js test/folders.test.js test/principal.test.js
 Files: `scripts/lib/identities.mjs`, `test/identidades-dueno.test.js`
 Depends on: none
 Blocked by: A
-Existing: `scripts/lib/identities.mjs:13` limita `fabrica-constructor` a un solo dueño (factory-am89, sacado de `REPO`), y `leerFicha` rechaza una ficha de `pabloam89/MenuPlan` con esa identidad (`scripts/lib/repo-card.mjs:30-33`). `token.mjs` ya canjea para otro dueño, sin caché (`scripts/token.mjs:215-223`). `ls test | grep -i identit` -> sin salida.
+Existing: `scripts/lib/identities.mjs:13` limita `fabrica-constructor` a un solo dueño (factory-am89, sacado de `REPO`), y `leerFicha` rechaza una ficha de `pabloam89/MenuPlan` con esa identidad (`scripts/lib/repo-card.mjs:30-33`). `token.mjs` ya canjea para otro dueño, sin caché (`scripts/token.mjs:215-223`). `ls test | grep -i identit` -> sin salida. Campos nuevos: ninguno en `fields.json`; `dueno` es una clave de la constante `IDENTIDADES` de código, no un campo de entidad, y `git grep -n -i "dueno" -- fields.json entities.json` -> sin salida (ninguna fila equivalente que reutilizar).
 Not done: solo si A es la opción 1; con la 2 sobra y no se construye. `dueno` pasa de un texto a una lista cerrada de dueños, nunca a «cualquiera». No añade caché por dueño: hoy cada llamada fuera de factory-am89 lee 1Password, con tope de 60 lecturas por hora (`scripts/token.mjs:152`); si el constructor lo agota, otro trozo.
 Done:
 ```sh
@@ -68,7 +68,7 @@ node --test test/identidades-dueno.test.js test/clean.test.js
 Files: `.claude/hooks/carpeta-principal.mjs`, `test/principal.test.js`
 Depends on: none
 Blocked by: C
-Existing: `.claude/hooks/carpeta-principal.mjs:201` saca las carpetas de `entrada.cwd`, así que solo conoce el repo de la sesión; la prueba de «Estado medido» deja pasar un `Write` en `C:/dev/MenuPlan/prueba.txt`.
+Existing: `.claude/hooks/carpeta-principal.mjs:201` saca las carpetas de `entrada.cwd`, así que solo conoce el repo de la sesión; la prueba de «Estado medido» deja pasar un `Write` en `C:/dev/MenuPlan/prueba.txt`. Fallo reproducido por la entrada real del hook (stdin JSON de `PreToolUse`, `cwd` de una carpeta de la Fábrica, `node .claude/hooks/carpeta-principal.mjs`): con `C:/dev/MenuPlan/prueba.txt` -> sin salida (no niega); con `C:/dev/fabrica/prueba.txt` -> `deny`; con la carpeta de la propia sesión -> sin salida. Cifra antes: 1 de 2 carpetas principales protegidas; después (criterio del test): 2 de 2. Quién más lee o escribe la misma regla de carpeta, buscado con `git grep -l "carpeta-principal|folders.mjs" -- . ":!plans" ":!test"`: `.claude/settings.json` (dispara el hook), `scripts/clean.mjs`, `scripts/retire.mjs`, `scripts/tarea.mjs`, `scripts/install-hooks.mjs`, `scripts/pull-main.mjs`, `scripts/sesiones.mjs`, `scripts/limpiar-al-terminar.mjs`, `scripts/prejuicio.mjs`, `scripts/lib/can-delete.mjs`; los hooks de git (`.githooks/denegar-principal.sh`) son otra capa, no leen el hook.
 Not done: clase: una regla de carpeta que solo mira el repo de la sesión. Calcula la principal desde la ruta tocada (su `git worktree list`), sin lista de repos. Lector: el propio hook; disparador: `PreToolUse` de `.claude/settings.json`; el test lo prueba por la entrada real (stdin del hook) con un caso en rojo sobre otro repo. No toca los hooks de git de `.githooks/` ni la guardia de MenuPlan. Endurece un check (C13); si rompe, se revierte el PR desde una rama nueva.
 Done:
 ```sh
@@ -91,7 +91,7 @@ Files: `.github/workflows/revisor.yml`, `test/revisor-workflow.test.js`
 Depends on: none
 Blocked by: C
 Existing: `allowed_bots` es fijo: `grep -n "allowed_bots\|inputs:" .github/workflows/revisor.yml` -> `122: allowed_bots: fabrica-constructor,fabrica-administrador`, sin `inputs:`. `test/revisor-workflow.test.js:38` ya exige `workflow_call`.
-Not done: una entrada `bots` de `workflow_call` que se suma a la lista fija; en la propia Fábrica la lista no cambia. No añade ni quita ninguna pregunta ni paso del juez (C13: amplía quién puede despertar al juez solo en el repo que llama); si rompe, se revierte desde una rama nueva.
+Not done: una entrada `bots` de `workflow_call` que se suma a la lista fija; en la propia Fábrica la lista no cambia. Comparado con `fields.json` y `entities.json` (`git grep -n -i "bots" -- fields.json entities.json` -> sin salida): `bots` es una entrada de `workflow_call`, no un campo de entidad, y no hay otra equivalente que reutilizar. No añade ni quita ninguna pregunta ni paso del juez (C13: amplía quién puede despertar al juez solo en el repo que llama); si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
 node --test test/revisor-workflow.test.js test/workflows.test.js test/gate-files.test.js
@@ -113,7 +113,7 @@ Files: `scripts/admin/proyecto.mjs`, `scripts/admin/cuerpo-ruleset.mjs`, `test/a
 Depends on: none
 Blocked by: none
 Existing: `scripts/admin/proyecto.mjs:80` fija el nombre `main` y `scripts/admin/proyecto.mjs:94` `strict_required_status_checks_policy: false`; la condición ya es `~DEFAULT_BRANCH`, que en MenuPlan es `staging`. `ls scripts/admin` -> `aplicar.mjs crear.mjs humo.mjs leer-plan.mjs proyecto.mjs secretos.mjs`; ninguno imprime el cuerpo.
-Not done: por defecto todo queda igual (homenu-panel no cambia). La orden solo imprime JSON; aplicarlo es el paso 6 de Pablo. Mantiene `bypass_actors` vacío y `enforcement` en `active` (lo siguen vigilando `test/ruleset-never-paused.test.js` y `test/administrador.test.js`). Toca la puerta (`scripts/admin/`, `ADMIN_GATE_FILES` de `scripts/lib/gate.mjs`) sin aflojar nada: solo añade strict donde se pide (C13); si rompe, se revierte desde una rama nueva. No enseña a `administrar.yml` la rama `staging` (si A es 2, otro trozo: `scripts/admin/proyecto.mjs:172` y el PR de humo fijan `main`).
+Not done: por defecto todo queda igual (homenu-panel no cambia). La orden solo imprime JSON; aplicarlo es el paso 6 de Pablo. Sin campos nuevos en `fields.json` ni `entities.json` (`git grep -n -i "strict_required" -- fields.json entities.json` -> sin salida): `strict` y el nombre son parámetros de una función de código, no campos de entidad. Mantiene `bypass_actors` vacío y `enforcement` en `active` (lo siguen vigilando `test/ruleset-never-paused.test.js` y `test/administrador.test.js`). Toca la puerta (`scripts/admin/`, `ADMIN_GATE_FILES` de `scripts/lib/gate.mjs`) sin aflojar nada: solo añade strict donde se pide (C13); si rompe, se revierte desde una rama nueva. No enseña a `administrar.yml` la rama `staging` (si A es 2, otro trozo: `scripts/admin/proyecto.mjs:172` y el PR de humo fijan `main`).
 Done:
 ```sh
 node --test test/admin-proyecto.test.js test/ruleset-never-paused.test.js test/administrador.test.js
@@ -244,26 +244,25 @@ Con A = 2 cambian los pasos 2 a 4: transferir el repo, reinstalar en factory-am8
 
 ## Decisions for Pablo
 
+Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-28), no aquí.
+
 ### A. ¿Dónde vive HoMenu para que la Fábrica lo opere?
 Por qué te lo pregunto: las Apps de la Fábrica son privadas y solo viven en factory-am89; llevarlas a HoMenu es tocar permisos de Apps o mudar el repo, y las dos cosas son tuyas.
 1. Se queda en tu cuenta pabloam89; haces públicas fabrica-revisor y fabrica-constructor y las instalas solo en MenuPlan. Coste: unos 15 minutos de clics y nada de producción se toca; administrar.yml no lo gestiona y nadie vigila que el ruleset no cambie (recommended)
 2. Se muda a factory-am89: las Apps lo ven solas y administrar.yml lo puede gestionar. Coste: riesgo en producción al mudar (Vercel, la App de Dependabot y la deploy key cuelgan hoy de tu cuenta), Álvaro pasa a colaborador externo de la org y hay que enseñar a administrar.yml la rama staging
 3. Se muda a una org nueva de HoMenu, con Álvaro de codueño: separa la empresa de la Fábrica. Coste: lo de la opción 2 y además hacer públicas las Apps como en la 1
-Respuesta de Pablo (2026-10-28): opción 1.
 
 ### B. Cuando revisor sea obligatorio, ¿qué pasa con los que hoy fusionan en staging sin él?
 Por qué te lo pregunto: mantener una excepción es saltarse la puerta, y cambiar qué App despierta al juez toca secretos y permisos.
 1. Nadie se lo salta: el juez acepta a homenu-sesiones y a la App de Dependabot, Dependabot espera al revisor y mercadona-sync abre PR; se borran la deploy key y su excepción (recommended)
 2. Lo mismo, pero mercadona-sync sigue empujando directo con su deploy key: los datos semanales entran sin revisor, y quien tenga esa clave puede meter en staging un workflow que lea la clave del revisor
 3. Dependabot y mercadona dejan de fusionar solos: sus PR esperan a que una sesión los lleve, sin tocar sus workflows ahora
-Respuesta de Pablo (2026-10-28): opción 1.
 
 ### C. ¿Das el OK a los trozos que tocan rutas cerradas (workflows de los dos repos, el hook de carpetas de la Fábrica y el CLAUDE.md de HoMenu)?
 Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgando cada PR.
 1. Sí, OK al plan entero (recommended)
 2. Sí, pero trozo a trozo
 3. No, plan aparcado
-Respuesta de Pablo (2026-10-28): opción 1.
 
 ## Not verified
 
