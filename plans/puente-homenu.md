@@ -167,7 +167,7 @@ npx vitest run ops/anulacion-fabrica.test.js
 Files: `.github/workflows/dependabot-auto.yml`, `scripts/dependabot-auto.mjs`, `scripts/dependabot-auto.test.js`
 Depends on: 11
 Blocked by: B, C
-Existing: el workflow fusiona «con `tests` en verde» (`.github/workflows/dependabot-auto.yml:1-2` de MenuPlan); `git show origin/staging:scripts/dependabot-auto.mjs | grep -c revisor` -> `0`.
+Existing: el workflow fusiona «con `tests` en verde» (`.github/workflows/dependabot-auto.yml:1-2` de MenuPlan); `git show origin/staging:scripts/dependabot-auto.mjs | grep -c revisor` -> `0`. `scripts/dependabot-auto.test.js` ya existe en MenuPlan y no menciona `revisor` (`git show origin/staging:scripts/dependabot-auto.test.js | grep -c revisor` -> `0`): su Done hoy pasa; el trozo añade los casos de `revisor` a ese test y se ven fallar antes de tocar `dependabot-auto.mjs`.
 Not done: la pasada programada (la que no es evento de Dependabot) toca el PR con el token de `homenu-dependabot-merge` para que `pull_request_target` corra como esa App y vea el environment; los de versión mayor siguen para una sesión. No da secretos de Actions a Dependabot. Con B = 3 este trozo no se construye. Lector: el ruleset de `staging` (exige `revisor`) y el propio `dependabot-auto`; disparador: `cron` (su pasada programada). C13: no quita ni afloja ningún check de `staging`; si rompe, se revierte desde una rama nueva.
 Done:
 ```sh
