@@ -16,4 +16,7 @@ permissions:
 jobs:
   revisor:
     uses: factory-am89/fabrica/.github/workflows/revisor.yml@main
+    with:
+      # Slug de la App de revisor de este repo (la que crea la Fábrica por defecto); si el repo usa otra App, cámbialo.
+      revisor-app-slug: fabrica-revisor
     secrets: inherit

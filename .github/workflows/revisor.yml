@@ -9,7 +9,8 @@ name: revisor
 #   secrets: inherit
 # desde un workflow suyo con `on: pull_request_target` (el job lee github.event.pull_request) y con
 # permisos contents/pull-requests/checks: read como mínimo (un workflow llamado no puede subirlos).
-# Los tres secretos y el environment `revisor` los define el repo que llama. En un workflow
+# Los tres secretos y el environment `revisor` los define el repo que llama (la App de revisor es la suya: el input
+# revisor-app-slug dice cuál, y el check se busca y se publica con ella). En un workflow
 # reutilizable `github.repository` y `github.event` son los del repo que llama; por eso el juez
 # (scripts, estándar y rol del revisor) se baja siempre de la Fábrica a `.fabrica/`.
 on:
@@ -22,6 +23,12 @@ on:
         type: string
         required: false
         default: ''
+      # Slug de la App de revisor del repo que llama: veredicto.mjs solo cuenta los check `revisor` de esa App (juicio y
+      # `cerrar`). Obligatorio al llamar: sin él veredicto.mjs falla en alto. Solo en la propia Fábrica (pull_request_target,
+      # sin inputs) vale la constante de scripts/lib/repo.mjs.
+      revisor-app-slug:
+        type: string
+        required: true
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -158,6 +165,7 @@ jobs:
       - if: always()
         run: node .fabrica/scripts/veredicto.mjs
         env:
+          REVISOR_APP_SLUG: ${{ inputs.revisor-app-slug }}
           SALIDA: ${{ steps.claude.outputs.structured_output }}
           STANDARD: .fabrica/standards/code.md
           REPO: ${{ github.repository }}
@@ -201,6 +209,7 @@ jobs:
       - run: node .fabrica/scripts/veredicto.mjs
         env:
           MODO: cerrar
+          REVISOR_APP_SLUG: ${{ inputs.revisor-app-slug }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
           TOKEN: ${{ steps.appcierra.outputs.token }}

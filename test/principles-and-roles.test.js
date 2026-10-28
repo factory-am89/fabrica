@@ -82,6 +82,14 @@ test('el constructor apunta una fila por cada «no» en el registro y deja el de
   assert.match(texto, /otra sesión/, 'no dice que el desenlace lo pone otra sesión');
 });
 
+test('el constructor sabe trabajar en un repo que la Fábrica opera: --repo, FABRICA_REPO, evidence y el enlace a subir.md', () => {
+  const texto = leer('.claude/agents/constructor.md');
+  for (const palabra of ['--repo', 'FABRICA_REPO', 'CLAUDE.md', '.claude/rules/', 'npm run evidence', 'referencias/subir.md', 'prejuicio']) {
+    assert.ok(texto.includes(palabra), `constructor.md no dice ${palabra}`);
+  }
+  assert.match(texto, /Repo ajeno/, 'falta la sección de repo ajeno');
+});
+
 test('el estándar tiene al menos 10 preguntas, C1..Cn seguidas, cada una con bien y mal', () => {
   assert.ok(preguntas.length >= 10, `hay ${preguntas.length}`);
   assert.deepEqual(preguntas.map((p) => p.id), preguntas.map((_, i) => `C${i + 1}`));
