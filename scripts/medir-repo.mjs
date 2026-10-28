@@ -19,6 +19,7 @@ export const DEFAULT_LIMIT = 20;
 // Candidatos de más, por si algún diff no se puede leer (406: más de 300 ficheros o 20000 líneas); se cuentan aparte, nunca como «sí».
 export const HOLGURA = 10;
 const DIFF_DEMASIADO_GRANDE = 406;
+const PREFIJO_CASO = 'pr-';
 const PAGE = 100;
 const MAX_PAGES = 5;
 const REPO_FORMA = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -38,15 +39,9 @@ export async function ultimosFusionados(repo, limit, fetchFn = fetch) {
   return fusionados.sort((a, b) => (a.merged_at < b.merged_at ? 1 : -1)).slice(0, limit + HOLGURA).map((p) => ({ numero: p.number, titulo: p.title ?? '', cuerpo: p.body ?? '' }));
 }
 
-// El diff del PR (la misma API, otro Accept). Sin credencial; falla en alto con cualquier estado que no sea 200.
+// El diff del PR: la misma consulta pública de gh-public.mjs con otro Accept; falla en alto con cualquier estado que no sea 200.
 export async function diffDe(repo, numero, fetchFn = fetch) {
-  const res = await fetchFn(`https://api.github.com/repos/${repo}/pulls/${numero}`, {
-    headers: { accept: 'application/vnd.github.diff', 'x-github-api-version': '2022-11-28', 'user-agent': 'fabrica-medir-repo' },
-  });
-  if (!res.ok) {
-    throw Object.assign(new Error(`GET diff de ${repo}#${numero} → ${res.status}${res.status === 403 || res.status === 429 ? ' (¿límite de consultas sin credencial?)' : ''}`), { status: res.status });
-  }
-  const texto = await res.text();
+  const texto = await consultar(`repos/${repo}/pulls/${numero}`, fetchFn, 'application/vnd.github.diff');
   if (texto.trim() === '') throw new Error(`el diff de ${repo}#${numero} está vacío`);
   return texto;
 }
@@ -66,7 +61,7 @@ export async function armarCorpus(repo, prs, limit, dir, fetchFn = fetch) {
       omitidos.push(pr.numero);
       continue;
     }
-    const caso = path.join(dir, `pr-${pr.numero}`);
+    const caso = path.join(dir, `${PREFIJO_CASO}${pr.numero}`);
     mkdirSync(caso, { recursive: true });
     writeFileSync(path.join(caso, CASE_FILE.diff), diff);
     // El título va siempre delante del cuerpo (el cuerpo vacío no vale para golden-run), como lo vería `gh pr view`.
@@ -78,13 +73,15 @@ export async function armarCorpus(repo, prs, limit, dir, fetchFn = fetch) {
 }
 
 // DIR/<caso>/<intento>.json -> { casos: [{id, no: [ids]}], conNo, preguntas: {id: n} }. Un PR recibe «no» si algún intento tiene algún «no».
-export function resumir(outputs, preguntas) {
-  const casos = readdirSync(outputs, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort((a, b) => Number(a.slice(3)) - Number(b.slice(3)));
+export function resumir(outputs, preguntas, trials = 1) {
+  const casos = readdirSync(outputs, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort((a, b) => Number(a.slice(PREFIJO_CASO.length)) - Number(b.slice(PREFIJO_CASO.length)));
   if (casos.length === 0) throw new Error(`ningún caso en ${outputs}: no hay cifra que dar`);
   const porPregunta = {};
   const lista = casos.map((id) => {
     const nos = new Set();
-    for (const f of readdirSync(path.join(outputs, id)).filter((x) => x.endsWith('.json'))) {
+    const ficheros = readdirSync(path.join(outputs, id)).filter((x) => x.endsWith('.json'));
+    if (ficheros.length !== trials) throw new Error(`${id}: ${ficheros.length} salidas del juez, no ${trials}: sin salida no hay «sí»`);
+    for (const f of ficheros) {
       const respuestas = answersOf(readFileSync(path.join(outputs, id, f), 'utf8'), preguntas, `${id}/${f}`);
       for (const [q, r] of Object.entries(respuestas)) if (r === ANSWER.no) nos.add(q);
     }
@@ -95,7 +92,7 @@ export function resumir(outputs, preguntas) {
 }
 
 export function formatear(r, repo) {
-  const lineas = r.casos.map((c) => `${repo}#${c.id.slice(3)}: ${c.no.length ? `no (${c.no.join(', ')})` : 'sí'}`);
+  const lineas = r.casos.map((c) => `${repo}#${c.id.slice(PREFIJO_CASO.length)}: ${c.no.length ? `no (${c.no.join(', ')})` : 'sí'}`);
   const qs = Object.entries(r.preguntas).sort().map(([q, n]) => `${q} (${n} PR)`);
   return [...lineas, `${r.conNo} de ${r.casos.length} PR recibirían «no»`, `preguntas con «no»: ${qs.length ? qs.join(', ') : 'ninguna'}`].join('\n');
 }
@@ -108,7 +105,7 @@ export async function medir({ repo, limit = DEFAULT_LIMIT, trials = 1, ref = 'HE
   mkdirSync(corpus, { recursive: true });
   const omitidos = await armarCorpus(repo, prs, limit, corpus, fetchFn);
   runPass({ trials, ref, out: outputs, corpus, phase: 'collect', log });
-  const informe = formatear(resumir(outputs, cargarPreguntas(STANDARD)), repo);
+  const informe = formatear(resumir(outputs, cargarPreguntas(STANDARD), trials), repo);
   const aparte = omitidos.length ? `\nsin medir (diff demasiado grande para la API, 406): ${omitidos.map((n) => `#${n}`).join(', ')}` : '';
   return `${informe}${aparte}\nsalidas del juez en ${outputs}`;
 }

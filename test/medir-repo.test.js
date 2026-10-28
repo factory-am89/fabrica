@@ -102,6 +102,9 @@ test('una salida del juez ilegible, o ninguna, no cuenta como «sí»: resumir f
   mkdirSync(path.join(roto, 'pr-1'));
   writeFileSync(path.join(roto, 'pr-1', '1.json'), 'esto no es json');
   assert.throws(() => resumir(roto, preguntas), /unreadable output: pr-1\/1\.json/);
+  const sinSalida = temporal();
+  mkdirSync(path.join(sinSalida, 'pr-2'));
+  assert.throws(() => resumir(sinSalida, preguntas), /pr-2: 0 salidas del juez, no 1/);
 });
 
 test('formatear cuenta PR con «no» y las preguntas', () => {
