@@ -16,6 +16,9 @@ import { STANDARD, answersOf } from './golden.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
 export const DEFAULT_LIMIT = 20;
+// Candidatos de más, por si algún diff no se puede leer (406: más de 300 ficheros o 20000 líneas); se cuentan aparte, nunca como «sí».
+export const HOLGURA = 10;
+const DIFF_DEMASIADO_GRANDE = 406;
 const PAGE = 100;
 const MAX_PAGES = 5;
 const REPO_FORMA = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -25,14 +28,14 @@ const REPO_FORMA = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 export async function ultimosFusionados(repo, limit, fetchFn = fetch) {
   if (!REPO_FORMA.test(repo)) throw new Error(`--repo debe ser dueño/nombre, no «${repo}»`);
   const fusionados = [];
-  for (let page = 1; page <= MAX_PAGES && fusionados.length < limit; page += 1) {
+  for (let page = 1; page <= MAX_PAGES && fusionados.length < limit + HOLGURA; page += 1) {
     const lista = JSON.parse(await consultar(`repos/${repo}/pulls?state=closed&sort=created&direction=desc&per_page=${PAGE}&page=${page}`, fetchFn));
     if (!Array.isArray(lista)) throw new Error('la lista de PR no es una lista');
     fusionados.push(...lista.filter((p) => p.merged_at));
     if (lista.length < PAGE) break;
   }
   if (fusionados.length < limit) throw new Error(`solo hay ${fusionados.length} PR fusionados al alcance, no ${limit}`);
-  return fusionados.sort((a, b) => (a.merged_at < b.merged_at ? 1 : -1)).slice(0, limit).map((p) => ({ numero: p.number, titulo: p.title ?? '', cuerpo: p.body ?? '' }));
+  return fusionados.sort((a, b) => (a.merged_at < b.merged_at ? 1 : -1)).slice(0, limit + HOLGURA).map((p) => ({ numero: p.number, titulo: p.title ?? '', cuerpo: p.body ?? '' }));
 }
 
 // El diff del PR (la misma API, otro Accept). Sin credencial; falla en alto con cualquier estado que no sea 200.
@@ -40,21 +43,38 @@ export async function diffDe(repo, numero, fetchFn = fetch) {
   const res = await fetchFn(`https://api.github.com/repos/${repo}/pulls/${numero}`, {
     headers: { accept: 'application/vnd.github.diff', 'x-github-api-version': '2022-11-28', 'user-agent': 'fabrica-medir-repo' },
   });
-  if (!res.ok) throw new Error(`GET diff de ${repo}#${numero} → ${res.status}${res.status === 403 || res.status === 429 ? ' (¿límite de consultas sin credencial?)' : ''}`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`GET diff de ${repo}#${numero} → ${res.status}${res.status === 403 || res.status === 429 ? ' (¿límite de consultas sin credencial?)' : ''}`), { status: res.status });
+  }
   const texto = await res.text();
   if (texto.trim() === '') throw new Error(`el diff de ${repo}#${numero} está vacío`);
   return texto;
 }
 
-// Escribe el corpus (una carpeta pr-<n> por PR) en `dir`. Mismo formato que lee golden-run.mjs.
-export async function armarCorpus(repo, prs, dir, fetchFn = fetch) {
+// Escribe el corpus (una carpeta pr-<n> por PR) en `dir`, mismo formato que lee golden-run.mjs, hasta juntar `limit`. Un diff demasiado
+// grande para la API (406) se salta y se devuelve en `omitidos`; cualquier otro fallo lanza. Si no se junta `limit`, lanza.
+export async function armarCorpus(repo, prs, limit, dir, fetchFn = fetch) {
+  const omitidos = [];
+  let escritos = 0;
   for (const pr of prs) {
+    if (escritos === limit) break;
+    let diff;
+    try {
+      diff = await diffDe(repo, pr.numero, fetchFn);
+    } catch (e) {
+      if (e.status !== DIFF_DEMASIADO_GRANDE) throw e;
+      omitidos.push(pr.numero);
+      continue;
+    }
     const caso = path.join(dir, `pr-${pr.numero}`);
     mkdirSync(caso, { recursive: true });
-    writeFileSync(path.join(caso, CASE_FILE.diff), await diffDe(repo, pr.numero, fetchFn));
-    // El cuerpo vacío no vale para golden-run: el título va siempre delante, como lo vería `gh pr view`.
+    writeFileSync(path.join(caso, CASE_FILE.diff), diff);
+    // El título va siempre delante del cuerpo (el cuerpo vacío no vale para golden-run), como lo vería `gh pr view`.
     writeFileSync(path.join(caso, CASE_FILE.body), `# ${pr.titulo}\n\n${pr.cuerpo}\n`);
+    escritos += 1;
   }
+  if (escritos < limit) throw new Error(`solo se pudieron leer ${escritos} diffs de ${limit} (omitidos: ${omitidos.join(', ') || 'ninguno'})`);
+  return omitidos;
 }
 
 // DIR/<caso>/<intento>.json -> { casos: [{id, no: [ids]}], conNo, preguntas: {id: n} }. Un PR recibe «no» si algún intento tiene algún «no».
@@ -86,10 +106,11 @@ export async function medir({ repo, limit = DEFAULT_LIMIT, trials = 1, ref = 'HE
   const corpus = path.join(base, 'corpus');
   const outputs = path.join(base, 'outputs');
   mkdirSync(corpus, { recursive: true });
-  await armarCorpus(repo, prs, corpus, fetchFn);
+  const omitidos = await armarCorpus(repo, prs, limit, corpus, fetchFn);
   runPass({ trials, ref, out: outputs, corpus, phase: 'collect', log });
   const informe = formatear(resumir(outputs, cargarPreguntas(STANDARD)), repo);
-  return `${informe}\nsalidas del juez en ${outputs}`;
+  const aparte = omitidos.length ? `\nsin medir (diff demasiado grande para la API, 406): ${omitidos.map((n) => `#${n}`).join(', ')}` : '';
+  return `${informe}${aparte}\nsalidas del juez en ${outputs}`;
 }
 
 function parseArgs(argv) {

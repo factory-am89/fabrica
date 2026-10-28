@@ -1,10 +1,10 @@
 // scripts/medir-repo.mjs mide un repo ajeno con el juez de la Fábrica: GitHub grabada (fetch inyectado) y el claude falso, sin red ni modelo.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { medir, ultimosFusionados, diffDe, resumir, formatear } from '../scripts/medir-repo.mjs';
+import { armarCorpus, medir, ultimosFusionados, diffDe, resumir, formatear } from '../scripts/medir-repo.mjs';
 import { cargarPreguntas } from '../scripts/veredicto.mjs';
 
 const FALSO = path.join(import.meta.dirname, 'fixtures', 'claude-falso.mjs');
@@ -25,7 +25,7 @@ const LISTA = [
   { number: 101, title: 'primero', body: 'cuerpo uno', merged_at: '2026-10-22T10:00:00Z' },
 ];
 
-function githubGrabada({ sinDiff = [] } = {}) {
+function githubGrabada({ sinDiff = [], grandes = [] } = {}) {
   const pedidas = [];
   const fetchFn = async (url, opciones = {}) => {
     pedidas.push({ url, cabeceras: Object.keys(opciones.headers ?? {}) });
@@ -33,6 +33,7 @@ function githubGrabada({ sinDiff = [] } = {}) {
     if (pathname === `/repos/${REPO}/pulls`) return new Response(JSON.stringify(LISTA), { status: 200 });
     const m = pathname.match(new RegExp(`^/repos/${REPO}/pulls/(\\d+)$`));
     if (m && opciones.headers.accept === 'application/vnd.github.diff') {
+      if (grandes.includes(Number(m[1]))) return new Response('too big', { status: 406 });
       return sinDiff.includes(Number(m[1])) ? new Response('no', { status: 404 }) : new Response(`diff --git a/f${m[1]} b/f${m[1]}\n+linea ${m[1]}\n`, { status: 200 });
     }
     return new Response('no existe', { status: 404 });
@@ -43,9 +44,19 @@ function githubGrabada({ sinDiff = [] } = {}) {
 test('elige los N fusionados más recientes por fecha de fusión y descarta el cerrado sin fusionar', async () => {
   const { fetchFn, pedidas } = githubGrabada();
   const prs = await ultimosFusionados(REPO, 2, fetchFn);
-  assert.deepEqual(prs.map((p) => p.numero), [101, 102]);
+  assert.deepEqual(prs.map((p) => p.numero), [101, 102, 103], 'por fecha de fusión, con la holgura de candidatos');
   assert.equal(prs[0].cuerpo, 'cuerpo uno');
   assert.ok(pedidas.length > 0 && pedidas.every((p) => !p.cabeceras.includes('authorization')), 'sin credencial');
+});
+
+test('un diff de 406 se salta y se cuenta aparte; otro fallo lanza; si no se juntan los N, lanza', async () => {
+  const prs = [101, 102, 103].map((numero) => ({ numero, titulo: `t${numero}`, cuerpo: '' }));
+  const dir = temporal();
+  const omitidos = await armarCorpus(REPO, prs, 2, dir, githubGrabada({ grandes: [101] }).fetchFn);
+  assert.deepEqual(omitidos, [101]);
+  assert.deepEqual(readdirSync(dir).sort(), ['pr-102', 'pr-103']);
+  await assert.rejects(armarCorpus(REPO, prs, 2, temporal(), githubGrabada({ sinDiff: [101] }).fetchFn), /404/);
+  await assert.rejects(armarCorpus(REPO, prs, 3, temporal(), githubGrabada({ grandes: [101] }).fetchFn), /solo se pudieron leer 2 diffs de 3 \(omitidos: 101\)/);
 });
 
 test('falla en alto: pide más PR de los que hay, repo mal escrito, diff que no se lee', async () => {
