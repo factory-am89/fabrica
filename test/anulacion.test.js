@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import { aprobacionDePablo } from '../scripts/veredicto.mjs';
-import { OWNER_LOGIN, REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 import { readCheckRuns } from '../scripts/lib/record.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
@@ -132,7 +132,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
   const checkouts = pasos.filter((p) => String(p.uses ?? '').startsWith('actions/checkout'));
   assert.equal(checkouts.length, 1);
-  assert.equal(checkouts[0].with.repository, 'factory-am89/fabrica');
+  assert.equal(checkouts[0].with.repository, REPO);
   assert.equal(checkouts[0].with.ref, '${{ job.workflow_sha }}', 'el juez, en el commit de este workflow');
   assert.equal(checkouts[0].with.path, '.fabrica');
   assert.equal(Object.values(doc.jobs)[0].environment, 'revisor');
