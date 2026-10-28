@@ -148,7 +148,8 @@ test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout
   const { texto, doc } = cargar('senal-review.yml');
   assert.deepEqual(doc.permissions, {});
   assert.doesNotMatch(texto, /secrets|environment|checkout|uses:/);
-  assert.deepEqual(Object.keys(doc.on ?? doc[true]), ['pull_request_review']);
+  assert.deepEqual(Object.keys(doc.on ?? doc[true]).sort(), ['pull_request_review', 'workflow_call']);
+  assert.equal((doc.on ?? doc[true]).workflow_call, null, 'workflow_call sin secretos ni inputs');
 });
 
 test('records: un check «override by Pablo» se cuenta aparte y no es un registro ilegible', () => {
