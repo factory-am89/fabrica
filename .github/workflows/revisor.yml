@@ -6,9 +6,16 @@ name: revisor
 #
 # También es reutilizable (workflow_call): otro repo de la organización lo llama con
 #   uses: factory-am89/fabrica/.github/workflows/revisor.yml@main
-#   secrets: inherit
+#   secrets:
+#     CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#     REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
+#     REVISOR_APP_KEY: ${{ secrets.REVISOR_APP_KEY }}
 # desde un workflow suyo con `on: pull_request_target` (el job lee github.event.pull_request) y con
 # permisos contents/pull-requests/checks: read como mínimo (un workflow llamado no puede subirlos).
+# Los tres por nombre y nunca la forma «inherit», que entregaría a este workflow, de otro repo, todos los secretos del llamador.
+# Según la documentación de GitHub (reuse-workflows) el llamador debe pasarlos aunque vivan solo en el environment: «You can
+# pass a secret by name even if it only exists in the environment»; el job llamado con `environment: revisor` recibe el valor
+# del environment.
 # Los tres secretos y el environment `revisor` los define el repo que llama (la App de revisor es la suya: el input
 # revisor-app-slug dice cuál, y el check se busca y se publica con ella). En un workflow
 # reutilizable `github.repository` y `github.event` son los del repo que llama; por eso el juez
@@ -98,6 +105,19 @@ jobs:
       pull-requests: read
       checks: read
     steps:
+      # `required: true` solo comprueba que el llamador pase el secreto, no que tenga valor: uno vacío llegaría en silencio.
+      - name: Comprobar secretos
+        run: |
+          faltan=""
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || faltan="$faltan CLAUDE_CODE_OAUTH_TOKEN"
+          [ -n "$REVISOR_CLIENT_ID" ] || faltan="$faltan REVISOR_CLIENT_ID"
+          [ -n "$REVISOR_APP_KEY" ] || faltan="$faltan REVISOR_APP_KEY"
+          if [ -n "$faltan" ]; then echo "::error::Faltan secretos del environment revisor:$faltan"; exit 1; fi
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
+          REVISOR_APP_KEY: ${{ secrets.REVISOR_APP_KEY }}
+
       # Sin `ref:`: se baja la rama base (main) del repo que se juzga, de confianza. El PR se lee por API.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,7 +144,9 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           SHA: ${{ github.event.pull_request.head.sha }}
 
-      # Claude solo recibe el token de solo lectura del workflow, no el de la App.
+      # Claude solo recibe el token de solo lectura del workflow, no el de la App. `--setting-sources user`: la acción carga por
+      # defecto user, project y local; project sería el .claude/settings.json (hooks) y el CLAUDE.md de la copia del repo
+      # llamador, que correrían con el token de Claude en el entorno. Solo user (vacío en el runner).
       - id: claude
         uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1.0.250
         env:
@@ -145,6 +167,7 @@ jobs:
           claude_args: >-
             --model opus
             --max-turns 20
+            --setting-sources user
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr checks:*)"
             --json-schema '{"type":"object","properties":{"respuestas":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","pattern":"^C[0-9]+$"},"respuesta":{"type":"string","enum":["sí","no","no aplica"]},"prueba":{"type":"string"}},"required":["id","respuesta","prueba"]}}},"required":["respuestas"]}'
 
