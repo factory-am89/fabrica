@@ -80,7 +80,7 @@ Files: `.claude/agents/constructor.md`
 Depends on: 2
 Blocked by: none
 Existing: `.claude/agents/constructor.md` solo habla de `origin/main`, `npm run lint`, `npm test`, `pr-body.mjs` y `prejuicio` de la Fábrica (`grep -n "origin/main\|npm test" .claude/agents/constructor.md` -> líneas 8, 12 y 13); `grep -n -- "--repo" .claude/agents/constructor.md` -> sin salida.
-Not done: dice: carpeta hermana del repo con `tarea --repo`; antes de escribir, leer el `CLAUDE.md` y `.claude/rules/` del repo; los tests del repo (en MenuPlan, `npx vitest run` con los ficheros tocados, y la suite solo antes del PR); token con `FABRICA_REPO`; cuerpo del PR con la plantilla de la Fábrica más la línea `Jueces: …, seguridad` cuando el repo la pide (`CLAUDE.md:32` de MenuPlan). `prejuicio` no sirve fuera de la Fábrica (`scripts/prejuicio.mjs:56` juzga `git diff MAIN_REF...HEAD` de su propio checkout): se dice, no se arregla aquí. No toca la skill `github` (tope de 120 líneas; `plans/menuplan-separation.md`, trozo 3).
+Not done: dice: carpeta hermana del repo con `tarea --repo`; antes de escribir, leer el `CLAUDE.md` y `.claude/rules/` del repo; los tests del repo (en MenuPlan, `npx vitest run` con los ficheros tocados, y la suite solo antes del PR); token con `FABRICA_REPO`; cuerpo del PR con la plantilla de la Fábrica más la línea `Jueces: …, seguridad` cuando el repo la pide (`CLAUDE.md:32` de MenuPlan). `prejuicio` no sirve fuera de la Fábrica (`scripts/prejuicio.mjs:56` juzga `git diff MAIN_REF...HEAD` de su propio checkout): se dice, no se arregla aquí. Lector: la sesión constructora, que lee el rol al empezar; disparador: `arranque`. No toca la skill `github` (tope de 120 líneas; `plans/menuplan-separation.md`, trozo 3).
 Done:
 ```sh
 node --test test/principles-and-roles.test.js test/contrato.test.js && git grep -q -- "--repo" .claude/agents/constructor.md
@@ -146,7 +146,7 @@ Files: `.github/workflows/revisor.yml`, `ops/revisor-fabrica.test.js`
 Depends on: 6, 10
 Blocked by: A, B, C
 Existing: `git ls-tree --name-only origin/staging .github/workflows/` -> 7 ficheros, ninguno `revisor.yml`; `git ls-tree --name-only origin/staging ops/` no tiene `revisor-fabrica.test.js`.
-Not done: parte de la plantilla `apps/proyecto-nuevo/revisor.yml` de la Fábrica, con `branches: [staging]` y la entrada `bots` con `homenu-sesiones,homenu-dependabot-merge`. No hace el check obligatorio (paso 6 de Pablo) ni crea el environment ni sus secretos (paso 4). A este PR no lo juzga el revisor (corre con `pull_request_target` desde la base, que aún no tiene el fichero); lleva `Jueces: …, seguridad` porque toca un workflow (`CLAUDE.md:32` de MenuPlan). Con D = 1 el juez reutilizable no cambia: ya recibe `REVISOR_CLIENT_ID` y `REVISOR_APP_KEY` como secretos del llamador (`.github/workflows/revisor.yml:25-31`, `create-github-app-token` en las líneas 63-66, 147-150 y 195-198), así que HoMenu le pasa los de su App; el trozo 6 solo añade `bots`. Es puerta (define el check `revisor` de HoMenu): añade un check y no quita ni afloja ninguno (C13); si rompe, se revierte desde una rama nueva. Lector: el ruleset de `staging` (el check `revisor`, paso 6 de Pablo) y el propio juez; disparador: `pull_request_target` en PR a `staging`.
+Not done: parte de la plantilla `apps/proyecto-nuevo/revisor.yml` de la Fábrica, con `branches: [staging]` y la entrada `bots` con `homenu-sesiones,homenu-dependabot-merge`. No hace el check obligatorio (paso 6 de Pablo) ni crea el environment ni sus secretos (paso 4). A este PR no lo juzga el revisor (corre con `pull_request_target` desde la base, que aún no tiene el fichero); lleva `Jueces: …, seguridad` porque toca un workflow (`CLAUDE.md:32` de MenuPlan). Con D = 1 el juez reutilizable necesitaba un cambio que no estaba en el plan y ya está hecho en #182 (puente 6b, `666984f`): `veredicto.mjs` solo cuenta los check `revisor` de la App cuyo slug le pasa el llamador, con la entrada obligatoria `revisor-app-slug` de `workflow_call` (`.github/workflows/revisor.yml:26-32`; sin ella falla en alto); el trozo 6 añadió `bots`. Este trozo pasa `revisor-app-slug` con el slug de la App de HoMenu y sus `REVISOR_CLIENT_ID` y `REVISOR_APP_KEY` (`.github/workflows/revisor.yml:25-31`) como secretos. Que el check de la App nueva lo reconozca el ruleset de `staging` con su integration id se comprueba en el paso 6 de Pablo, no aquí. Es puerta (define el check `revisor` de HoMenu): añade un check y no quita ni afloja ninguno (C13); si rompe, se revierte desde una rama nueva. Lector: el ruleset de `staging` (el check `revisor`, paso 6 de Pablo) y el propio juez; disparador: `ci-judge` (el juez corre en cada PR a `staging`).
 Done:
 ```sh
 npx vitest run ops/revisor-fabrica.test.js
@@ -157,7 +157,7 @@ Files: `.github/workflows/senal-review.yml`, `.github/workflows/anulacion.yml`, 
 Depends on: 7, 11
 Blocked by: A, C
 Existing: `git ls-tree --name-only origin/staging .github/workflows/ | grep -i "anulacion\|senal"` -> sin salida; `git ls-tree --name-only origin/staging ops/ | grep -i anulacion` -> sin salida (no existe `ops/anulacion-fabrica.test.js`).
-Not done: solo los dos que llaman; la regla vive en la Fábrica. El Approve solo vale de `pabloam89` (`OWNER_LOGIN`, `scripts/lib/repo.mjs`); que Álvaro pueda anular es del puente 2. Es puerta (publica `revisor` en verde con el Approve de Pablo): la regla y sus tres condiciones siguen en la Fábrica, sin aflojar (C13); si rompe, se revierte desde una rama nueva. Lector: el ruleset de `staging` (el check `revisor` en verde tras el Approve); disparador: `pull_request_review` (la señal) y, a su paso, `anulacion.yml`.
+Not done: solo los dos que llaman; la regla vive en la Fábrica. El Approve solo vale de `pabloam89` (`OWNER_LOGIN`, `scripts/lib/repo.mjs`); que Álvaro pueda anular es del puente 2. Es puerta (publica `revisor` en verde con el Approve de Pablo): la regla y sus tres condiciones siguen en la Fábrica, sin aflojar (C13); si rompe, se revierte desde una rama nueva. Lector: el ruleset de `staging` (el check `revisor` en verde tras el Approve); disparador: `ci-judge` (la señal de review despierta a `anulacion.yml`).
 Done:
 ```sh
 npx vitest run ops/anulacion-fabrica.test.js
@@ -168,7 +168,7 @@ Files: `.github/workflows/dependabot-auto.yml`, `scripts/dependabot-auto.mjs`, `
 Depends on: 11
 Blocked by: B, C
 Existing: el workflow fusiona «con `tests` en verde» (`.github/workflows/dependabot-auto.yml:1-2` de MenuPlan); `git show origin/staging:scripts/dependabot-auto.mjs | grep -c revisor` -> `0`.
-Not done: la pasada programada (la que no es evento de Dependabot) toca el PR con el token de `homenu-dependabot-merge` para que `pull_request_target` corra como esa App y vea el environment; los de versión mayor siguen para una sesión. No da secretos de Actions a Dependabot. Con B = 3 este trozo no se construye. Lector: el ruleset de `staging` (exige `revisor`) y el propio `dependabot-auto`; disparador: su pasada programada.
+Not done: la pasada programada (la que no es evento de Dependabot) toca el PR con el token de `homenu-dependabot-merge` para que `pull_request_target` corra como esa App y vea el environment; los de versión mayor siguen para una sesión. No da secretos de Actions a Dependabot. Con B = 3 este trozo no se construye. Lector: el ruleset de `staging` (exige `revisor`) y el propio `dependabot-auto`; disparador: `cron` (su pasada programada).
 Done:
 ```sh
 npx vitest run scripts/dependabot-auto.test.js
@@ -179,7 +179,7 @@ Files: `.github/workflows/mercadona-sync.yml`, `ops/mercadona-pr.test.js`
 Depends on: 11
 Blocked by: B, C
 Existing: `git ls-tree --name-only origin/staging ops/ | grep -i mercadona` -> sin salida (no existe `ops/mercadona-pr.test.js`); `.github/workflows/mercadona-sync.yml:23-31` de MenuPlan empuja con `MERCADONA_DEPLOY_KEY` porque la deploy key es la única excepción del ruleset; 2 de sus empujes dejaron `staging` en rojo (runs del 12 y del 26 oct, «Estado medido»).
-Not done: abre el PR con un token de App (según la documentación de GitHub, https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication, los eventos creados con `GITHUB_TOKEN` no lanzan otros workflows; no lo he probado en HoMenu) y arma la fusión automática. Borrar la deploy key y su excepción es el paso 7 de Pablo (irreversible). Con B = 2 o 3 este trozo no se construye. Lector: el ruleset de `staging` (exige `tests` y `revisor` al PR); disparador: el cron de `mercadona-sync`.
+Not done: abre el PR con un token de App (según la documentación de GitHub, https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication, los eventos creados con `GITHUB_TOKEN` no lanzan otros workflows; no lo he probado en HoMenu) y arma la fusión automática. Borrar la deploy key y su excepción es el paso 7 de Pablo (irreversible). Con B = 2 o 3 este trozo no se construye. Lector: el ruleset de `staging` (exige `tests` y `revisor` al PR); disparador: `cron` (el de `mercadona-sync`).
 Done:
 ```sh
 npx vitest run ops/mercadona-pr.test.js ops/workflows.test.js
@@ -201,7 +201,7 @@ Files: `CLAUDE.md`
 Depends on: 11
 Blocked by: A, C
 Existing: `git show origin/staging:CLAUDE.md | grep -n "fusiona la propia sesión"` -> línea 21; `git show origin/staging:CLAUDE.md | grep -c revisor` -> `0`.
-Not done: solo la sección «Ramas, carpetas y PR»: estándar `standards/code.md` de la Fábrica, `gh pr merge --auto`, arreglar un «no» en la rama, Approve de Pablo como salida. No toca las skills ni el resto. `plans/menuplan-separation.md` (trozo 6) también edita este `CLAUDE.md`: van uno detrás de otro, nunca a la vez. Lector: las sesiones de MenuPlan, que leen `CLAUDE.md` al empezar; disparador: el inicio de sesión. Quien hace cumplir la regla es el ruleset del paso 6 de Pablo; el Done solo comprueba que el texto está.
+Not done: solo la sección «Ramas, carpetas y PR»: estándar `standards/code.md` de la Fábrica, `gh pr merge --auto`, arreglar un «no» en la rama, Approve de Pablo como salida. No toca las skills ni el resto. `plans/menuplan-separation.md` (trozo 6) también edita este `CLAUDE.md`: van uno detrás de otro, nunca a la vez. Lector: las sesiones de MenuPlan, que leen `CLAUDE.md` al empezar; disparador: `arranque` (el inicio de sesión). Quien hace cumplir la regla es el ruleset del paso 6 de Pablo; el Done solo comprueba que el texto está.
 Done:
 ```sh
 git grep -q "revisor" -- CLAUDE.md && ! git grep -q "fusiona la propia sesión" -- CLAUDE.md
@@ -286,3 +286,4 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 - Que una App privada solo se pueda instalar en la cuenta que la posee, y que un PR abierto con `GITHUB_TOKEN` no lance `tests` ni `revisor`: lo dice la documentación de GitHub (enlaces en el texto), no lo he probado.
 - Que la App de revisor nueva de HoMenu, con los permisos del manifiesto de `fabrica-revisor`, baste para publicar el check y para `update-branch` o aprobar como lo hace `fabrica-revisor`: copia los permisos de su manifiesto, no lo he probado en HoMenu.
 - La protección clásica de `staging`: la leyó la sesión coordinadora con la sesión de Pablo; con la identidad del constructor, `gh api` da 403 y no la he repetido.
+- Que el ruleset de `staging` reconozca el check `revisor` de la App nueva por su integration id: se comprueba en el paso 6 de Pablo; no lo he probado.
