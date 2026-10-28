@@ -8,11 +8,26 @@ name: anulacion
 # Por qué workflow_run y no pull_request_review: pull_request_review ejecuta el workflow tal como lo trae el PR y su
 # rama no puede usar el environment `revisor` (limitado a main). workflow_run corre siempre la versión de main, con
 # el código de main, y despierta tras senal-review.yml, que no tiene secretos. Aquí NUNCA se baja el código del PR:
-# el checkout no lleva `ref:` (baja main) y el PR solo se lee por API.
+# el único checkout es el de la Fábrica (job.workflow_sha) y el PR solo se lee por API.
+#
+# También es reutilizable (workflow_call): otro repo lo llama con
+#   uses: factory-am89/fabrica/.github/workflows/anulacion.yml@main
+#   secrets: inherit
+# desde un workflow suyo con `on: workflow_run` tras su propio senal-review (el job lee github.event.workflow_run)
+# y con permisos contents/pull-requests: read (un workflow llamado no puede subirlos). Los dos secretos y el
+# environment `revisor` los define el repo que llama: el check se publica con SU App, nunca con unas fijas de la
+# Fábrica. En un workflow reutilizable `github.repository` y `github.event` son los del repo que llama; por eso el
+# juez (veredicto.mjs) se baja siempre de la Fábrica a `.fabrica/`.
 on:
   workflow_run:
     workflows: [senal-review]
     types: [completed]
+  workflow_call:
+    secrets:
+      REVISOR_CLIENT_ID:
+        required: true
+      REVISOR_APP_KEY:
+        required: true
 
 # No cancela una anulación en curso (otra review llegada a la vez); sí espera a la anterior del mismo PR.
 concurrency:
@@ -35,8 +50,13 @@ jobs:
     permissions:
       contents: read
     steps:
+      # El juez, siempre de la Fábrica y en el mismo commit de este workflow (job.workflow_sha: el del fichero
+      # que define el job, no el del repo que llama). La Fábrica es pública: no hace falta token propio.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: factory-am89/fabrica
+          ref: ${{ job.workflow_sha }}
+          path: .fabrica
           persist-credentials: false
 
       - id: app
@@ -47,7 +67,7 @@ jobs:
           permission-pull-requests: read
           permission-checks: write
 
-      - run: node scripts/veredicto.mjs
+      - run: node .fabrica/scripts/veredicto.mjs
         env:
           MODO: anulacion
           REPO: ${{ github.repository }}

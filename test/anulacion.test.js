@@ -121,18 +121,27 @@ test('anulación: sin TOKEN falla en alto', () => {
 
 const cargar = (f) => ({ texto: leer(`.github/workflows/${f}`), doc: yaml.load(leer(`.github/workflows/${f}`)) });
 
-test('anulacion.yml: solo workflow_run, desde main, sin bajar nunca el código del PR', () => {
+test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código del PR y con el juez de la Fábrica', () => {
   const { texto, doc } = cargar('anulacion.yml');
   const on = doc.on ?? doc[true];
-  assert.deepEqual(Object.keys(on), ['workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
+  assert.deepEqual(Object.keys(on).sort(), ['workflow_call', 'workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
-  assert.doesNotMatch(texto, /^\s*ref:/m, 'un checkout con ref: podría traer el código del PR');
-  assert.doesNotMatch(texto, /^\s*repository:/m);
+  assert.deepEqual(Object.keys(on.workflow_call), ['secrets'], 'sin inputs: nada del llamador decide qué se baja');
+  assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
-  assert.equal(pasos.filter((p) => String(p.uses ?? '').startsWith('actions/checkout')).length, 1);
+  const checkouts = pasos.filter((p) => String(p.uses ?? '').startsWith('actions/checkout'));
+  assert.equal(checkouts.length, 1);
+  assert.equal(checkouts[0].with.repository, 'factory-am89/fabrica');
+  assert.equal(checkouts[0].with.ref, '${{ job.workflow_sha }}', 'el juez, en el commit de este workflow');
+  assert.equal(checkouts[0].with.path, '.fabrica');
   assert.equal(Object.values(doc.jobs)[0].environment, 'revisor');
-  assert.equal(pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs')).env.MODO, 'anulacion');
+  const app = pasos.find((p) => String(p.uses ?? '').startsWith('actions/create-github-app-token'));
+  assert.equal(app.with['client-id'], '${{ secrets.REVISOR_CLIENT_ID }}');
+  assert.equal(app.with['private-key'], '${{ secrets.REVISOR_APP_KEY }}');
+  const juez = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
+  assert.equal(juez.run, 'node .fabrica/scripts/veredicto.mjs');
+  assert.equal(juez.env.MODO, 'anulacion');
 });
 
 test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout, sin código del PR', () => {
