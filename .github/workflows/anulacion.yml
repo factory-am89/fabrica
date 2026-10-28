@@ -25,11 +25,11 @@ on:
   workflow_call:
     inputs:
       # Slug de la App de revisor del repo que llama: veredicto.mjs solo cuenta los check `revisor` de esa App.
-      # Sin él cuenta los de la App de la Fábrica (el valor vive en scripts/lib/repo.mjs, no aquí).
+      # Obligatorio al llamar: sin él no se sabe qué App es la del llamador y veredicto.mjs falla en alto. Solo en la
+      # propia Fábrica (workflow_run, sin inputs) vale la constante de scripts/lib/repo.mjs.
       revisor-app-slug:
         type: string
-        required: false
-        default: ''
+        required: true
     secrets:
       REVISOR_CLIENT_ID:
         required: true

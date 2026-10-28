@@ -40,7 +40,7 @@ const corre = (extra) => {
   const ruta = fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url));
   const r = spawnSync(process.execPath, ['--import', precarga, ruta], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, REPO: 'o/r', PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', ...extra },
+    env: { PATH: process.env.PATH, REPO: 'o/r', REVISOR_APP_SLUG, PR: '2', SHA, BASE: 'b'.repeat(40), TOKEN: 'falso', LECTOR: 'falso', CHECK_RUN: '4242', ...extra },
   });
   const publicado = r.stderr.split('\n').filter((l) => l.startsWith('PUBLICADO ')).map((l) => JSON.parse(l.slice(10)));
   return { r, checks: publicado.filter((p) => esCheck(p)).map((p) => p.cuerpo) };
@@ -81,7 +81,7 @@ const previo = (extra = {}) => ({ id: 100, status: 'completed', conclusion: 'fai
 const anula = (reviewsFalsas, checksFalsos) => corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos) });
 
 const anulaCon = (reviewsFalsas, checksFalsos, slug) =>
-  corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos), ...(slug === undefined ? {} : { REVISOR_APP_SLUG: slug }) });
+  corre({ MODO: 'anulacion', REVIEWS_FALSAS: reviewsFalsas, CHECKS_FALSOS: JSON.stringify(checksFalsos), REVISOR_APP_SLUG: slug ?? '' });
 
 test('anulación (tras una review): su aprobación sobre la cabeza convierte el último rojo de la App en verde, con los hallazgos', () => {
   const { r, checks } = anula(reviews(review()), [previo()]);
@@ -119,9 +119,20 @@ test('anulación: lo que cuenta es el último check de la App, no uno viejo en v
 test('anulación: con la App propia de otro repo (REVISOR_APP_SLUG) anula su rojo y no el de la App de la Fábrica', () => {
   const propia = previo({ app: { slug: 'homenu-revisor' } });
   assert.equal(anulaCon(reviews(review()), [propia], 'homenu-revisor').checks.length, 1);
-  assert.deepEqual(anulaCon(reviews(review()), [propia]).checks, [], 'sin el slug, la App ajena no cuenta');
   assert.deepEqual(anulaCon(reviews(review()), [previo()], 'homenu-revisor').checks, [], 'con el slug de HoMenu, la App de la Fábrica no cuenta');
-  assert.equal(anulaCon(reviews(review()), [previo()], '  ').checks.length, 1, 'vacío (lo que llega sin input) = la App de la Fábrica');
+  assert.deepEqual(anulaCon(reviews(review()), [propia], REVISOR_APP_SLUG).checks, [], 'la App ajena no cuenta con el slug de la Fábrica');
+});
+
+test('anulación: sin REVISOR_APP_SLUG falla en alto en un repo ajeno y vale la App de la Fábrica en la propia Fábrica', () => {
+  for (const vacio of [undefined, '', '  ']) {
+    const { r, checks } = anulaCon(reviews(review()), [previo()], vacio);
+    assert.equal(r.status, 1, JSON.stringify(vacio));
+    assert.match(r.stderr, /REVISOR_APP_SLUG/);
+    assert.deepEqual(checks, []);
+  }
+  const propia = corre({ MODO: 'anulacion', REPO, REVIEWS_FALSAS: reviews(review()), CHECKS_FALSOS: JSON.stringify([previo()]) });
+  assert.equal(propia.r.status, 0, propia.r.stderr);
+  assert.equal(propia.checks.length, 1);
 });
 
 test('anulación: sin TOKEN falla en alto', () => {
@@ -139,7 +150,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
   assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
   assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
-  assert.equal(on.workflow_call.inputs['revisor-app-slug'].default, '', 'sin input, veredicto.mjs usa la constante de repo.mjs: el valor no se copia aquí');
+  assert.equal(on.workflow_call.inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
   assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);

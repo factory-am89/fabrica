@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
 import { checkGolden } from './lib/golden-guard.mjs';
-import { OWNER_LOGIN, REVISOR_APP_SLUG } from './lib/repo.mjs';
+import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO as REPO_FABRICA } from './lib/repo.mjs';
 import { ANSWER, ANSWERS, CUT_TITLE, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
@@ -203,13 +203,19 @@ const FALLO_JUICIO_MAS_NUEVO = 'hay un juicio más nuevo de esta cabeza';
 
 // Todos los check `revisor` de una cabeza publicados por la App, del más nuevo al más viejo, de cualquier estado.
 // filter=all: sin él la API devuelve solo el último de cada nombre.
-// El slug es el de la Fábrica salvo que el repo que llama tenga su propia App de revisor (REVISOR_APP_SLUG en el
-// entorno; vacío o ausente = el de la Fábrica, porque una expresión de Actions sin valor llega vacía).
-const slugDeLaApp = () => process.env.REVISOR_APP_SLUG?.trim() || REVISOR_APP_SLUG;
-async function revisoresDeLaApp(repo, sha, token) {
+// La anulación cuenta solo los check de la App del repo que llama (REVISOR_APP_SLUG, lo pasa anulacion.yml). Sin él no se
+// sabe qué App es y se lanza; solo en la propia Fábrica vale la constante de repo.mjs. (El juicio y `cerrar` siguen con
+// la App de la Fábrica por defecto: los repos que llaman a revisor.yml hoy usan fabrica-revisor.)
+function slugDeLaAnulacion(repo) {
+  const slug = process.env.REVISOR_APP_SLUG?.trim();
+  if (slug) return slug;
+  if (repo === REPO_FABRICA) return REVISOR_APP_SLUG;
+  throw new Error(`REVISOR_APP_SLUG falta: no se sabe de qué App son los check \`revisor\` de ${repo}`);
+}
+async function revisoresDeLaApp(repo, sha, token, slug = REVISOR_APP_SLUG) {
   const { check_runs: checks } = await api(token, 'GET', `/repos/${repo}/commits/${sha}/check-runs?check_name=revisor&filter=all&per_page=100`);
   if (!Array.isArray(checks)) throw new Error('check-runs: la API no devolvió una lista');
-  return checks.filter((c) => c.app?.slug === slugDeLaApp()).sort((a, b) => b.id - a.id);
+  return checks.filter((c) => c.app?.slug === slug).sort((a, b) => b.id - a.id);
 }
 
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
@@ -233,7 +239,7 @@ async function anular({ REPO, PR, TOKEN }) {
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: null, token: TOKEN });
   const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
   if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
-  const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN))[0];
+  const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN, slugDeLaAnulacion(REPO)))[0];
   if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
   if (ultimo.status !== 'completed') return console.log('anulación: hay un juicio en curso sobre esta cabeza; lo aplicará al terminar');
   if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
