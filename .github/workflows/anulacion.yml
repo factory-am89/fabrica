@@ -25,10 +25,11 @@ on:
   workflow_call:
     inputs:
       # Slug de la App de revisor del repo que llama: veredicto.mjs solo cuenta los check `revisor` de esa App.
+      # Sin él cuenta los de la App de la Fábrica (el valor vive en scripts/lib/repo.mjs, no aquí).
       revisor-app-slug:
         type: string
         required: false
-        default: fabrica-revisor
+        default: ''
     secrets:
       REVISOR_CLIENT_ID:
         required: true
@@ -76,7 +77,7 @@ jobs:
       - run: node .fabrica/scripts/veredicto.mjs
         env:
           MODO: anulacion
-          REVISOR_APP_SLUG: ${{ inputs.revisor-app-slug || 'fabrica-revisor' }}
+          REVISOR_APP_SLUG: ${{ inputs.revisor-app-slug }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           TOKEN: ${{ steps.app.outputs.token }}

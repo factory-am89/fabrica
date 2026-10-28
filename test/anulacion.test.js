@@ -121,9 +121,7 @@ test('anulación: con la App propia de otro repo (REVISOR_APP_SLUG) anula su roj
   assert.equal(anulaCon(reviews(review()), [propia], 'homenu-revisor').checks.length, 1);
   assert.deepEqual(anulaCon(reviews(review()), [propia]).checks, [], 'sin el slug, la App ajena no cuenta');
   assert.deepEqual(anulaCon(reviews(review()), [previo()], 'homenu-revisor').checks, [], 'con el slug de HoMenu, la App de la Fábrica no cuenta');
-  const vacio = anulaCon(reviews(review()), [propia], '  ');
-  assert.equal(vacio.r.status, 1);
-  assert.match(vacio.r.stderr, /REVISOR_APP_SLUG/);
+  assert.equal(anulaCon(reviews(review()), [previo()], '  ').checks.length, 1, 'vacío (lo que llega sin input) = la App de la Fábrica');
 });
 
 test('anulación: sin TOKEN falla en alto', () => {
@@ -141,7 +139,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
   assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
   assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
-  assert.equal(on.workflow_call.inputs['revisor-app-slug'].default, REVISOR_APP_SLUG);
+  assert.equal(on.workflow_call.inputs['revisor-app-slug'].default, '', 'sin input, veredicto.mjs usa la constante de repo.mjs: el valor no se copia aquí');
   assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
   const pasos = Object.values(doc.jobs).flatMap((j) => j.steps);
@@ -157,7 +155,7 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   const juez = pasos.find((p) => String(p.run ?? '').includes('veredicto.mjs'));
   assert.equal(juez.run, 'node .fabrica/scripts/veredicto.mjs');
   assert.equal(juez.env.MODO, 'anulacion');
-  assert.match(juez.env.REVISOR_APP_SLUG, /inputs\.revisor-app-slug/, 'veredicto.mjs cuenta los check de la App del llamador');
+  assert.equal(juez.env.REVISOR_APP_SLUG, '${{ inputs.revisor-app-slug }}', 'veredicto.mjs cuenta los check de la App del llamador');
 });
 
 test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout, sin código del PR', () => {
