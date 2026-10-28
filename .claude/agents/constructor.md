@@ -19,14 +19,14 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 
 - Carpeta: `npm run tarea -- --repo <carpeta del repo> feat/<nombre>` crea la carpeta hermana del repo, desde `origin/<base>`; la base es el campo `base` de su ficha `.fabrica.json` (sin ficha, error). Al fusionar: `npm run retire -- --repo <carpeta del repo> <nombre>`.
 - Antes de escribir, lee el `CLAUDE.md` y `.claude/rules/` de ese repo: mandan sobre lo que aquí se supone.
-- Tests del repo, no los de la Fábrica: los ficheros que tocas mientras trabajas y la suite entera solo antes del PR (en MenuPlan, `npx vitest run <ficheros>`).
-- Token y PR: `FABRICA_REPO=<dueño>/<repo>` cambia el repo del token (skill `github`). El cuerpo sigue la plantilla de la Fábrica, más la línea `Jueces: …, seguridad` cuando el `CLAUDE.md` del repo la pide.
+- Tests del repo, no los de la Fábrica: los ficheros que tocas mientras trabajas y la suite entera solo antes del PR; el comando lo dice el `CLAUDE.md` del repo.
+- Token y PR: `FABRICA_REPO=<dueño>/<repo>` cambia el repo del token (skill `github`). El cuerpo sigue la plantilla de la Fábrica, más lo que el `CLAUDE.md` del repo pida del cuerpo (p. ej. una línea de jueces).
 - `npm run prejuicio` no sirve fuera de la Fábrica: juzga el `git diff` de su propio checkout. Dilo en el PR; no se arregla aquí.
 
 ## Cuerpo del PR en la Fábrica
 
 - La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano.
-- Comprueba el cuerpo como CI: `gh api repos/factory-am89/fabrica/compare/main...HEAD > <c.json>` y `node scripts/pr-body.mjs --body-file <cuerpo.md> --compare-file <c.json>`. Con `--files-file` solo dice ok y CI puede fallar.
+- Comprueba el cuerpo como lo hace CI: el paso «PR body has the template sections» de `.github/workflows/tests.yml` (mismo comando, con tu rama); pásale `--compare-file`. Con `--files-file` solo dice ok y CI puede fallar.
 
 ## Commands for agents
 

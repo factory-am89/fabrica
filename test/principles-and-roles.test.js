@@ -84,7 +84,7 @@ test('el constructor apunta una fila por cada «no» en el registro y deja el de
 
 test('el constructor sabe trabajar en un repo que la Fábrica opera: --repo, FABRICA_REPO, evidence y --compare-file', () => {
   const texto = leer('.claude/agents/constructor.md');
-  for (const palabra of ['--repo', 'FABRICA_REPO', 'CLAUDE.md', '.claude/rules/', 'npm run evidence', '--compare-file', 'prejuicio']) {
+  for (const palabra of ['--repo', 'FABRICA_REPO', 'CLAUDE.md', '.claude/rules/', 'npm run evidence', '--compare-file', 'tests.yml', 'prejuicio']) {
     assert.ok(texto.includes(palabra), `constructor.md no dice ${palabra}`);
   }
   assert.match(texto, /Repo ajeno/, 'falta la sección de repo ajeno');
