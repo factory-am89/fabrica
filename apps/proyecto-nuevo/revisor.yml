@@ -19,4 +19,9 @@ jobs:
     with:
       # Slug de la App de revisor de este repo (la que crea la Fábrica por defecto); si el repo usa otra App, cámbialo.
       revisor-app-slug: fabrica-revisor
-    secrets: inherit
+    # Solo los tres que el juez usa, por nombre: GitHub exige que el llamador los pase aunque vivan solo en el environment
+    # `revisor`, y la forma «inherit» entregaría además todos los demás secretos de este repo a un workflow de otro repo.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
+      REVISOR_APP_KEY: ${{ secrets.REVISOR_APP_KEY }}

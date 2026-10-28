@@ -12,7 +12,10 @@ name: anulacion
 #
 # También es reutilizable (workflow_call): otro repo lo llama con
 #   uses: factory-am89/fabrica/.github/workflows/anulacion.yml@main
-#   secrets: inherit
+#   secrets:
+#     REVISOR_CLIENT_ID: ${{ secrets.REVISOR_CLIENT_ID }}
+#     REVISOR_APP_KEY: ${{ secrets.REVISOR_APP_KEY }}
+# (por nombre y nunca la forma «inherit»: entregaría todos los secretos del llamador a un workflow de otro repo)
 # desde un workflow suyo con `on: workflow_run` tras su propio senal-review (el job lee github.event.workflow_run)
 # y con permiso contents: read (un workflow llamado no puede subirlos). Los dos secretos y el
 # environment `revisor` los define el repo que llama: el check se publica con SU App, nunca con unas fijas de la
