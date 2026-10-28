@@ -25,7 +25,7 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 
 ## Cuerpo del PR en la Fábrica
 
-- La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano. Lo que `--files-file` no comprueba (esa línea) y cómo se comprueba con `--compare-file` como CI: `.claude/skills/github/referencias/subir.md`, pasos 1 y 2; no se repite aquí.
+- La sección de evidencia sale de `npm run evidence` (incluye la línea `HEAD <sha>`); no la escribas a mano. Lo que `--files-file` no comprueba (esa línea) y cómo se comprueba con `--compare-file` como CI: `.claude/skills/github/referencias/subir.md`, paso 3; no se repite aquí.
 
 ## Commands for agents
 
