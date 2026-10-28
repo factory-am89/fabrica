@@ -37,7 +37,7 @@ test('las plantillas de workflows llaman a los reutilizables de la Fábrica y pa
   const revisor = yaml.load(leer(PLANTILLAS, 'revisor.yml'));
   assert.equal(tests.jobs.tests.uses, `${REPO}/.github/workflows/tests.yml@main`);
   assert.equal(revisor.jobs.revisor.uses, `${REPO}/.github/workflows/revisor.yml@main`);
-  assert.equal(revisor.jobs.revisor.secrets, 'inherit');
+  assert.notEqual(revisor.jobs.revisor.secrets, 'inherit', 'inherit entregaría todos los secretos del repo (ver llamadores-sin-secretos.test.js)');
   assert.ok('pull_request_target' in revisor.on, 'el juez corre con pull_request_target, como el reutilizable');
   assert.ok('pull_request' in tests.on);
   // El check que se exige es "<job que llama> / <job llamado>": si alguien renombra el job, el ruleset se queda sin check.
