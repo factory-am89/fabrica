@@ -146,7 +146,7 @@ jobs:
 
       # Claude solo recibe el token de solo lectura del workflow, no el de la App. `--setting-sources user`: la acción carga por
       # defecto user, project y local; project sería el .claude/settings.json (hooks) y el CLAUDE.md de la copia del repo
-      # llamador, que correrían con el token de Claude en el entorno. Solo user (vacío en el runner).
+      # llamador, que correrían con el token de Claude en el entorno. Solo user.
       - id: claude
         uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1.0.250
         env:
