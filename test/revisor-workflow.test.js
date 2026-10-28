@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import yaml from 'js-yaml';
 import { accionFijada } from '../scripts/lib/actions.mjs';
-import { REPO } from '../scripts/lib/repo.mjs';
+import { REPO, ADMIN_APP_SLUG } from '../scripts/lib/repo.mjs';
+import { IDENTIDADES } from '../scripts/lib/identities.mjs';
 import { leer } from './apoyo/fabrica.mjs';
 
 // Los workflows se comprueban (permisos y SHA, C4) en test/workflows.test.js, que también sirve
@@ -102,9 +103,10 @@ test('revisor.yml: la entrada bots de workflow_call se suma a la lista fija de a
   assert.equal(entrada.required, false, 'bots opcional: la Fábrica no la pasa');
   const pasos = doc.jobs.juzgar.steps;
   const allowed = pasos.map((p) => p.with?.allowed_bots).find((x) => typeof x === 'string');
-  assert.ok(allowed?.startsWith('fabrica-constructor,fabrica-administrador'), 'la lista fija debe seguir delante');
+  const fija = [...Object.keys(IDENTIDADES).filter((n) => n !== 'ninguna'), ADMIN_APP_SLUG].join(',');
+  assert.ok(allowed?.startsWith(fija), 'la lista fija (las Apps de la Fábrica) debe seguir delante');
   assert.match(allowed, /inputs\.bots/, 'allowed_bots no suma la entrada bots');
-  assert.equal(allowed.replace(/\$\{\{.*?\}\}/g, ''), 'fabrica-constructor,fabrica-administrador', 'solo la expresión de bots se añade a la lista fija');
+  assert.equal(allowed.replace(/\$\{\{.*?\}\}/g, ''), fija, 'solo la expresión de bots se añade a la lista fija');
   // Una entrada del repo que llama nunca va a un script de shell (inyección): solo a `with:`.
   for (const [nombre, job] of Object.entries(doc.jobs)) {
     for (const p of job.steps ?? []) assert.doesNotMatch(String(p.run ?? ''), /inputs\./, `${nombre}: inputs.* en un run`);
