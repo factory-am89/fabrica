@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { REPO } from '../scripts/lib/repo.mjs';
@@ -326,4 +327,34 @@ test('settings: null (not visible) asks for no PATCH and is listed as hidden; a 
   const real = { ...completo(), repo: { private: REPO_REAL.private, allow_auto_merge: REPO_REAL.allow_auto_merge, delete_branch_on_merge: REPO_REAL.delete_branch_on_merge } };
   assert.deepEqual(plan(real), []);
   assert.deepEqual(hiddenFields(real), []);
+});
+
+// plans/puente-1, trozo 8: el cuerpo para la rama buena de otro repo (HoMenu: staging) sale del mismo rulesetBody.
+test('ruleset body: strict and name are parameters; by default nothing changes, and the rest stays closed', () => {
+  const porDefecto = rulesetBody({ revisorAppId: REVISOR_APP_ID });
+  assert.equal(porDefecto.name, 'main');
+  assert.equal(porDefecto.rules[1].parameters.strict_required_status_checks_policy, false);
+  const staging = rulesetBody({ revisorAppId: REVISOR_APP_ID, strict: true, name: 'staging', testsContext: 'tests' });
+  assert.equal(staging.name, 'staging');
+  assert.equal(staging.rules[1].parameters.strict_required_status_checks_policy, true);
+  assert.equal(staging.enforcement, 'active');
+  assert.deepEqual(staging.bypass_actors, []);
+  assert.deepEqual(staging.rules[1].parameters.required_status_checks, [
+    { context: 'tests', integration_id: ACTIONS_APP_ID },
+    { context: 'revisor', integration_id: REVISOR_APP_ID },
+  ]);
+  assert.throws(() => rulesetBody({ revisorAppId: REVISOR_APP_ID, strict: 'si' }), /strict/);
+  assert.throws(() => rulesetBody({ revisorAppId: REVISOR_APP_ID, name: '' }), /name/);
+});
+
+test('cuerpo-ruleset.mjs prints the JSON body for the given branch and fails loud without --app-id', () => {
+  const orden = (...args) => spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'admin', 'cuerpo-ruleset.mjs'), ...args], { encoding: 'utf8' });
+  const ok = orden('--app-id', String(REVISOR_APP_ID), '--name', 'staging', '--strict', '--tests-context', 'tests');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(JSON.parse(ok.stdout), rulesetBody({ revisorAppId: REVISOR_APP_ID, strict: true, name: 'staging', testsContext: 'tests' }));
+  assert.deepEqual(JSON.parse(orden('--app-id', String(REVISOR_APP_ID)).stdout), rulesetBody({ revisorAppId: REVISOR_APP_ID }));
+  const sin = orden();
+  assert.notEqual(sin.status, 0);
+  assert.match(sin.stderr, /--app-id/);
+  assert.equal(sin.stdout, '');
 });
