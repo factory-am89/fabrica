@@ -3,6 +3,7 @@
 // lesson: git-not-from-main-folder
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, realpathSync, cpSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -29,8 +30,8 @@ function repo(nombre = 'fabrica') {
   git(principal, 'init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
-  writeFileSync(path.join(principal, '.fabrica.json'), FICHA_FABRICA); // tarea lee de la ficha la rama base
-  git(principal, 'add', 'a.txt', '.fabrica.json');
+  writeFileSync(path.join(principal, NOMBRE_FICHA), FICHA_FABRICA); // tarea lee de la ficha la rama base
+  git(principal, 'add', 'a.txt', NOMBRE_FICHA);
   git(principal, 'commit', '-q', '-m', 'inicial');
   return principal;
 }

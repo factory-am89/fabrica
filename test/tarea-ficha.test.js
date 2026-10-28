@@ -1,14 +1,17 @@
 // tarea y retire sirven para un repo ajeno: la rama base sale de su ficha y no se le ponen los hooks de la Fábrica.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EXIT } from '../scripts/lib/exit.mjs';
+import { NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { crearTarea, cliTarea } from '../scripts/tarea.mjs';
 import { retirar, cliRetirar } from '../scripts/retire.mjs';
+import { leerFicha } from '../scripts/lib/repo-card.mjs';
 import { HOOK_MARCA } from '../scripts/install-hooks.mjs';
-import { git, repo } from './apoyo/repo.mjs';
+import { git, repo, FICHA_FABRICA } from './apoyo/repo.mjs';
 
 const FALSO = fileURLToPath(new URL('./fixtures/token-falso.mjs', import.meta.url));
 
@@ -17,8 +20,8 @@ const FICHA_AJENA = '{"repo":"pabloam89/MenuPlan","base":"staging","identidad":"
 // Un repo ajeno: rama staging con su ficha, remoto con staging y main distintos, sin .githooks/.
 function ajeno({ ficha = FICHA_AJENA } = {}) {
   const { padre, principal } = repo();
-  if (ficha) writeFileSync(path.join(principal, '.fabrica.json'), ficha);
-  else rmSync(path.join(principal, '.fabrica.json'));
+  if (ficha) writeFileSync(path.join(principal, NOMBRE_FICHA), ficha);
+  else rmSync(path.join(principal, NOMBRE_FICHA));
   git(principal, 'add', '-A');
   git(principal, 'commit', '-q', '-m', 'ficha');
   git(principal, 'branch', 'staging');
@@ -65,7 +68,7 @@ test('tarea --repo: trabaja sobre el repo de esa carpeta, desde otro cwd', () =>
   const r = cliTarea(['--json', '--repo', principal, 'feat/fuera'], { instalar: false });
   assert.equal(r.code, 0, r.stderr);
   assert.equal(JSON.parse(r.stdout).base, 'origin/staging');
-  assert.equal(cliTarea(['--repo'], { instalar: false }).code, 2);
+  assert.equal(cliTarea(['--repo'], { instalar: false }).code, EXIT.USAGE);
 });
 
 // Una carpeta con un commit subido, en un repo ajeno cuya base es staging; `prs` es lo que GitHub (falso) devuelve.
@@ -108,6 +111,10 @@ test('retirar --repo: lo mismo desde otra carpeta, y sin ficha falla en alto', (
   assert.equal(r.code, 0, r.stderr);
   assert.ok(!existsSync(carpeta));
   const sin = ajeno({ ficha: null });
-  assert.equal(cliRetirar(['--repo', sin.principal, 'nada']).code, 2);
-  assert.equal(cliRetirar(['--repo']).code, 2);
+  assert.equal(cliRetirar(['--repo', sin.principal, 'nada']).code, EXIT.USAGE);
+  assert.equal(cliRetirar(['--repo']).code, EXIT.USAGE);
+});
+
+test('la ficha de los repos de prueba es la de esta Fábrica', () => {
+  assert.deepEqual(JSON.parse(FICHA_FABRICA), leerFicha(path.join(import.meta.dirname, '..')));
 });

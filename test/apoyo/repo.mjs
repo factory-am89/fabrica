@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { NOMBRE_FICHA } from '../../scripts/lib/repo-card.mjs';
 
 // La ficha .fabrica.json de los repos de prueba: tarea y retire leen de ella la rama base.
 export const FICHA_FABRICA = '{"repo":"factory-am89/fabrica","base":"main","identidad":"fabrica-constructor"}\n';
@@ -26,8 +27,8 @@ export function repo({ lockfile = false } = {}) {
   for (const [k, v] of [['user.email', 't@t'], ['user.name', 't'], ['commit.gpgsign', 'false']]) git(principal, 'config', k, v);
   writeFileSync(path.join(principal, 'a.txt'), 'a\n');
   // la ficha: tarea y retire leen de ella la rama base (sin ficha fallan en alto)
-  writeFileSync(path.join(principal, '.fabrica.json'), FICHA_FABRICA);
-  git(principal, 'add', 'a.txt', '.fabrica.json');
+  writeFileSync(path.join(principal, NOMBRE_FICHA), FICHA_FABRICA);
+  git(principal, 'add', 'a.txt', NOMBRE_FICHA);
   if (lockfile) {
     writeFileSync(path.join(principal, 'package.json'), '{"name":"x","version":"1.0.0"}\n');
     writeFileSync(path.join(principal, 'package-lock.json'), '{"name":"x","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"x","version":"1.0.0"}}}\n');

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearTarea } from '../scripts/tarea.mjs';
 import { limpiar, opciones, imprimir } from '../scripts/clean.mjs';
-import { leerFicha } from '../scripts/lib/repo-card.mjs';
+import { leerFicha, NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { IDENTIDADES, identidadDe } from '../scripts/lib/identities.mjs';
 import { consultar, rutaDe } from '../scripts/lib/gh-public.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
@@ -44,7 +44,7 @@ function mundo(ramas, { ficha = FICHA, conStaging = false } = {}) {
   git(principal, 'push', '-q', 'origin', 'main');
   if (conStaging) git(principal, 'push', '-q', 'origin', 'main:staging');
   // tarea lee la rama base de la ficha: las carpetas se crean con la ficha común y después se pone la que se prueba
-  writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(FICHA));
+  writeFileSync(path.join(principal, NOMBRE_FICHA), JSON.stringify(FICHA));
   const carpetas = {};
   for (const rama of ramas) {
     const { carpeta } = crearTarea(rama, { cwd: principal, instalar: false });
@@ -54,8 +54,8 @@ function mundo(ramas, { ficha = FICHA, conStaging = false } = {}) {
     git(carpeta, 'push', '-q', 'origin', rama);
     carpetas[rama] = { carpeta, punta: git(carpeta, 'rev-parse', 'HEAD') };
   }
-  if (ficha) writeFileSync(path.join(principal, '.fabrica.json'), JSON.stringify(ficha));
-  else rmSync(path.join(principal, '.fabrica.json'));
+  if (ficha) writeFileSync(path.join(principal, NOMBRE_FICHA), JSON.stringify(ficha));
+  else rmSync(path.join(principal, NOMBRE_FICHA));
   return { padre, principal, remoto, carpetas };
 }
 
