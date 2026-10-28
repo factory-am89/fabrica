@@ -215,10 +215,10 @@ Ola 1 (Fábrica, sin Pablo): 1, 2 y 8, y 5 tras 2. Ola 2 (Fábrica): 4, 6 y 7 tr
 
 Solo lo que la lista cerrada de `standards/intervention.md` le reserva (permisos, secretos, la puerta, lo irreversible). Para la opción recomendada de A:
 
-1. Contestar A, B, C y D (hecho el 2026-10-28).
+1. Las decisiones del plan (sus respuestas están en `intervenciones.md`).
 2. En los ajustes de `fabrica-constructor` en GitHub, «Make public» (unos 1 min); `fabrica-revisor` ya no hace falta publicarla (D). Cambia quién puede instalarlas, no sus permisos.
 3. Instalar `fabrica-constructor` en la cuenta pabloam89, «Only select repositories», solo MenuPlan (unos 2 min).
-4. Crear la App de revisor de HoMenu (propia de la cuenta pabloam89, con los mismos permisos que el manifiesto de `fabrica-revisor` en `apps/crear-apps.html`: `pull_requests` write y `checks` write, y sin eventos), instalarla solo en MenuPlan, generar su clave, crear el environment `revisor` de MenuPlan limitado a la rama `staging` y guardar los tres secretos `REVISOR_APP_KEY` (la clave de la App nueva, leyendo el fichero por la entrada), `REVISOR_CLIENT_ID` (el de la App nueva) y `CLAUDE_CODE_OAUTH_TOKEN` (de `claude setup-token`) en ese environment; borrar el fichero de la clave (unos 8 min).
+4. Crear la App de revisor de HoMenu (propia de la cuenta pabloam89, con los permisos del manifiesto de `fabrica-revisor` en `apps/crear-apps.html`), instalarla solo en MenuPlan, generar su clave, crear el environment `revisor` de MenuPlan limitado a la rama `staging` y guardar los tres secretos `REVISOR_APP_KEY` (la clave de la App nueva, leyendo el fichero por la entrada), `REVISOR_CLIENT_ID` (el de la App nueva) y `CLAUDE_CODE_OAUTH_TOKEN` (de `claude setup-token`) en ese environment; borrar el fichero de la clave (unos 8 min).
 5. En MenuPlan, activar «Allow auto-merge» (unos 30 s).
 6. Aplicar el ruleset de `staging` con la salida de `node scripts/admin/cuerpo-ruleset.mjs` (trozo 8), con un PUT a `repos/pabloam89/MenuPlan/rulesets/24770007`: PR obligatorio, `tests` y `revisor` (el integration id de la App nueva de HoMenu, no 5332150), al día y sin excepciones. Luego cerrar la sesión de `gh` (unos 3 min).
 7. Con B = 1 y el trozo 14 ya fusionado: borrar la deploy key `mercadona-sync` y el secreto `MERCADONA_DEPLOY_KEY` (irreversible; si hiciera falta se crea otra) y guardar en el environment `mercadona-sync` la clave de la App con la que abrirá el PR (unos 4 min).
@@ -244,10 +244,13 @@ Con A = 2 cambian los pasos 2 a 4 (con D = 1 la App de revisor nueva se crea igu
 - principio 2 | eligió: el despertador «al día» pone al día un solo PR cada vez (el armado más antiguo y detrás de la base) y el coste de strict se mide con la cifra «PR por día» | descartó: poner al día a todos los PR abiertos tras cada fusión, cuyo coste (repetir `tests` y `revisor` en cada uno) no se mediría | motivo: decidido
 - principio 4 | eligió: la cifra del trozo 1 va al issue de este plan | descartó: un fichero nuevo en el repo con la cifra, que quedaría viejo en cuanto cambie el corpus | motivo: decidido
 - principio 4 | eligió: `scripts/admin/cuerpo-ruleset.mjs`, una orden que solo imprime el cuerpo del ruleset a partir de `rulesetBody` | descartó: aplicarlo desde el propio plan o escribir el JSON a mano en `PASOS-PABLO.md` | motivo: decidido
+- principio 4 | eligió: `dueno` de una identidad pasa a una lista cerrada de dueños (trozo 3) | descartó: `null`, o sea valer para cualquier dueño | motivo: decidido
+- principio 2 | eligió: los trozos 13 y 15 usan el token de la App `homenu-dependabot-merge` para tocar el PR y ponerlo al día | descartó: `GITHUB_TOKEN`, cuyo push no lanza `tests` ni `revisor` (documentación de GitHub, Not verified); sus permisos se miran en 13 antes de construir | motivo: decidido
+- principio 2 | eligió: el trozo 14 abre el PR de mercadona-sync con un token de App de HoMenu, cuál se fija al construirlo y se apunta en su PR | descartó: abrirlo con `GITHUB_TOKEN`, que no lanzaría los checks | motivo: decidido
 
 ## Decisions for Pablo
 
-Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-28), no aquí. La decisión D (¿con qué App juzga el revisor en HoMenu?) también está contestada allí, opción 1: una App de revisor propia de HoMenu; por eso en A solo hace falta hacer pública `fabrica-constructor`. Un plan admite como máximo 3 decisiones abiertas (`MAX_DECISIONS`, `scripts/lib/plan.mjs:47`), de modo que D no se lista aquí como pregunta.
+Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-28), no aquí. La decisión D (¿con qué App juzga el revisor en HoMenu?) también consta allí. Un plan admite como máximo 3 decisiones abiertas (`MAX_DECISIONS`, `scripts/lib/plan.mjs:47`), de modo que D no se lista aquí como pregunta.
 
 ### A. ¿Dónde vive HoMenu para que la Fábrica lo opere?
 Por qué te lo pregunto: las Apps de la Fábrica son privadas y solo viven en factory-am89; llevarlas a HoMenu es tocar permisos de Apps o mudar el repo, y las dos cosas son tuyas.
@@ -281,5 +284,5 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 - Con A = 2: qué secretos, environments, deploy keys e integraciones (Vercel, Supabase, TestFlight) sobreviven a la transferencia. No lo he mirado.
 - Cuánto gasta de la suscripción juzgar HoMenu (picos de 41 PR al día, y strict repite juicios). El revisor usa `CLAUDE_CODE_OAUTH_TOKEN`, no la `ANTHROPIC_API_KEY` de HoMenu; las evals de Lola (`scripts/bot-evals.mjs`) no las toca ningún trozo.
 - Que una App privada solo se pueda instalar en la cuenta que la posee, y que un PR abierto con `GITHUB_TOKEN` no lance `tests` ni `revisor`: lo dice la documentación de GitHub (enlaces en el texto), no lo he probado.
-- Que la App de revisor nueva de HoMenu, con solo `pull_requests` write y `checks` write, baste para publicar el check y para `update-branch` o aprobar como lo hace `fabrica-revisor`: copia los permisos de su manifiesto, no lo he probado en HoMenu.
+- Que la App de revisor nueva de HoMenu, con los permisos del manifiesto de `fabrica-revisor`, baste para publicar el check y para `update-branch` o aprobar como lo hace `fabrica-revisor`: copia los permisos de su manifiesto, no lo he probado en HoMenu.
 - La protección clásica de `staging` y la lista de colaboradores de MenuPlan: los leyó la sesión coordinadora con la sesión de Pablo; con la identidad del constructor, `gh api` da 403 y no los he repetido.
