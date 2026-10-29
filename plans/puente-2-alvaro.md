@@ -33,7 +33,7 @@ Files: `scripts/lib/identities.mjs`, `scripts/token.mjs`, `scripts/lib/repo-card
 Depends on: none
 Blocked by: A
 Existing: `git grep -n "FABRICA_IDENTIDAD"` -> sin salida; `ls test | grep -i identidad-activa` -> sin salida. El cliente, el documento y la bóveda están fijos en `scripts/token.mjs:134,176` y en `CLIENT_ID_CONSTRUCTOR` (`scripts/lib/repo.mjs:7`), y solo `FABRICA_CONSTRUCTOR_CLIENT_ID` y `OP_VAULT` los cambian, por separado. Campos: `clientId`, `documento` y `boveda` son claves de la constante de código `IDENTIDADES`, no campos de entidad. `git grep -n -i -E "identidad|clientId|boveda|persona" -- fields.json entities.json` -> sin salida: ninguna fila equivalente que reutilizar.
-Not done: una sola variable de entorno por PC, `FABRICA_IDENTIDAD`. Una función `identidadActiva(env, ficha)` en `identities.mjs` es su único lector y la usan `token.mjs` y `leerFicha`. Sin variable vale la de la ficha, como hoy. Si la variable nombra una identidad que no existe o cuyo dueño no es el del repo, falla en alto. No añade la identidad de Álvaro (trozo 2) ni caché por dueño: el tope de 60 lecturas por hora sigue y se mide con `npm run op-reads`. En la Fábrica y en el PC de Pablo nada cambia. Con A = 3 no se construye. Lector: `token.mjs` y `leerFicha`; disparador: cada llamada a `token.mjs` y a `tarea`, `clean` y `retire` (entrada real: `node scripts/token.mjs -- node -e ...` con un `op` falso, como `test/token-cache.test.js`).
+Not done: una sola variable de entorno por PC, `FABRICA_IDENTIDAD`. Una función `identidadActiva(env, ficha)` en `identities.mjs` es su único lector y la usan `token.mjs` y `leerFicha`. Sin variable vale la de la ficha, como hoy. Si la variable nombra una identidad que no existe o cuyo dueño no es el del repo, falla en alto. No añade la identidad de Álvaro (trozo 2) ni caché por dueño: el tope de 60 lecturas por hora sigue y se mide con `npm run op-reads`. En la Fábrica y en el PC de Pablo nada cambia. Con A = 3 no se construye. Lector: `token.mjs` y `leerFicha`; disparador: `manual` (la persona lo activa al fijar la variable en su PC), declarado como deuda: no hay otro disparador para un ajuste por PC (entrada real: `node scripts/token.mjs -- node -e ...` con un `op` falso, como `test/token-cache.test.js`).
 Done:
 ```sh
 node --test test/identidad-activa.test.js test/identidades-dueno.test.js test/token-clientid.test.js test/token-cache.test.js test/op-door.test.js
@@ -49,6 +49,7 @@ Done:
 ```sh
 node --test test/identidades-dueno.test.js test/identidad-activa.test.js
 ```
+Falla antes: el caso nuevo de `test/identidades-dueno.test.js` (la entrada de Álvaro con dueño solo `pabloam89`) falla porque la identidad no existe en el mapa.
 
 ### 3. (Fábrica) `install-pc` no pisa un fichero que no instaló él
 Files: `scripts/install-pc.mjs`, `test/install-pc.test.js`
@@ -115,6 +116,7 @@ Done:
 ```sh
 npx vitest run ops/anulacion-fabrica.test.js
 ```
+Falla antes: el caso nuevo de `ops/anulacion-fabrica.test.js` (el workflow pasa `duenos` con los dos logins) falla porque hoy solo pasa `revisor-app-slug`.
 
 ### 9. (Fábrica) Guardar el token de la cuenta de servicio en el llavero sin el arranque de Pablo
 Files: `apps/guardar-token-servicio.ps1`, `scripts/lib/op-door.mjs`, `scripts/token.mjs`, `test/op-door.test.js`, `test/guardar-token-servicio.test.js`
