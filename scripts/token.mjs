@@ -59,7 +59,8 @@ const { recurso: LLAVERO_RECURSO, usuario: LLAVERO_USUARIO } = JSON.parse(
 // Orden de PowerShell que lee la entrada. Sale con 0 y el valor si la hay; con 1 SOLO si el almacén dice
 // «elemento no encontrado» (HRESULT 0x80070490 = -2147023728, en la excepción interna: no depende del idioma);
 // con 2 ante cualquier otro error (no carga el tipo, acceso denegado...). Sin el try, una excepción de un
-// método .NET con -Command solo cortaría esa sentencia y el proceso saldría con 0.
+// método .NET con -Command solo cortaría esa sentencia y el proceso saldría con 0. Pendiente: Llavero-Orden-Leer de
+// apps/lib-gh.ps1 conserva la orden antigua (cualquier error sale con 1); no es la misma receta.
 export function ordenLeerLlavero(recurso, usuario) {
   return (
     "$ErrorActionPreference = 'Stop'; try { " +
