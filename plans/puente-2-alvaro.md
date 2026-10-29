@@ -6,8 +6,8 @@ Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `orig
 
 ## Lo desagradable primero
 
-- **La clave del constructor no se puede repartir.** `fabrica-constructor` está instalada en **todos** los repos de factory-am89 con permisos de escritura sobre código, workflows, PR e issues (`gh api orgs/factory-am89/installations`, campo `repository_selection`). No todos esos repos admiten reglas en el plan gratis, así que parte de lo que esa clave alcanza no pasa por PR ni juez. Lo mismo vale para otras credenciales de Pablo con alcance amplio. Clase del riesgo: una credencial con más alcance que el trabajo que se le encarga.
-- **Es un riesgo que ya existe hoy, sin Álvaro.** Las sesiones de Pablo ya tienen esas credenciales. El puente 2 solo lo multiplicaría si una clave saliera del PC de Pablo; por eso ninguna sale. Ningún trozo reduce el riesgo que ya existe: acotar esas dos instalaciones a «solo los repos elegidos» es un clic de Pablo (paso recomendado más abajo).
+- **La clave del constructor no se puede repartir.** `fabrica-constructor` está instalada en todos los repos de factory-am89 con permisos de escritura (`gh api orgs/factory-am89/installations`, campo `repository_selection`), un alcance mayor que el trabajo de HoMenu. Clase del riesgo: una credencial con más alcance que el trabajo que se le encarga. Por eso Álvaro necesita su propia identidad.
+- **Ninguna clave de Pablo sale de su PC.** Revisar el alcance de las instalaciones que ya existen no lo pide este plan; ver «Pasos de Pablo».
 - **Meter a Álvaro en la org le enseña lo privado de Pablo.** El permiso base de la org es de lectura (`gh api orgs/factory-am89`, campo `default_repository_permission`), y un miembro leería el repo privado de configuración. Además no hace falta: `fabrica` es público (`gh api orgs/factory-am89/repos`), y para HoMenu basta su permiso `write` en MenuPlan (`gh api repos/pabloam89/MenuPlan/collaborators` -> `algbarc-design write`).
 - **Instalar la capa de usuario pisaría la configuración que Álvaro ya tiene.** `install-pc instalar` sobrescribe un `~/.claude/CLAUDE.md` o `settings.json` distinto aunque no lo haya instalado él (`scripts/install-pc.mjs:96` lo marca `editado-a-mano` y el bucle de la línea 158 lo escribe). Lo comprueba `test/install-pc.test.js:55` («reinstalar sobrescribe lo editado»). En el PC de Álvaro, que ya usa Claude Code con HoMenu, borraría sus ajustes sin avisar.
 - **Hoy las sesiones de Álvaro le hablarían como a Pablo.** `usuario/CLAUDE.md` se titula «Reglas de Pablo», da la hora «de Pablo» y apunta a la ruta fija de los hooks de Pablo en su carpeta de usuario (`usuario/CLAUDE.md:1,11,21`). La lista cerrada y el principio 6 dicen «Pablo» (`standards/intervention.md:26`, `CLAUDE.md:4`).
@@ -55,7 +55,7 @@ Files: `scripts/install-pc.mjs`, `test/install-pc.test.js`
 Depends on: none
 Blocked by: none
 Existing: `scripts/install-pc.mjs:96` da `editado-a-mano` tanto a un fichero tocado tras instalar como a uno que nunca se instaló (sin huella), y los dos se sobrescriben (`test/install-pc.test.js:55`). En lo leído de `install-pc.mjs` (líneas 84-97) no hay ningún estado para un fichero sin huella.
-Not done: clase: una instalación que borra en silencio lo que no es suyo. Estado nuevo `ajeno` (el fichero existe, difiere y la huella no lo tiene). `instalar` no escribe nada y sale con 1 nombrándolo, salvo con `--reemplazar`, que antes guarda una copia `<fichero>.antes-de-fabrica`. Lo de después de instalar sigue igual (lo exige el test de la línea 55). Reproducido por la entrada real: un `home` con `CLAUDE.md` propio y sin huella, `node scripts/install-pc.mjs instalar` -> hoy lo escribe; después, sale con 1 y no lo toca. Quién más escribe en `~/.claude`: Claude Code y el propio usuario (no se tocan); la lista del código sale al construir con `git grep -n "\.claude" -- scripts`. Lector: `install-pc`; disparador: `manual` (lo lanza la persona), declarado como deuda: no hay otro disparador para instalar un PC.
+Not done: clase: una instalación que borra en silencio lo que no es suyo. Estado nuevo `ajeno` (el fichero existe, difiere y la huella no lo tiene). `instalar` no escribe nada y sale con 1 nombrándolo, salvo con `--reemplazar`, que antes guarda una copia `<fichero>.antes-de-fabrica`. Lo de después de instalar sigue igual (lo exige el test de la línea 55). La reproducción (un `home` con `CLAUDE.md` propio y sin huella; `node scripts/install-pc.mjs instalar` hoy lo escribe y después sale con 1 sin tocarlo) es el test nuevo, que se ve fallar antes. Quién más escribe en `~/.claude`: Claude Code y el propio usuario (no se tocan); `git grep -n -l "[.]claude" -- scripts` nombra 14 ficheros, casi todos por la carpeta `.claude/` del repo, y `install-pc.mjs` es el único que instala la capa de usuario. Lector: `install-pc`; disparador: `manual` (lo lanza la persona), declarado como deuda: no hay otro disparador para instalar un PC.
 Done:
 ```sh
 node --test test/install-pc.test.js test/usuario-settings.test.js
@@ -87,7 +87,7 @@ node --test test/principles-and-roles.test.js test/contrato.test.js && ! git gre
 Files: `scripts/veredicto.mjs`, `scripts/lib/record.mjs`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`, `test/anulacion-duenos.test.js`
 Depends on: none
 Blocked by: B, C
-Existing: `aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN)` acepta un solo login (`scripts/veredicto.mjs:126`); `anulacion.yml` en `workflow_call` solo recibe `revisor-app-slug` (líneas 25-37). `grep -n "duenos" .github/workflows/anulacion.yml` -> sin salida.
+Existing: `git grep -n -i "duenos" -- fields.json entities.json` -> sin salida (el `duenos` de cada identidad es una clave de `IDENTIDADES`, `scripts/lib/identities.mjs:13`; la entrada de `workflow_call` reutiliza el nombre para otra cosa: logins por repo). `aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN)` acepta un solo login (`scripts/veredicto.mjs:126`); `anulacion.yml` en `workflow_call` solo recibe `revisor-app-slug` (líneas 25-37). `grep -n "duenos" .github/workflows/anulacion.yml` -> sin salida.
 Not done: entrada opcional `duenos` de `workflow_call`: cada dueño con su login y la lista de Apps que lanzan sus sesiones (p. ej. `pabloam89:fabrica-constructor,algbarc-design:<App de Álvaro>`). Una aprobación solo cuenta si su autor está en la lista, si es su última review decisiva sobre la cabeza actual y si el autor del PR no es una de sus propias Apps. Sin la entrada (la propia Fábrica) todo sigue igual, con `OWNER_LOGIN` y sin la regla nueva. El título «override by Pablo» (`scripts/lib/record.mjs:13`) pasa a nombrar al dueño que anula. `node scripts/records.mjs` lo sigue contando como `overrides`. `OWNER_LOGIN` también es dueño de repo en `identities.mjs:13`: no se separa aquí. Es puerta: amplía quién anula, solo en el repo que lo pide, y añade una condición. Las tres de hoy siguen, y `test/anulacion.test.js` sigue en rojo si se quita alguna (C13). Si rompe, se revierte desde una rama nueva. Lector: `veredicto.mjs` (MODO=anulacion); disparador: `ci-judge`.
 Done:
 ```sh
@@ -158,7 +158,7 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 1. Contestar A, B y C (hecho: consta en `intervenciones.md`, filas del 2026-10-29).
 2. Con A = 1: aceptar la petición de instalación de la App de Álvaro, solo en `pabloam89/MenuPlan`.
 3. No añadir a Álvaro a factory-am89 (decisión tomada, abajo).
-4. Recomendado, aunque no lo pide este plan: en factory-am89 pasar `fabrica-constructor` y `homenu-sesiones` de «All repositories» a «Only select repositories», dejando fuera los que no admiten reglas.
+4. Recomendado, aunque no lo pide este plan: revisar el alcance de las instalaciones de `fabrica-constructor` y `homenu-sesiones` en factory-am89 y acotarlo a los repos que necesitan.
 5. Los pasos 5 a 7 del puente 1 siguen pendientes. Sin el paso 6 (ruleset de `staging` con `revisor`), el juez corre pero no es obligatorio para nadie, tampoco para Álvaro.
 
 ## Pasos de Álvaro
@@ -179,12 +179,12 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 
 ## Decisions taken
 - principio 4 | eligió: la identidad de GitHub de las sesiones es de la persona (`FABRICA_IDENTIDAD` en su PC, validada contra la ficha), y la ficha guarda la de por defecto del repo | descartó: cambiar la ficha de MenuPlan a una identidad común para los dos, que haría indistinguible quién lanzó cada PR y dejaría sin base la regla de cuatro ojos del trozo 6 | motivo: decidido
-- principio 6 | eligió: no añadir a Álvaro a factory-am89 | descartó: hacerle miembro, que con el permiso base `read` le daría lectura del repo privado de configuración de Pablo y no le hace falta porque `fabrica` es público | motivo: decidido
+- principio 6 | eligió: no añadir a Álvaro a factory-am89 | descartó: hacerle miembro, que ampliaría sus permisos sobre repos privados de Pablo (clase «Change permissions or secrets» de `standards/intervention.md`) y no le hace falta porque `fabrica` es público | motivo: decidido
 - principio 3 | eligió: install-pc falla en alto ante un fichero que no instaló y solo lo reemplaza con `--reemplazar` y copia previa | descartó: seguir sobrescribiendo en silencio la configuración de quien instala por primera vez | motivo: decidido
 - principio 2 | eligió: la capa personal se une a la común al instalar, en un solo `~/.claude/CLAUDE.md` | descartó: un `@import` desde `~/.claude/CLAUDE.md`, que no he probado en esta versión de Claude Code | motivo: decidido
 - principio 4 | eligió: los valores privados de Álvaro viven en su propio fichero, con `FABRICA_VALORES` (que `install-pc` ya admite) | descartó: darle acceso a `fabrica-privado` o meter sus valores en el mismo `valores.json` que Pablo | motivo: decidido
 - principio 4 | eligió: los dueños de cada repo para la anulación los pasa el workflow que llama, y la Fábrica sigue con `OWNER_LOGIN` | descartó: convertir `OWNER_LOGIN` en una lista global, que daría a Álvaro poder de anular en la propia Fábrica | motivo: decidido
-- principio 4 | eligió: los pasos de Álvaro en `PASOS-ALVARO.md`, como los de Pablo en `PASOS-PABLO.md` | descartó: mezclarlos en `PASOS-PABLO.md`, donde Álvaro tendría que buscar entre clics que no son suyos | motivo: decidido
+- principio 4 | eligió: los pasos de Álvaro en `PASOS-ALVARO.md` | descartó: copiarlos también en `PASOS-PABLO.md`, que repetiría el mismo dato en dos sitios | motivo: decidido
 
 ## Decisions for Pablo
 
@@ -194,7 +194,7 @@ Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026
 Por qué te lo pregunto: es dar o crear credenciales y permisos de Apps, que es tuyo.
 1. Con una App propia de Álvaro, que crea él, cuya clave solo guarda él y que instalas solo en MenuPlan. Ninguna clave tuya sale de tu bóveda, cada PR dice quién lo lanzó y la quitas desinstalándola. Coste: unos 20 minutos de Álvaro, un clic tuyo y los trozos 1, 2, 7 y 9 (recommended)
 2. Con su propia cuenta de GitHub, como hoy en su PC. Coste: nada que montar, pero los PR no salen de una App y una sesión suya podría aprobar PR ajenos como él, así que con esta opción Álvaro no puede tener la anulación
-3. Con tus claves (el constructor o `homenu-sesiones`), mediante una segunda cuenta de servicio de tu 1Password. Coste: lo más rápido, pero esa clave escribe también en los otros repos de factory-am89, alguno sin protección posible
+3. Con tus claves (el constructor o `homenu-sesiones`), mediante una segunda cuenta de servicio de tu 1Password. Coste: lo más rápido, pero esa clave tiene más alcance que el trabajo de HoMenu
 
 ### B. ¿Qué puede contestar Álvaro y puede anular al juez en HoMenu?
 Por qué te lo pregunto: es la lista cerrada de intención y autoridad, y la anulación es la única salida de un «no»; las dos son tuyas.
@@ -217,4 +217,4 @@ Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgand
 - La zona horaria de Álvaro: si no es Madrid, `madrid-time.mjs` y la regla de la hora pasan a la capa personal (trozo 4 lo deja preparado).
 - Cuántas lecturas de 1Password por hora gastaría Álvaro sin caché (MenuPlan no es de factory-am89): no lo he medido.
 - Hice `git fetch -q origin` en la carpeta principal de MenuPlan (solo mueve las ramas remotas, sin checkout ni pull) para leer `origin/staging` = `eab121d7`.
-- Que la guardia de HoMenu (`guardia-minima.mjs`, que niega aprobar PR) proteja a una sesión de Álvaro que trabaja desde una carpeta de la Fábrica: solo corre en sesiones abiertas en MenuPlan (puente 1, «Estado medido»).
+- Que las guardias de HoMenu cubran a una sesión de Álvaro que trabaje desde una carpeta de la Fábrica (ver «Estado medido» del puente 1).
