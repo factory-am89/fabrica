@@ -1,6 +1,6 @@
 # Plan: puente 2, Álvaro usa la Fábrica de Pablo para trabajar en HoMenu desde su PC
 
-Verdict: viable sin dar a Álvaro ninguna clave de Pablo, pero no tal como se pidió: la clave del constructor abre todos los repos de factory-am89, y no todos admiten reglas en el plan gratis; Álvaro necesita su propia identidad, su propia capa personal y una regla de anulación de «cuatro ojos». A, B y C ya las contestó Pablo (abajo).
+Verdict: viable sin dar a Álvaro ninguna clave de Pablo, pero no tal como se pidió: la clave del constructor abre todos los repos de factory-am89, y no todos admiten reglas en el plan gratis; Álvaro necesita su propia identidad, su propia capa personal y una regla de anulación de «cuatro ojos».
 
 Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `origin/staging` = `eab121d7` (leído con `git show origin/staging:<ruta>`). Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. Fuera de este plan: mudar HoMenu a una org neutral (memoria «HoMenu en org neutral», pendiente de hablar), que Álvaro pueda fusionar `main` de HoMenu (ruleset «main: solo Pablo fusiona»), y los trozos 12 a 16 del puente 1.
 
@@ -66,7 +66,7 @@ Files: `usuario/CLAUDE.md`, `usuario/personas/pabloam89.md`, `scripts/install-pc
 Depends on: 3
 Blocked by: none
 Existing: `ls usuario` -> `CLAUDE.md hooks settings.json settings.motivos.json tls`, sin `personas/`; `git grep -n "personas/\|persona.md"` -> sin salida; `ls test | grep persona` -> sin salida.
-Not done: `install-pc` instala en `~/.claude/CLAUDE.md` la parte común seguida de `usuario/personas/<persona>.md`, y `<persona>` es el valor `persona` del fichero de valores de cada uno. Las dos se unen al instalar (no con un `@import`, que no he probado en esta versión de Claude Code). Lo común sale de `usuario/CLAUDE.md`: dónde se trabaja (con `~/.claude/hooks/...` en vez de la ruta de Pablo), borrar carpetas, pensar en datos y tests. Lo personal va a `pabloam89.md`: nombre, Madrid, cómo responderle. `madrid-time.mjs` deja de decir «de Pablo». El fichero de Álvaro lo escribe él (paso 4 de Álvaro) en un PR suyo. No cambia el puntero de `CLAUDE.md:4` ni el de `standards/intervention.md:26` (trozo 5, ruta cerrada). `valores.json` gana una clave (`persona`), que sigue siendo privada.
+Not done: `install-pc` instala en `~/.claude/CLAUDE.md` la parte común seguida de `usuario/personas/<persona>.md`, y `<persona>` es el valor `persona` del fichero de valores de cada uno. Las dos se unen al instalar (no con un `@import`, que no he probado en esta versión de Claude Code). Lo común sale de `usuario/CLAUDE.md`: dónde se trabaja (con `~/.claude/hooks/...` en vez de la ruta de Pablo), borrar carpetas, pensar en datos y tests. Lo personal va a `pabloam89.md`: nombre, Madrid, cómo responderle. `madrid-time.mjs` deja de decir «de Pablo». Lector: la instalación de cada PC (`install-pc` al instalar); disparador: `manual` (lo lanza la persona), declarado como deuda. `valores.json` gana una clave (`persona`); `git grep -n -i "persona" -- fields.json entities.json` -> sin salida: ninguna fila equivalente que reutilizar (se vuelve a lanzar al construir). El fichero de Álvaro lo escribe él (paso 4 de Álvaro) en un PR suyo. No cambia el puntero de `CLAUDE.md:4` ni el de `standards/intervention.md:26` (trozo 5, ruta cerrada). `valores.json` gana una clave (`persona`), que sigue siendo privada.
 Done:
 ```sh
 node --test test/install-pc-persona.test.js test/install-pc.test.js
@@ -171,8 +171,8 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 
 ## Cifras antes y después
 
-- Claves de Pablo que salen de su bóveda: antes 0; después 0 con A = 1 o 2, y 1 (con alcance sobre 3 o 4 repos) con A = 3. Se comprueba en la lista de miembros y cuentas de servicio de la bóveda `Fabrica`.
-- Repos que alcanza la credencial de las sesiones de Álvaro: con A = 1, 1 (MenuPlan); con A = 3, los 3 de factory-am89 más MenuPlan (`gh api orgs/factory-am89/installations`).
+- Claves de Pablo que salen de su bóveda: antes 0; después 0 con A = 1 o 2, y 1 (con un alcance mayor que el trabajo) con A = 3. Se comprueba en la lista de miembros y cuentas de servicio de la bóveda `Fabrica`.
+- Repos que alcanza la credencial de las sesiones de Álvaro: con A = 1, 1 (MenuPlan); con A = 3, todos los de factory-am89 más MenuPlan (`gh api orgs/factory-am89/installations`).
 - PR de HoMenu abiertos por sesiones de Álvaro y juzgados por el revisor: antes, ninguno distinguible por su autor; después, los de su App. Se cuentan con `gh pr list --repo pabloam89/MenuPlan --state merged --json author`.
 - Anulaciones en HoMenu por dueño: antes, solo podía Pablo; después, se cuentan con `node scripts/records.mjs` y el login de cada check «override».
 - Lecturas de 1Password por hora en el PC de Álvaro (`npm run op-reads`), para ver si el tope de 60 basta sin caché fuera de factory-am89.
@@ -188,7 +188,7 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 
 ## Decisions for Pablo
 
-Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-29), no aquí. En las tres eligió la opción 1; abajo quedan las preguntas como contexto de los trozos que dicen «Blocked by». Ya no hay ninguna abierta.
+Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-29), no aquí. Abajo quedan las preguntas como contexto de los trozos que dicen «Blocked by». Ya no hay ninguna abierta.
 
 ### A. ¿Con qué identidad abren PR en HoMenu las sesiones de Álvaro?
 Por qué te lo pregunto: es dar o crear credenciales y permisos de Apps, que es tuyo.
