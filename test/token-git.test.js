@@ -74,6 +74,7 @@ test('llavero: la orden de lectura de una entrada inexistente sale con error', {
   assert.equal(leerLlavero(inexistente, 'service-account'), '');
 });
 
+// lesson: keychain-timeout-disguised-as-missing
 test('llavero: entrada inexistente da vacío; timeout o fallo de powershell lanza ErrorLlavero con la causa', () => {
   const falso = (r) => () => r;
   assert.equal(leerLlavero('r', 'u', falso({ status: 1, stdout: '' })), '');
