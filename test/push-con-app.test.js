@@ -76,7 +76,7 @@ test('.claude/settings.json registra el hook para Bash y PowerShell, y la orden 
   assert.equal(entradas[0].matcher, 'Bash|PowerShell');
   // La orden tal como la lanza Claude Code (con $CLAUDE_PROJECT_DIR puesto), no llamando a decidir().
   const raiz = fileURLToPath(new URL('..', import.meta.url));
-  const orden = entradas[0].hooks[0].command.replace('$CLAUDE_PROJECT_DIR', raiz.replace(/[\/]$/, ''));
+  const orden = entradas[0].hooks[0].command.replace('$CLAUDE_PROJECT_DIR', raiz.replace(/[\\/]$/, ''));
   const r = spawnSync(orden, { shell: true, input: JSON.stringify({ tool_name: 'PowerShell', tool_input: { command: 'git push' } }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: raiz } });
   assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny', r.stderr);
 });
