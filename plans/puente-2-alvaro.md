@@ -177,12 +177,12 @@ Ya, sin esperar a nadie ni a Pablo (A, B y C contestadas, puente 1 cerrado): 3 y
 - Lecturas de 1Password por hora en el PC de Álvaro (`npm run op-reads`), para ver si el tope de 60 basta sin caché fuera de factory-am89.
 
 ## Decisions taken
-- principio 4 | eligió: la identidad de GitHub de las sesiones es de la persona (`FABRICA_IDENTIDAD` en su PC, validada contra la ficha), y la ficha guarda la de por defecto del repo | descartó: cambiar la ficha de MenuPlan a una identidad común para los dos, que haría indistinguible quién lanzó cada PR y dejaría sin base la regla de cuatro ojos del trozo 6 | motivo: decidido
+- principio 2 | eligió: la identidad de GitHub de las sesiones es de la persona (`FABRICA_IDENTIDAD` en su PC, validada contra la ficha), y la ficha guarda la de por defecto del repo | descartó: cambiar la ficha de MenuPlan a una identidad común para los dos, que haría indistinguible quién lanzó cada PR y dejaría sin base la regla de cuatro ojos del trozo 6 | motivo: decidido
 - principio 6 | eligió: no añadir a Álvaro a factory-am89 | descartó: hacerle miembro, que ampliaría sus permisos sobre repos privados de Pablo (clase «Change permissions or secrets» de `standards/intervention.md`) y no le hace falta porque `fabrica` es público | motivo: decidido
 - principio 3 | eligió: install-pc falla en alto ante un fichero que no instaló y solo lo reemplaza con `--reemplazar` y copia previa | descartó: seguir sobrescribiendo en silencio la configuración de quien instala por primera vez | motivo: decidido
 - principio 2 | eligió: la capa personal se une a la común al instalar, en un solo `~/.claude/CLAUDE.md` | descartó: un `@import` desde `~/.claude/CLAUDE.md`, que no he probado en esta versión de Claude Code | motivo: decidido
-- principio 4 | eligió: los valores privados de Álvaro viven en su propio fichero, con `FABRICA_VALORES` (que `install-pc` ya admite) | descartó: darle acceso a `fabrica-privado` o meter sus valores en el mismo `valores.json` que Pablo | motivo: decidido
-- principio 4 | eligió: los dueños de cada repo para la anulación los pasa el workflow que llama, y la Fábrica sigue con `OWNER_LOGIN` | descartó: convertir `OWNER_LOGIN` en una lista global, que daría a Álvaro poder de anular en la propia Fábrica | motivo: decidido
+- principio 6 | eligió: los valores privados de Álvaro viven en su propio fichero, con `FABRICA_VALORES` (que `install-pc` ya admite) | descartó: darle acceso a `fabrica-privado` o meter sus valores en el mismo `valores.json` que Pablo | motivo: decidido
+- principio 6 | eligió: los dueños de cada repo para la anulación los pasa el workflow que llama, y la Fábrica sigue con `OWNER_LOGIN` | descartó: convertir `OWNER_LOGIN` en una lista global, que daría a Álvaro poder de anular en la propia Fábrica | motivo: decidido
 - principio 4 | eligió: los pasos de Álvaro en `PASOS-ALVARO.md` | descartó: copiarlos también en `PASOS-PABLO.md`, que repetiría el mismo dato en dos sitios | motivo: decidido
 
 ## Decisions for Pablo
