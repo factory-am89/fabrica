@@ -1,6 +1,6 @@
 # Plan standard
 
-Yes-or-no questions about an architect plan (the product «plan»; the product «diff» is judged by `standards/code.md`). Each says who checks it: the **machine** (a command) or the **reviewer**. All must be `sí` (or `no aplica`) for a plan to be built.
+Yes-or-no questions about a plan (the product «plan»; the product «diff» is judged by `standards/code.md`). Each says who checks it: the **machine** (a command) or the **reviewer**. All must be `sí` (or `no aplica`) for a plan to be built.
 
 ## Shape
 
@@ -81,7 +81,7 @@ Mal: a chunk that changes `scripts/lib/gate.mjs` and says nothing about the chec
 Quién: máquina (`node scripts/check-plan.mjs --file <plan> --closed-paths <list>`).
 The machine decides what it can compute: a chunk whose `Files` meet the closed paths needs `Blocked by`, and each decision has the fixed number of options with the first marked as recommended. The reviewer reads the rest (plain words, a question that is not on the list).
 Bien: a decision about `.github/workflows/**` with its options, the recommended one first, and the chunk marked `Blocked by: A`.
-Mal: asking Pablo which name to give a file, which is not on the closed list: the architect decides and writes it down.
+Mal: asking Pablo which name to give a file, which is not on the closed list: the constructor decides and writes it down.
 
 ### P10 — Is each new field or entity in the plan classified, and compared with the ones that already exist in `entities.json` and `fields.json`?
 Quién: revisor.
