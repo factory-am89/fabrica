@@ -82,7 +82,7 @@ export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO
   // Salida 1 = la entrada no existe (la orden la da solo para «elemento no encontrado»). Cualquier otra cosa (timeout, no arranca, otra salida) es un fallo de powershell, no «falta»: se dice.
   if (r.status === 1) return '';
   const causa = r.error?.code === 'ETIMEDOUT' || r.signal ? 'timeout' : r.error ? `no arranca (${r.error.code ?? 'error'})` : `salida ${r.status}`;
-  throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`);
+  throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`, r.error ? { cause: r.error } : undefined);
 }
 
 // Fallo de powershell al leer el llavero (distinto de «la entrada no existe»). Su mensaje no lleva valores.

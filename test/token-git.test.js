@@ -85,7 +85,7 @@ test('llavero: entrada inexistente da vacío; timeout o fallo de powershell lanz
     [{ status: null, error: Object.assign(new Error('x'), { code: 'ENOENT' }) }, /ENOENT/],
   ];
   for (const [r, causa] of casos) {
-    assert.throws(() => leerLlavero('r', 'u', falso(r)), (e) => e instanceof ErrorLlavero && causa.test(e.message));
+    assert.throws(() => leerLlavero('r', 'u', falso(r)), (e) => e instanceof ErrorLlavero && causa.test(e.message) && (r.error ? e.cause === r.error : e.cause === undefined));
   }
 });
 
