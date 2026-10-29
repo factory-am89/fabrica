@@ -6,7 +6,7 @@ Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `orig
 
 ## Lo desagradable primero
 
-- **La clave del constructor no se puede repartir.** `fabrica-constructor` está instalada en **todos** los repos de factory-am89 con permisos de escritura sobre código, workflows, PR e issues (`gh api orgs/factory-am89/installations`, campo `repository_selection`). Al menos uno de esos repos no admite reglas en el plan gratis (`gh api repos/factory-am89/<repo>/rulesets` da 403), así que quien tenga la clave lo escribe sin PR ni juez. Ese repo guarda configuración privada de las sesiones de Pablo. Lo mismo pasa con la instalación de `homenu-sesiones` y con la cuenta de servicio que lee la bóveda `Fabrica`. Clase del riesgo: una credencial con más alcance que el trabajo que se le encarga.
+- **La clave del constructor no se puede repartir.** `fabrica-constructor` está instalada en **todos** los repos de factory-am89 con permisos de escritura sobre código, workflows, PR e issues (`gh api orgs/factory-am89/installations`, campo `repository_selection`). No todos esos repos admiten reglas en el plan gratis, así que parte de lo que esa clave alcanza no pasa por PR ni juez. Lo mismo vale para otras credenciales de Pablo con alcance amplio. Clase del riesgo: una credencial con más alcance que el trabajo que se le encarga.
 - **Es un riesgo que ya existe hoy, sin Álvaro.** Las sesiones de Pablo ya tienen esas credenciales. El puente 2 solo lo multiplicaría si una clave saliera del PC de Pablo; por eso ninguna sale. Ningún trozo reduce el riesgo que ya existe: acotar esas dos instalaciones a «solo los repos elegidos» es un clic de Pablo (paso recomendado más abajo).
 - **Meter a Álvaro en la org le enseña lo privado de Pablo.** El permiso base de la org es de lectura (`gh api orgs/factory-am89`, campo `default_repository_permission`), y un miembro leería el repo privado de configuración. Además no hace falta: `fabrica` es público (`gh api orgs/factory-am89/repos`), y para HoMenu basta su permiso `write` en MenuPlan (`gh api repos/pabloam89/MenuPlan/collaborators` -> `algbarc-design write`).
 - **Instalar la capa de usuario pisaría la configuración que Álvaro ya tiene.** `install-pc instalar` sobrescribe un `~/.claude/CLAUDE.md` o `settings.json` distinto aunque no lo haya instalado él (`scripts/install-pc.mjs:96` lo marca `editado-a-mano` y el bucle de la línea 158 lo escribe). Lo comprueba `test/install-pc.test.js:55` («reinstalar sobrescribe lo editado»). En el PC de Álvaro, que ya usa Claude Code con HoMenu, borraría sus ajustes sin avisar.
@@ -19,12 +19,12 @@ Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `orig
 - Puente 1: `.fabrica.json` y `revisor.yml` ya están en `staging` (`git show origin/staging:.fabrica.json` -> `{ "repo": "pabloam89/MenuPlan", "base": "staging", "identidad": "fabrica-constructor" }`; `revisor.yml` pasa `bots: homenu-sesiones,homenu-dependabot-merge` y `revisor-app-slug: homenu-revisor`). Faltan `anulacion.yml` y `senal-review.yml` (`git ls-tree --name-only origin/staging .github/workflows/` no los trae). `allow_auto_merge` sigue en `false` y el ruleset de `staging` sigue siendo «staging: tests obligatorios» (`gh api repos/pabloam89/MenuPlan`, `.../rulesets`): los pasos 5 a 7 de Pablo no están hechos.
 - Apps: `curl https://api.github.com/apps/<slug>` -> `fabrica-constructor 200` (pública), `fabrica-revisor 404`, `fabrica-administrador 404`, `homenu-sesiones 200`. `homenu-revisor` da 404 porque es privada (App ID 5521568, dato de Pablo), no porque no exista. `fabrica-constructor` tiene además otra instalación, en la cuenta pabloam89, solo en MenuPlan (distinta de la de factory-am89, que abarca todos sus repos; dato que Pablo dio a la sesión coordinadora: la API pide el JWT de la App y no lo comprobé), y el revisor de HoMenu ya juzga PR reales (MenuPlan #961 y #962; dato de Pablo, no lo comprobé aquí).
 - Org factory-am89: plan `free`, un solo miembro (`gh api orgs/factory-am89/members` -> `pabloam89`), `members_can_create_repositories: true`.
-- Identidad: el mapa `IDENTIDADES` tiene dos entradas, `fabrica-constructor` y `ninguna` (`scripts/lib/identities.mjs:12-16`). La App, el documento y la bóveda de la clave están fijos en `token.mjs` (`CLIENT_ID_CONSTRUCTOR` en `scripts/lib/repo.mjs:9`; `DOCUMENTO_CLAVE = 'fabrica-constructor.pem'` en `scripts/token.mjs:134`; la bóveda, `OP_VAULT ?? 'Fabrica'` en `scripts/token.mjs:176`). La identidad es del repo (campo `identidad` de la ficha), no de la persona (`scripts/lib/repo-card.mjs:11`). `git grep -n "FABRICA_IDENTIDAD"` -> sin salida.
+- Identidad: el mapa `IDENTIDADES` tiene dos entradas, `fabrica-constructor` y `ninguna` (`scripts/lib/identities.mjs:12-16`). La App, el documento y la bóveda de la clave están fijos en `token.mjs` (`CLIENT_ID_CONSTRUCTOR` en `scripts/lib/repo.mjs:7`; `DOCUMENTO_CLAVE = 'fabrica-constructor.pem'` en `scripts/token.mjs:134`; la bóveda, `OP_VAULT ?? 'Fabrica'` en `scripts/token.mjs:176`). La identidad es del repo (campo `identidad` de la ficha), no de la persona (`scripts/lib/repo-card.mjs:11`). `git grep -n "FABRICA_IDENTIDAD"` -> sin salida.
 - La caché del token solo sirve para el dueño de `REPO` (`scripts/token.mjs`, `mismoDueno`): en MenuPlan, cada token lee 1Password (tope de 60 lecturas por hora, `scripts/token.mjs:152`).
-- Capa de usuario: `usuario/settings.json` ya es plantilla con huecos (`{{home}}`, `{{enabledPlugins}}`, `{{autoMode.*}}`). Los valores se leen de `FABRICA_VALORES` o de `../fabrica-privado/usuario/valores.json` (`scripts/install-pc.mjs:12,58`): Álvaro puede tener su propio fichero sin entrar en `fabrica-privado`. `usuario/CLAUDE.md` se copia tal cual.
+- Capa de usuario: `usuario/settings.json` ya es plantilla con huecos (`{{home}}`, `{{enabledPlugins}}`, `{{autoMode.*}}`). Los valores se leen de `FABRICA_VALORES` o de un fichero privado junto a la Fábrica (`scripts/install-pc.mjs:12,58`): Álvaro puede tener su propio fichero sin acceder al de Pablo. `usuario/CLAUDE.md` se copia tal cual.
 - Rutas fijas (búsqueda con `git grep -n -i` de la carpeta de usuario de Pablo y de `C:/dev`, fuera de `plans/` y `test/`): `usuario/CLAUDE.md:5,8,11,21`, `apps/arranque.ps1:14` (solo el arranque de Pablo), y comentarios en `scripts/tarea.mjs:1`, `scripts/lib/folders.mjs:20,50`, `scripts/install-pc.mjs:12` y `.claude/hooks/carpeta-principal.mjs:1`. El código calcula las carpetas como hermanas de la principal (`scripts/lib/folders.mjs:50`), sin exigir `C:/dev`. Los hooks del proyecto usan `$CLAUDE_PROJECT_DIR` (`.claude/settings.json`) y los registros van a `~/.fabrica/` con `homedir()` (`scripts/lib/gh-log.mjs:14`, `op-log.mjs:8`, `intervention-log.mjs:49`, `session-log.mjs:25`). El hook de usuario `limpiar-worktrees.mjs` sale sin hacer nada en un repo con ficha (`usuario/hooks/limpiar-worktrees.mjs:364`). `scripts/madrid-time.mjs:7` imprime «Hora local de Pablo (Madrid)» en cada arranque.
 - 1Password: la puerta está cerrada por un check. `scripts/lib/op-door.mjs` (`PUERTAS`) lista quién puede llamar a `op` o al llavero, y `test/op-door.test.js` falla si alguien más lo hace. El token de la cuenta de servicio sale del entorno o de la entrada del llavero «Fabrica 1Password» (`apps/llavero.json`, `scripts/token.mjs:82-93`). Solo la guarda `apps/arranque.ps1`, que además crea Apps, environments y el ruleset con la sesión de `gh` de quien lo lanza: no sirve para Álvaro.
-- HoMenu ya prevé a Álvaro: «en otro PC, `gh` y `git` van con la cuenta de quien está delante» (`CLAUDE.md:45` de MenuPlan). Sus sesiones toman la clave de `homenu-sesiones` de la bóveda `HoMenu-sesiones`, dentro de la cuenta Familias de Pablo (`scripts/lib/env.mjs:116` y skill `1password` de MenuPlan).
+- HoMenu ya prevé a Álvaro: «en otro PC, `gh` y `git` van con la cuenta de quien está delante» (`CLAUDE.md:45` de MenuPlan). Sus sesiones toman la clave de `homenu-sesiones` de la bóveda de HoMenu (`scripts/lib/env.mjs:116` y skill `1password` de MenuPlan).
 
 ## Chunks
 
@@ -32,7 +32,7 @@ Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `orig
 Files: `scripts/lib/identities.mjs`, `scripts/token.mjs`, `scripts/lib/repo-card.mjs`, `test/identidad-activa.test.js`
 Depends on: none
 Blocked by: A
-Existing: `git grep -n "FABRICA_IDENTIDAD"` -> sin salida; `ls test | grep -i identidad-activa` -> sin salida. El cliente, el documento y la bóveda están fijos en `scripts/token.mjs:134,176` y en `CLIENT_ID_CONSTRUCTOR` (`scripts/lib/repo.mjs:9`), y solo `FABRICA_CONSTRUCTOR_CLIENT_ID` y `OP_VAULT` los cambian, por separado. Campos: `clientId`, `documento` y `boveda` son claves de la constante de código `IDENTIDADES`, no campos de entidad. `git grep -n -i -E "identidad|clientId|boveda|persona" -- fields.json entities.json` -> sin salida: ninguna fila equivalente que reutilizar.
+Existing: `git grep -n "FABRICA_IDENTIDAD"` -> sin salida; `ls test | grep -i identidad-activa` -> sin salida. El cliente, el documento y la bóveda están fijos en `scripts/token.mjs:134,176` y en `CLIENT_ID_CONSTRUCTOR` (`scripts/lib/repo.mjs:7`), y solo `FABRICA_CONSTRUCTOR_CLIENT_ID` y `OP_VAULT` los cambian, por separado. Campos: `clientId`, `documento` y `boveda` son claves de la constante de código `IDENTIDADES`, no campos de entidad. `git grep -n -i -E "identidad|clientId|boveda|persona" -- fields.json entities.json` -> sin salida: ninguna fila equivalente que reutilizar.
 Not done: una sola variable de entorno por PC, `FABRICA_IDENTIDAD`. Una función `identidadActiva(env, ficha)` en `identities.mjs` es su único lector y la usan `token.mjs` y `leerFicha`. Sin variable vale la de la ficha, como hoy. Si la variable nombra una identidad que no existe o cuyo dueño no es el del repo, falla en alto. No añade la identidad de Álvaro (trozo 2) ni caché por dueño: el tope de 60 lecturas por hora sigue y se mide con `npm run op-reads`. En la Fábrica y en el PC de Pablo nada cambia. Con A = 3 no se construye. Lector: `token.mjs` y `leerFicha`; disparador: cada llamada a `token.mjs` y a `tarea`, `clean` y `retire` (entrada real: `node scripts/token.mjs -- node -e ...` con un `op` falso, como `test/token-cache.test.js`).
 Done:
 ```sh
@@ -84,25 +84,25 @@ node --test test/principles-and-roles.test.js test/contrato.test.js && ! git gre
 ```
 
 ### 6. (Fábrica) Anulación con varios dueños por repo y nunca sobre el trabajo propio
-Files: `scripts/veredicto.mjs`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`
+Files: `scripts/veredicto.mjs`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`, `test/anulacion-duenos.test.js`
 Depends on: none
 Blocked by: B, C
 Existing: `aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN)` acepta un solo login (`scripts/veredicto.mjs:126`); `anulacion.yml` en `workflow_call` solo recibe `revisor-app-slug` (líneas 25-37). `grep -n "duenos" .github/workflows/anulacion.yml` -> sin salida.
 Not done: entrada opcional `duenos` de `workflow_call`: cada dueño con su login y la lista de Apps que lanzan sus sesiones (p. ej. `pabloam89:fabrica-constructor,algbarc-design:<App de Álvaro>`). Una aprobación solo cuenta si su autor está en la lista, si es su última review decisiva sobre la cabeza actual y si el autor del PR no es una de sus propias Apps. Sin la entrada (la propia Fábrica) todo sigue igual, con `OWNER_LOGIN` y sin la regla nueva. El título «override by Pablo» (`scripts/lib/record.mjs:13`) pasa a nombrar al dueño que anula. `node scripts/records.mjs` lo sigue contando como `overrides`. `OWNER_LOGIN` también es dueño de repo en `identities.mjs:13`: no se separa aquí. Es puerta: amplía quién anula, solo en el repo que lo pide, y añade una condición. Las tres de hoy siguen, y `test/anulacion.test.js` sigue en rojo si se quita alguna (C13). Si rompe, se revierte desde una rama nueva. Lector: `veredicto.mjs` (MODO=anulacion); disparador: `ci-judge`.
 Done:
 ```sh
-node --test test/anulacion.test.js test/workflows.test.js test/gate-files.test.js test/revisor-pendiente.test.js
+node --test test/anulacion-duenos.test.js test/anulacion.test.js test/workflows.test.js test/gate-files.test.js test/revisor-pendiente.test.js
 ```
 
 ### 7. (MenuPlan) `revisor.yml` acepta la App de Álvaro
-Files: `.github/workflows/revisor.yml`, `ops/revisor-fabrica.test.js`
+Files: `.github/workflows/revisor.yml`, `ops/revisor-fabrica.test.js`, `ops/revisor-bots.test.js`
 Depends on: 2
 Blocked by: A, C
 Existing: `git show origin/staging:.github/workflows/revisor.yml` -> `bots: homenu-sesiones,homenu-dependabot-merge`, sin la de Álvaro; `ops/revisor-fabrica.test.js` ya existe (`git ls-tree --name-only origin/staging ops/`).
-Not done: solo añade el slug a `bots` y su caso al test. Con A = 2 no hace falta: un PR de una persona con `write` no pasa por `allowed_bots` (no lo he probado; ver Not verified). Es puerta de HoMenu: amplía quién despierta al juez y no quita ninguna pregunta (C13). Si rompe, se revierte desde una rama nueva. Lleva `Jueces: …, seguridad` (`CLAUDE.md:32` de MenuPlan). Lector: el juez reutilizable; disparador: `ci-judge`.
+Not done: solo añade el slug a `bots`; su caso va en `ops/revisor-bots.test.js` (fichero nuevo, que falla sin el slug). Con A = 2 no hace falta: un PR de una persona con `write` no pasa por `allowed_bots` (no lo he probado; ver Not verified). Es puerta de HoMenu: amplía quién despierta al juez y no quita ninguna pregunta (C13). Si rompe, se revierte desde una rama nueva. Lleva `Jueces: …, seguridad` (`CLAUDE.md:32` de MenuPlan). Lector: el juez reutilizable; disparador: `ci-judge`.
 Done:
 ```sh
-npx vitest run ops/revisor-fabrica.test.js
+npx vitest run ops/revisor-bots.test.js ops/revisor-fabrica.test.js
 ```
 
 ### 8. (MenuPlan) `anulacion.yml` de HoMenu pasa los dos dueños
@@ -117,14 +117,14 @@ npx vitest run ops/anulacion-fabrica.test.js
 ```
 
 ### 9. (Fábrica) Guardar el token de la cuenta de servicio en el llavero sin el arranque de Pablo
-Files: `apps/guardar-token-servicio.ps1`, `scripts/lib/op-door.mjs`, `scripts/token.mjs`, `test/op-door.test.js`
+Files: `apps/guardar-token-servicio.ps1`, `scripts/lib/op-door.mjs`, `scripts/token.mjs`, `test/op-door.test.js`, `test/guardar-token-servicio.test.js`
 Depends on: 1
 Blocked by: A, C
 Existing: solo `apps/arranque.ps1` llama a `Llavero-Guardar` (`apps/lib-gh.ps1:213`); `git grep -n "guardar-token"` -> sin salida. El mensaje de `scripts/token.mjs:92` manda a «el script de arranque de Pablo».
 Not done: un script que lee el token por la entrada estándar (nunca por argumentos) y lo guarda en la entrada de `apps/llavero.json`. Pasa a la lista `PUERTAS.lectores` con su motivo, y el mensaje de `token.mjs` lo nombra. No crea la cuenta de servicio ni la bóveda: eso lo hace Álvaro en su 1Password (paso 2 de Álvaro). Con A = 2 o 3 no se construye. Lector: `test/op-door.test.js`; disparador: `ci-test`.
 Done:
 ```sh
-node --test test/op-door.test.js test/token-servicio.test.js
+node --test test/guardar-token-servicio.test.js test/op-door.test.js
 ```
 
 ### 10. (Fábrica) `comprobar-pc`: una orden que dice si un PC está listo para la Fábrica
@@ -158,7 +158,7 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 1. Contestar A, B y C (hecho: consta en `intervenciones.md`, filas del 2026-10-29).
 2. Con A = 1: aceptar la petición de instalación de la App de Álvaro, solo en `pabloam89/MenuPlan`.
 3. No añadir a Álvaro a factory-am89 (decisión tomada, abajo).
-4. Recomendado, aunque no lo pide este plan: en factory-am89 pasar `fabrica-constructor` y `homenu-sesiones` de «All repositories» a «Only select repositories», dejando fuera el repo privado de configuración, que no admite reglas.
+4. Recomendado, aunque no lo pide este plan: en factory-am89 pasar `fabrica-constructor` y `homenu-sesiones` de «All repositories» a «Only select repositories», dejando fuera los que no admiten reglas.
 5. Los pasos 5 a 7 del puente 1 siguen pendientes. Sin el paso 6 (ruleset de `staging` con `revisor`), el juez corre pero no es obligatorio para nadie, tampoco para Álvaro.
 
 ## Pasos de Álvaro
@@ -194,7 +194,7 @@ Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026
 Por qué te lo pregunto: es dar o crear credenciales y permisos de Apps, que es tuyo.
 1. Con una App propia de Álvaro, que crea él, cuya clave solo guarda él y que instalas solo en MenuPlan. Ninguna clave tuya sale de tu bóveda, cada PR dice quién lo lanzó y la quitas desinstalándola. Coste: unos 20 minutos de Álvaro, un clic tuyo y los trozos 1, 2, 7 y 9 (recommended)
 2. Con su propia cuenta de GitHub, como hoy en su PC. Coste: nada que montar, pero los PR no salen de una App y una sesión suya podría aprobar PR ajenos como él, así que con esta opción Álvaro no puede tener la anulación
-3. Con tus claves (el constructor o `homenu-sesiones`), mediante una segunda cuenta de servicio de tu 1Password. Coste: lo más rápido, pero esa clave escribe también en los otros repos de factory-am89, uno de ellos sin protección posible
+3. Con tus claves (el constructor o `homenu-sesiones`), mediante una segunda cuenta de servicio de tu 1Password. Coste: lo más rápido, pero esa clave escribe también en los otros repos de factory-am89, alguno sin protección posible
 
 ### B. ¿Qué puede contestar Álvaro y puede anular al juez en HoMenu?
 Por qué te lo pregunto: es la lista cerrada de intención y autoridad, y la anulación es la única salida de un «no»; las dos son tuyas.
