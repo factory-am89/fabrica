@@ -39,6 +39,12 @@ Se pasa por tubería (stdin) entre dos procesos.
 
 ## Lo que falló
 
+- **2026-10-29 · «Falta el token de la cuenta de servicio» con el token en el llavero.** Causa: el PC iba
+  cargado, la lectura del llavero con `powershell` se pasó de tiempo y `leerLlavero` devolvía `''` ante
+  cualquier fallo (y `tokenServicio` tragaba cualquier excepción): un timeout se disfrazaba de «falta».
+  Arreglo: en `scripts/token.mjs`, solo «entrada inexistente» (salida 1) es `''`; lo demás lanza
+  `ErrorLlavero` con la causa y «reintenta». Lo guardan `test/token-git.test.js` y
+  `test/token-servicio.test.js`.
 - **2026-10-09 · una dirección `op://` daba error con ficha y campo bien puestos.** Causa: el nombre de la
   ficha llevaba tilde; `op://` solo admite letras y cifras sin acento, espacios, `-`, `_` y `.`. Arreglo: leerla
   por nombre con `op item get` y crear las fichas nuevas sin tildes.

@@ -55,7 +55,7 @@ const { recurso: LLAVERO_RECURSO, usuario: LLAVERO_USUARIO } = JSON.parse(
 );
 
 // Lee el token del llavero (PasswordVault) con powershell.exe 5.1. El valor vuelve por el
-// stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Si falla, devuelve ''.
+// stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Entrada inexistente: ''. Fallo o timeout de powershell: lanza ErrorLlavero.
 // Orden de PowerShell que lee la entrada. Con -Command, una excepción de un método .NET solo corta
 // esa sentencia y el proceso sale con 0: el Stop del principio hace que, si la entrada no existe,
 // el bloque pare y el proceso salga con 1 (mismo bloque que Llavero-Orden-Leer de apps/lib-gh.ps1).
@@ -68,26 +68,29 @@ export function ordenLeerLlavero(recurso, usuario) {
   );
 }
 
-export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO) {
+export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO, spawn = spawnSync) {
   const ps = ordenLeerLlavero(recurso, usuario);
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+  const r = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
     timeout: 15000,
   });
-  return r.status === 0 ? (r.stdout ?? '') : '';
+  if (r.status === 0) return r.stdout ?? '';
+  // Salida 1 = la entrada no existe (el Stop de la orden). Cualquier otra cosa (timeout, no arranca, otra salida) es un fallo de powershell, no «falta»: se dice.
+  if (r.status === 1) return '';
+  const causa = r.error?.code === 'ETIMEDOUT' || r.signal ? 'timeout' : r.error ? `no arranca (${r.error.code ?? 'error'})` : `salida ${r.status}`;
+  throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`);
 }
+
+// Fallo de powershell al leer el llavero (distinto de «la entrada no existe»). Su mensaje no lleva valores.
+export class ErrorLlavero extends Error {}
 
 // El entorno manda; si no, el llavero (inyectable para los tests). El error no lleva valores.
 export function tokenServicio(env = process.env, llavero = leerLlavero) {
   const delEntorno = (env.OP_SERVICE_ACCOUNT_TOKEN ?? '').trim();
   if (delEntorno) return delEntorno;
-  let delLlavero = '';
-  try {
-    delLlavero = (llavero() ?? '').trim();
-  } catch {
-    delLlavero = '';
-  }
+  // Sin try/catch: un fallo del llavero (ErrorLlavero u otro) sube tal cual; solo «vacío» es «falta».
+  const delLlavero = (llavero() ?? '').trim();
   if (delLlavero) return delLlavero;
   throw new Error('Falta el token de la cuenta de servicio de 1Password (ni en el entorno ni en el llavero): lanza el script de arranque de Pablo.');
 }
