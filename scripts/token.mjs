@@ -55,39 +55,45 @@ const { recurso: LLAVERO_RECURSO, usuario: LLAVERO_USUARIO } = JSON.parse(
 );
 
 // Lee el token del llavero (PasswordVault) con powershell.exe 5.1. El valor vuelve por el
-// stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Si falla, devuelve ''.
-// Orden de PowerShell que lee la entrada. Con -Command, una excepción de un método .NET solo corta
-// esa sentencia y el proceso sale con 0: el Stop del principio hace que, si la entrada no existe,
-// el bloque pare y el proceso salga con 1 (mismo bloque que Llavero-Orden-Leer de apps/lib-gh.ps1).
+// stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Entrada inexistente: ''. Fallo o timeout de powershell: lanza ErrorLlavero.
+// Orden de PowerShell que lee la entrada. Sale con 0 y el valor si la hay; con 1 SOLO si el almacén dice
+// «elemento no encontrado» (HRESULT 0x80070490 = -2147023728, en la excepción interna: no depende del idioma);
+// con 2 ante cualquier otro error (no carga el tipo, acceso denegado...). Sin el try, una excepción de un
+// método .NET con -Command solo cortaría esa sentencia y el proceso saldría con 0. Pendiente: Llavero-Orden-Leer de
+// apps/lib-gh.ps1 conserva la orden antigua (cualquier error sale con 1); no es la misma receta.
 export function ordenLeerLlavero(recurso, usuario) {
   return (
-    "$ErrorActionPreference = 'Stop'; " +
+    "$ErrorActionPreference = 'Stop'; try { " +
     '[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; ' +
     '$v = New-Object Windows.Security.Credentials.PasswordVault; ' +
-    `$c = $v.Retrieve('${recurso}', '${usuario}'); $c.RetrievePassword(); [Console]::Out.Write($c.Password)`
+    `$c = $v.Retrieve('${recurso}', '${usuario}'); $c.RetrievePassword(); [Console]::Out.Write($c.Password) ` +
+    '} catch { $e = $_.Exception; $nf = $false; while ($e) { if ($e.HResult -eq -2147023728) { $nf = $true }; $e = $e.InnerException }; if ($nf) { exit 1 } else { exit 2 } }'
   );
 }
 
-export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO) {
+export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO, spawn = spawnSync) {
   const ps = ordenLeerLlavero(recurso, usuario);
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+  const r = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
     timeout: 15000,
   });
-  return r.status === 0 ? (r.stdout ?? '') : '';
+  if (r.status === 0) return r.stdout ?? '';
+  // Salida 1 = la entrada no existe (la orden la da solo para «elemento no encontrado»). Cualquier otra cosa (timeout, no arranca, otra salida) es un fallo de powershell, no «falta»: se dice.
+  if (r.status === 1) return '';
+  const causa = r.error?.code === 'ETIMEDOUT' || r.signal ? 'timeout' : r.error ? `no arranca (${r.error.code ?? 'error'})` : `salida ${r.status}`;
+  throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`, r.error ? { cause: r.error } : undefined);
 }
+
+// Fallo de powershell al leer el llavero (distinto de «la entrada no existe»). Su mensaje no lleva valores.
+export class ErrorLlavero extends Error {}
 
 // El entorno manda; si no, el llavero (inyectable para los tests). El error no lleva valores.
 export function tokenServicio(env = process.env, llavero = leerLlavero) {
   const delEntorno = (env.OP_SERVICE_ACCOUNT_TOKEN ?? '').trim();
   if (delEntorno) return delEntorno;
-  let delLlavero = '';
-  try {
-    delLlavero = (llavero() ?? '').trim();
-  } catch {
-    delLlavero = '';
-  }
+  // Sin try/catch: un fallo del llavero (ErrorLlavero u otro) sube tal cual; solo «vacío» es «falta».
+  const delLlavero = (llavero() ?? '').trim();
   if (delLlavero) return delLlavero;
   throw new Error('Falta el token de la cuenta de servicio de 1Password (ni en el entorno ni en el llavero): lanza el script de arranque de Pablo.');
 }

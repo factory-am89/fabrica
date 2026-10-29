@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { entornoHijo, HELPER_GIT, leerLlavero, ordenLeerLlavero } from '../scripts/token.mjs';
+import { entornoHijo, ErrorLlavero, HELPER_GIT, leerLlavero, ordenLeerLlavero } from '../scripts/token.mjs';
 
 const TOKEN = 'ghs_TOKEN_DE_PRUEBA_123';
 
@@ -72,4 +72,26 @@ test('llavero: la orden de lectura de una entrada inexistente sale con error', {
   assert.notEqual(r.status, 0);
   assert.equal(r.stdout.trim(), '');
   assert.equal(leerLlavero(inexistente, 'service-account'), '');
+});
+
+// lesson: keychain-timeout-disguised-as-missing
+test('llavero: entrada inexistente da vacío; timeout o fallo de powershell lanza ErrorLlavero con la causa', () => {
+  const falso = (r) => () => r;
+  assert.equal(leerLlavero('r', 'u', falso({ status: 1, stdout: '' })), '');
+  assert.equal(leerLlavero('r', 'u', falso({ status: 0, stdout: 'tok' })), 'tok');
+  const casos = [
+    [{ status: null, signal: 'SIGTERM', error: Object.assign(new Error('x'), { code: 'ETIMEDOUT' }) }, /timeout/],
+    [{ status: 3 }, /salida 3/],
+    [{ status: null, error: Object.assign(new Error('x'), { code: 'ENOENT' }) }, /ENOENT/],
+  ];
+  for (const [r, causa] of casos) {
+    assert.throws(() => leerLlavero('r', 'u', falso(r)), (e) => e instanceof ErrorLlavero && causa.test(e.message) && (r.error ? e.cause === r.error : e.cause === undefined));
+  }
+});
+
+// lesson: keychain-timeout-disguised-as-missing
+test('llavero: un error de powershell que no es «no encontrado» sale con 2, no con 1', { skip: process.platform !== 'win32' }, () => {
+  const roto = ordenLeerLlavero('r', 'u').replace('New-Object Windows.Security.Credentials.PasswordVault', 'New-Object Tipo.Que.No.Existe');
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', roto], { encoding: 'utf8' });
+  assert.equal(r.status, 2);
 });

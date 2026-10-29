@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { tokenServicio } from '../scripts/token.mjs';
+import { tokenServicio, ErrorLlavero } from '../scripts/token.mjs';
 
 test('tokenServicio: el entorno manda y no toca el llavero', () => {
   let llamadas = 0;
@@ -17,7 +17,7 @@ test('tokenServicio: sin entorno, o con entorno vacío, lee el llavero', () => {
 });
 
 test('tokenServicio: sin ninguna vía, error en una frase y sin valores', () => {
-  for (const llavero of [() => '', () => null, () => { throw new Error('ops_SECRETO'); }]) {
+  for (const llavero of [() => '', () => null]) {
     assert.throws(
       () => tokenServicio({}, llavero),
       (e) => /arranque de Pablo/.test(e.message) && !e.message.includes('ops_') && !e.message.includes('\n'),
@@ -36,4 +36,17 @@ test('llavero: token.mjs y arranque.ps1 leen el mismo apps/llavero.json y ningun
     assert.ok(!src.includes(`'${usuario}'`), f + ' repite el usuario del llavero');
   }
   assert.match(leer('../scripts/token.mjs'), /_TOKEN: token/);
+});
+
+test('tokenServicio: un fallo de powershell no se disfraza de «falta el token»', () => {
+  for (const causa of ['timeout', 'salida 3']) {
+    assert.throws(
+      () => tokenServicio({}, () => { throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`); }),
+      (e) => e.message.includes(causa) && !/arranque de Pablo/.test(e.message),
+    );
+  }
+});
+
+test('tokenServicio: cualquier otra excepción del llavero sube, no se traga', () => {
+  assert.throws(() => tokenServicio({}, () => { throw new Error('rotura'); }), /rotura/);
 });
