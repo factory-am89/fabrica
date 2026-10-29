@@ -4,7 +4,7 @@ Verdict: el arquitecto se fusiona en el constructor y el revisor sigue aparte. L
 
 ## Lo que hay hoy (comprobado)
 
-Código leído de `origin/main` (d7d2ef5) con `git show origin/main:<ruta>`, el 2026-10-29.
+Código leído de `origin/main` con `git show origin/main:<ruta>`, el 2026-10-29: primero en d7d2ef5 y las búsquedas repetidas en 017b0f2, con la misma salida.
 
 - Tres roles en `.claude/agents/`: `arquitecto.md` (opus, sin Edit ni Write, deja el plan), `constructor.md` (sonnet, construye un trozo y abre el PR) y `revisor.md` (opus, juzga con contexto limpio).
 - «Trozo» ya está definido y lo comprueba una máquina: la forma, en `PLAN_FIELDS` y `PLAN_FAULTS` de `scripts/lib/plan.mjs` (`node scripts/check-plan.mjs --file <plan>`); que quepa en un PR, P4 de `standards/plan.md` («Is each chunk one idea that fits in one PR review?», revisor). Un PR demasiado grande ya recibe un «no» por C11 de `standards/code.md` («¿El PR es una sola idea y cabe en una sentada de revisión?»). Este plan no redefine el trozo: lo usa como unidad para decidir si se parte.
@@ -17,7 +17,7 @@ Código leído de `origin/main` (d7d2ef5) con `git show origin/main:<ruta>`, el 
 Files: `plans/un-solo-bucle.md`
 Depends on: none
 Blocked by: none
-Existing: `git ls-tree --name-only origin/main plans/` -> `app-admin.md cockpit.md menuplan-separation.md puente-homenu.md registro-de-no.md revisor-huerfano.md revisor-pendiente.md trabajar-solos.md`; ninguno trata los roles.
+Existing: `git ls-tree --name-only origin/main plans/` (en 017b0f2) -> `app-admin.md cockpit.md menuplan-separation.md puente-2-alvaro.md puente-homenu.md registro-de-no.md revisor-huerfano.md revisor-pendiente.md trabajar-solos.md`; ninguno trata los roles.
 Not done: no toca ningún rol; solo deja el plan.
 Done:
 ```sh
@@ -28,7 +28,7 @@ node scripts/check-plan.mjs --file plans/un-solo-bucle.md
 Files: `.claude/agents/constructor.md`, `.claude/agents/arquitecto.md`, `standards/plan.md`, `test/plan-standard.test.js`, `test/principles-and-roles.test.js`, `test/questions.test.js`, `intervenciones.md`
 Depends on: 1
 Blocked by: none
-Existing: `git grep -n -E "un trozo|varios trozos|tamaño" origin/main -- .claude/agents` -> sin salida: ningún rol tiene hoy una regla de tamaño.
+Existing: `git grep -n -E "más de un trozo|varios trozos|tamaño" origin/main -- .claude/agents` (en 017b0f2) -> sin salida, exit 1: ningún rol tiene hoy una regla de tamaño. «un trozo» solo aparece en `constructor.md:3` («Construye un trozo del plan»), que describe qué construye, no cuándo partir.
 Not done: no toca el revisor, ni `scripts/lib/plan.mjs` (fichero de puerta; su comentario «architect plans» de la línea 1 se queda, es solo un comentario), ni la fixture `caso-08`. No cambia la forma del plan. Qué hace: (a) `constructor.md` gana un paso 0: lee el código y escribe el plan según `standards/plan.md`, comprobado con `scripts/check-plan.mjs`; con un trozo, lo construye en esta sesión y el plan va en el cuerpo del PR; con más de uno, abre solo el PR del plan en `plans/` y para, y cada trozo lo construye una sesión nueva que relee el código; si a mitad de trabajo la conversación se resume por llena, para, parte lo que queda en trozos y lo apunta. Hereda literal las obligaciones del arquitecto que hoy vigila `test/principles-and-roles.test.js:60` («no preguntes ni adivines», «marca el trozo como bloqueado», `standards/intervention.md`). (b) `constructor.md` pasa a `model: opus` (planificar lo hacía opus). (c) se borra `arquitecto.md`. (d) `test/plan-standard.test.js:47`, `test/questions.test.js:97` y las frases de `test/principles-and-roles.test.js:60` leen `constructor.md` con las mismas aserciones; uno nuevo comprueba que `constructor.md` lleva la regla de tamaño. La tabla de modelos de `test/principles-and-roles.test.js:67` sí cambia de valor: pierde `arquitecto: 'opus'` (el rol deja de existir) y `constructor` pasa de `sonnet` a `opus`; el test sigue comprobando el modelo de cada rol que existe y que el revisor no escribe. (e) añade a `intervenciones.md` la fila de la decisión de Pablo del 2026-10-29, con la cita del veredicto de este plan. (f) `standards/plan.md`: «architect plan» pasa a «plan» y «the architect decides» a «the constructor decides»; la fila P2 («the former `arquitecto.md` list») es historia y se queda. Lector de la regla: `test/principles-and-roles.test.js` (disparador `ci-test`) para que la regla esté escrita, y C11 del revisor para que un PR no se salte el reparto; ninguna máquina puede contar los trozos de un plan que no se escribió, y eso se apunta como deuda. Puerta: toca `standards/plan.md`, que está en `GATE_FILES` (`PLAN_GATE_FILES`, `scripts/lib/gate.mjs:53-55`); solo cambian dos palabras que nombran al rol, ninguna pregunta ni su `Quién`. Mantiene C13: ninguna pregunta del estándar cambia. En los tests, la única aserción que desaparece es el modelo del arquitecto, porque el rol ya no existe; las que vigilaban sus obligaciones pasan al constructor, que es quien las cumple ahora. Si rompe `main`: revertir el PR desde una rama nueva.
 Done:
 ```sh
