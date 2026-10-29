@@ -56,15 +56,17 @@ const { recurso: LLAVERO_RECURSO, usuario: LLAVERO_USUARIO } = JSON.parse(
 
 // Lee el token del llavero (PasswordVault) con powershell.exe 5.1. El valor vuelve por el
 // stdout del proceso hijo: ni argumentos, ni ficheros, ni pantalla. Entrada inexistente: ''. Fallo o timeout de powershell: lanza ErrorLlavero.
-// Orden de PowerShell que lee la entrada. Con -Command, una excepción de un método .NET solo corta
-// esa sentencia y el proceso sale con 0: el Stop del principio hace que, si la entrada no existe,
-// el bloque pare y el proceso salga con 1 (mismo bloque que Llavero-Orden-Leer de apps/lib-gh.ps1).
+// Orden de PowerShell que lee la entrada. Sale con 0 y el valor si la hay; con 1 SOLO si el almacén dice
+// «elemento no encontrado» (HRESULT 0x80070490 = -2147023728, en la excepción interna: no depende del idioma);
+// con 2 ante cualquier otro error (no carga el tipo, acceso denegado...). Sin el try, una excepción de un
+// método .NET con -Command solo cortaría esa sentencia y el proceso saldría con 0.
 export function ordenLeerLlavero(recurso, usuario) {
   return (
-    "$ErrorActionPreference = 'Stop'; " +
+    "$ErrorActionPreference = 'Stop'; try { " +
     '[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]; ' +
     '$v = New-Object Windows.Security.Credentials.PasswordVault; ' +
-    `$c = $v.Retrieve('${recurso}', '${usuario}'); $c.RetrievePassword(); [Console]::Out.Write($c.Password)`
+    `$c = $v.Retrieve('${recurso}', '${usuario}'); $c.RetrievePassword(); [Console]::Out.Write($c.Password) ` +
+    '} catch { $e = $_.Exception; $nf = $false; while ($e) { if ($e.HResult -eq -2147023728) { $nf = $true }; $e = $e.InnerException }; if ($nf) { exit 1 } else { exit 2 } }'
   );
 }
 
@@ -76,7 +78,7 @@ export function leerLlavero(recurso = LLAVERO_RECURSO, usuario = LLAVERO_USUARIO
     timeout: 15000,
   });
   if (r.status === 0) return r.stdout ?? '';
-  // Salida 1 = la entrada no existe (el Stop de la orden). Cualquier otra cosa (timeout, no arranca, otra salida) es un fallo de powershell, no «falta»: se dice.
+  // Salida 1 = la entrada no existe (la orden la da solo para «elemento no encontrado»). Cualquier otra cosa (timeout, no arranca, otra salida) es un fallo de powershell, no «falta»: se dice.
   if (r.status === 1) return '';
   const causa = r.error?.code === 'ETIMEDOUT' || r.signal ? 'timeout' : r.error ? `no arranca (${r.error.code ?? 'error'})` : `salida ${r.status}`;
   throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`);

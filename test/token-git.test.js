@@ -88,3 +88,10 @@ test('llavero: entrada inexistente da vacío; timeout o fallo de powershell lanz
     assert.throws(() => leerLlavero('r', 'u', falso(r)), (e) => e instanceof ErrorLlavero && causa.test(e.message));
   }
 });
+
+// lesson: keychain-timeout-disguised-as-missing
+test('llavero: un error de powershell que no es «no encontrado» sale con 2, no con 1', { skip: process.platform !== 'win32' }, () => {
+  const roto = ordenLeerLlavero('r', 'u').replace('New-Object Windows.Security.Credentials.PasswordVault', 'New-Object Tipo.Que.No.Existe');
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', roto], { encoding: 'utf8' });
+  assert.equal(r.status, 2);
+});
