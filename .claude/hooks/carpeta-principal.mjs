@@ -45,7 +45,7 @@ const resolver = (dir, p) => {
 // Trocea una línea de shell (bash o PowerShell) en palabras y operadores. Respeta las comillas;
 // `;`, `&`, `|`, saltos de línea, `&&` y `||` separan órdenes; `(`, `$(` y `{` abren un ámbito y
 // `)` y `}` lo cierran.
-function trocear(s) {
+export function trocear(s) {
   const salida = [];
   let w = null;
   const suelta = () => {
@@ -86,7 +86,7 @@ function trocear(s) {
 }
 
 // Nombre de un ejecutable sin ruta ni .exe y en minúsculas: «C:\Git\bin\git.exe» → «git».
-const nombreDe = (w) => (w ?? '').split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase();
+export const nombreDe = (w) => (w ?? '').split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase();
 
 // Recorre las órdenes de una línea siguiendo cd/Set-Location/pushd (con sus ámbitos de subshell),
 // `git -C`, los prefijos `VAR=valor`, `env` y `command`, y las shells anidadas (`bash -c "…"`);

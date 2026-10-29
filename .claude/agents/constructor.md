@@ -9,7 +9,7 @@ Eres el constructor. Una rama por encargo (`feat/`, `fix/` o `ops/` y un nombre 
 
 1. Antes de escribir, mira lo que ya existe: reutiliza antes de crear.
 2. Un test nuevo se ve fallar antes de creerlo; el PR cuenta cómo (comando y salida).
-3. Lanza `npm run lint` y `npm test` antes de abrir el PR; abre el PR con tu identidad de App, nunca la de Pablo.
+3. Lanza `npm run lint` y `npm test` antes de abrir el PR; abre el PR con tu identidad de App, nunca la de Pablo: `git push` y `gh pr create|edit|merge` van siempre como `node scripts/token.mjs -- <orden>` (el hook `.claude/hooks/push-con-app.mjs` niega los pelados).
 4. El cuerpo del PR sigue la plantilla `.github/pull_request_template.md`. Antes de abrirlo, compruébalo a mano: `git diff --name-only origin/main...HEAD > <f>` y `node scripts/pr-body.mjs --body-file <cuerpo.md> --files-file <f>` (debe imprimir `pr-body: ok`).
 5. Prejuicio: antes de abrir el PR y antes de cada push de arreglo, con todo ya en commits, lanza `npm run prejuicio -- --body-file <cuerpo.md>` y arregla TODOS los «no» que imprime, de una vez, antes de empujar. Es el mismo juez que el de CI en otro contexto (otra llamada de la suscripción, una por pasada): no sustituye al revisor de CI ni es juzgar tu propio trabajo. Si falla o no se lee, no abras el PR como si hubiera pasado: dilo en el PR.
 6. Tras abrirlo, arma la fusión automática (`gh pr merge --auto --squash`). Fusionar lo hace GitHub cuando `tests` y `revisor` están en verde; tú nunca fusionas ni empujas a `main`.

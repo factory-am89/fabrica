@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { tokenServicio } from '../scripts/token.mjs';
+import { tokenServicio, ErrorLlavero } from '../scripts/token.mjs';
 
 test('tokenServicio: el entorno manda y no toca el llavero', () => {
   let llamadas = 0;
@@ -36,4 +36,13 @@ test('llavero: token.mjs y arranque.ps1 leen el mismo apps/llavero.json y ningun
     assert.ok(!src.includes(`'${usuario}'`), f + ' repite el usuario del llavero');
   }
   assert.match(leer('../scripts/token.mjs'), /_TOKEN: token/);
+});
+
+test('tokenServicio: un fallo de powershell no se disfraza de «falta el token»', () => {
+  for (const causa of ['timeout', 'salida 3']) {
+    assert.throws(
+      () => tokenServicio({}, () => { throw new ErrorLlavero(`powershell falló al leer el llavero (${causa}); la entrada puede existir: reintenta.`); }),
+      (e) => e.message.includes(causa) && !/arranque de Pablo/.test(e.message),
+    );
+  }
 });
