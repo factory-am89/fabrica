@@ -16,7 +16,7 @@ export const TERMINAL = new Set(['Bash', 'PowerShell']);
 const PROHIBIDOS = new Set(['commit', 'checkout', 'switch', 'merge', 'cherry-pick', 'revert', 'rebase', 'am', 'reset', 'pull']);
 const CAMBIA_DE_CARPETA = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
 const VUELVE_A_ALGUNA = new Set(['popd', 'pop-location']);
-export const ENVOLTORIOS = new Set(['command', 'exec', 'nohup', 'time', 'builtin']);
+const ENVOLTORIOS = new Set(['command', 'exec', 'nohup', 'time', 'builtin']);
 export const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'pwsh', 'powershell', 'cmd']);
 
 // Carpeta que no se sabe resolver (`cd $X`, `cd -`, `popd`): se trata como la principal.
