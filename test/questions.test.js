@@ -94,8 +94,8 @@ test('goals.json: C14 to C17 each have a row, and C16 is a reader of the goal of
   assert.deepEqual(rows.get(PLAN_BRIDGE_QUESTION)[KEY.goals], registry[LIST.goals].map((g) => g[KEY.id]), 'the bridge serves every goal');
 });
 
-test('arquitecto.md does not copy the count of the questions of plan.md (it goes stale when a question is added)', () => {
-  assert.doesNotMatch(readFileSync(new URL('../.claude/agents/arquitecto.md', import.meta.url), 'utf8'), /\bP\d+ (to|a) P\d+\b/);
+test('constructor.md does not copy the count of the questions of plan.md (it goes stale when a question is added)', () => {
+  assert.doesNotMatch(readFileSync(new URL('../.claude/agents/constructor.md', import.meta.url), 'utf8'), /\bP\d+ (to|a) P\d+\b/);
 });
 
 test('C16 says «no aplica» without a plan, and C17 without a new check (the way C1..C13 mark what does not apply)', () => {

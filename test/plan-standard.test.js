@@ -44,8 +44,8 @@ test('the fields listed in Shape are the ones of PLAN_FIELDS', () => {
   assert.deepEqual(listed, Object.values(PLAN_FIELDS));
 });
 
-test('arquitecto.md links the plan standard and no longer carries its own list', () => {
-  const role = read('.claude/agents/arquitecto.md');
+test('constructor.md links the plan standard and does not carry its own list', () => {
+  const role = read('.claude/agents/constructor.md');
   assert.match(role, /standards\/plan\.md/);
   assert.match(role, /scripts\/check-plan\.mjs/);
   assert.doesNotMatch(role, /Estándar del plan/);

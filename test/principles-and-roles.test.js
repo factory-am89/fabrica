@@ -1,4 +1,4 @@
-// What the Fábrica demands of itself (principle 5): CLAUDE.md, the three roles and the standard's questions.
+// What the Fábrica demands of itself (principle 5): CLAUDE.md, the two roles and the standard's questions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePrinciples } from '../scripts/lib/decision.mjs';
@@ -57,19 +57,26 @@ test('el principio 6 conserva las obligaciones del viejo: no adivinar, no interr
   for (const frase of ['no se adivina', 'ni se interrumpe', 'se para y se deja escrito', 'standards/intervention.md']) {
     assert.ok(linea.includes(frase), `el principio 6 perdió: ${frase}`);
   }
-  const arquitecto = leer('.claude/agents/arquitecto.md');
+  const constructor = leer('.claude/agents/constructor.md');
   for (const frase of ['no preguntes ni adivines', 'marca el trozo como bloqueado', 'standards/intervention.md']) {
-    assert.ok(arquitecto.includes(frase), `el arquitecto perdió: ${frase}`);
+    assert.ok(constructor.includes(frase), `el constructor perdió: ${frase}`);
   }
 });
 
-test('los tres roles tienen su modelo y el revisor no escribe', () => {
-  const modelos = { arquitecto: 'opus', constructor: 'sonnet', revisor: 'opus' };
+test('los dos roles tienen su modelo y el revisor no escribe', () => {
+  const modelos = { constructor: 'opus', revisor: 'opus' };
   for (const [rol, modelo] of Object.entries(modelos)) {
     const cabecera = leer(`.claude/agents/${rol}.md`).split('---')[1];
     assert.match(cabecera, new RegExp(`^name: ${rol}$`, 'm'));
     assert.match(cabecera, new RegExp(`^model: ${modelo}$`, 'm'));
     if (rol !== 'constructor') assert.doesNotMatch(cabecera, /Edit|Write/);
+  }
+});
+
+test('el constructor planifica primero y parte por tamaño: un trozo lo construye él, más de uno abre el plan y para', () => {
+  const texto = leer('.claude/agents/constructor.md');
+  for (const frase of ['standards/plan.md', 'scripts/check-plan.mjs', 'Con un trozo', 'Con más de un trozo', 'plans/', 'una sesión nueva', 'se resume']) {
+    assert.ok(texto.includes(frase), `constructor.md no dice ${frase}`);
   }
 });
 
