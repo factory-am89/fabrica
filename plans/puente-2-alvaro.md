@@ -2,7 +2,7 @@
 
 Verdict: viable sin dar a Álvaro ninguna clave de Pablo, pero no tal como se pidió: la clave del constructor tiene más alcance que HoMenu; Álvaro necesita su propia identidad, su propia capa personal y una regla de anulación de «cuatro ojos».
 
-Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `origin/staging` = `eab121d7` (leído con `git show origin/staging:<ruta>`). Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. Fuera de este plan: mudar HoMenu a una org neutral (memoria «HoMenu en org neutral», pendiente de hablar), que Álvaro pueda fusionar `main` de HoMenu (ruleset «main: solo Pablo fusiona»), y los trozos 12 a 16 del puente 1.
+Fecha: 29 oct 2026. Base leída: Fábrica en `b2a011e` (main); MenuPlan en `origin/staging` = `5afd0908` (leído con `git show origin/staging:<ruta>`). Cada trozo dice en el título en qué repo se construye; sus `Files` son relativos a ese repo. Fuera de este plan: mudar HoMenu a una org neutral (memoria «HoMenu en org neutral», pendiente de hablar), que Álvaro pueda fusionar `main` de HoMenu (ruleset «main: solo Pablo fusiona»). El puente 1 está cerrado (ver «Estado medido»); lo que le queda (borrar la deploy key de `mercadona-sync`) no bloquea nada de aquí.
 
 ## Lo desagradable primero
 
@@ -16,8 +16,8 @@ Fecha: 29 oct 2026. Base leída: Fábrica en `92254d1` (main); MenuPlan en `orig
 
 ## Estado medido
 
-- Puente 1: `.fabrica.json` y `revisor.yml` ya están en `staging` (`git show origin/staging:.fabrica.json` -> `{ "repo": "pabloam89/MenuPlan", "base": "staging", "identidad": "fabrica-constructor" }`; `revisor.yml` pasa `bots: homenu-sesiones,homenu-dependabot-merge` y `revisor-app-slug: homenu-revisor`). Faltan `anulacion.yml` y `senal-review.yml` (`git ls-tree --name-only origin/staging .github/workflows/` no los trae). `allow_auto_merge` sigue en `false` y el ruleset de `staging` sigue siendo «staging: tests obligatorios» (`gh api repos/pabloam89/MenuPlan`, `.../rulesets`): los pasos 5 a 7 de Pablo no están hechos.
-- Apps: `curl https://api.github.com/apps/<slug>` -> `fabrica-constructor 200` (pública), `fabrica-revisor 404`, `fabrica-administrador 404`, `homenu-sesiones 200`. `homenu-revisor` da 404 porque es privada (dato de Pablo), no porque no exista. `fabrica-constructor` tiene además otra instalación, en la cuenta pabloam89, solo en MenuPlan (distinta de la de factory-am89, que abarca todos sus repos; dato que Pablo dio a la sesión coordinadora: la API pide el JWT de la App y no lo comprobé), y el revisor de HoMenu ya juzga PR reales (MenuPlan #961 y #962; dato de Pablo, no lo comprobé aquí).
+- Puente 1: CERRADO (comprobado el 29 oct 2026). `.fabrica.json` (`{ "repo": "pabloam89/MenuPlan", "base": "staging", "identidad": "fabrica-constructor" }`), `revisor.yml` (`bots: homenu-sesiones,homenu-dependabot-merge`, `revisor-app-slug: homenu-revisor`), `anulacion.yml` y `senal-review.yml` están en `staging` (`git ls-tree --name-only origin/staging .github/workflows/`). El ruleset de `staging` exige PR, `tests` y `revisor`, es `strict` y no tiene excepciones; `allow_auto_merge` es `true` (`gh api repos/pabloam89/MenuPlan`, `.../rulesets`); MenuPlan#996 se fusionó sola. Por tanto el juez ya es obligatorio para cualquier PR a `staging`, también para los de Álvaro. El `anulacion.yml` de `staging` hoy solo pasa `revisor-app-slug`: la entrada de dueños del trozo 6 aún no existe.
+- Apps: `curl https://api.github.com/apps/<slug>` -> `fabrica-constructor 200` (pública), `fabrica-revisor 404`, `fabrica-administrador 404`, `homenu-sesiones 200`. `homenu-revisor` (App ID 5521568) existe y da 404 porque es privada, no porque falte; juzga PR reales de MenuPlan (el ruleset exige su check y MenuPlan#996 pasó por él). `fabrica-constructor` está instalada solo en MenuPlan en la cuenta `pabloam89` (además de la instalación de `factory-am89`, que abarca todos sus repos; la API pide el JWT de la App y no lo comprobé con `gh`: dato de `PASOS-PABLO.md`).
 - Org factory-am89: plan `free`, un solo miembro (`gh api orgs/factory-am89/members` -> `pabloam89`), `members_can_create_repositories: true`.
 - Identidad: el mapa `IDENTIDADES` tiene dos entradas, `fabrica-constructor` y `ninguna` (`scripts/lib/identities.mjs:12-16`). La App, el documento y la bóveda de la clave están fijos en `token.mjs` (`CLIENT_ID_CONSTRUCTOR` en `scripts/lib/repo.mjs:7`; `DOCUMENTO_CLAVE = 'fabrica-constructor.pem'` en `scripts/token.mjs:134`; la bóveda, `OP_VAULT` en `scripts/token.mjs:176`). La identidad es del repo (campo `identidad` de la ficha), no de la persona (`scripts/lib/repo-card.mjs:11`). `git grep -n "FABRICA_IDENTIDAD"` -> sin salida.
 - La caché del token solo sirve para el dueño de `REPO` (`scripts/token.mjs`, `mismoDueno`): en MenuPlan, cada token lee 1Password (tope de 60 lecturas por hora, `scripts/token.mjs:152`).
@@ -109,8 +109,8 @@ npx vitest run ops/revisor-bots.test.js ops/revisor-fabrica.test.js
 Files: `.github/workflows/anulacion.yml`, `ops/anulacion-fabrica.test.js`
 Depends on: 6, 2
 Blocked by: B, C
-Existing: no existen en `staging` (`git ls-tree --name-only origin/staging .github/workflows/ | grep -i anulacion` -> sin salida). Los crea el trozo 12 del puente 1 (`plans/puente-homenu.md`), que debe estar fusionado antes.
-Not done: solo añade la entrada `duenos` con los dos logins y sus Apps; el resto es del trozo 12 del puente 1. Con B = 2 no se construye. Puerta de HoMenu: la regla vive en la Fábrica (trozo 6); C13 igual que allí. Lector: el ruleset de `staging` (check `revisor`); disparador: `ci-judge`.
+Existing: `anulacion.yml` ya está en `staging` (puente 1 cerrado) y solo pasa `revisor-app-slug`; `ops/anulacion-fabrica.test.js` ya existe y se amplía.
+Not done: solo añade la entrada `duenos` con los dos logins y sus Apps y sube el sha de la Fábrica al que traiga el trozo 6. Con B = 2 no se construye. Puerta de HoMenu: la regla vive en la Fábrica (trozo 6); C13 igual que allí. Lector: el ruleset de `staging` (check `revisor`); disparador: `ci-judge`.
 Done:
 ```sh
 npx vitest run ops/anulacion-fabrica.test.js
@@ -151,14 +151,14 @@ git grep -q "comprobar-pc" -- PASOS-ALVARO.md && git grep -q "Puente 2" -- PASOS
 
 ## Build order
 
-Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 9 y 10. Tras el paso 2 de Álvaro (existe su App): 2, luego 7. Tras B y C: 5 (tras 4) y 6, luego 8 (tras el trozo 12 del puente 1). Al final, 11. Álvaro puede empezar a trabajar cuando 1, 2, 3, 4, 7, 9 y 10 estén en main y en `staging`. Sin 6 y 8, un «no» injusto en un PR suyo solo lo anula Pablo.
+Ya, sin esperar a nadie ni a Pablo (A, B y C contestadas, puente 1 cerrado): 3 y 6, luego 4, 5 (tras 4) y 1, y tras 1 los trozos 9 y 10 (10 también tras 4); 11 al final. Esperan al paso 2 de Álvaro (existe su App): 2 y 7, y 8 tras 2 y 6. El puente 1 está cerrado, así que 8 no espera a nada del puente 1. Álvaro puede empezar a trabajar cuando 1, 2, 3, 4, 7, 9 y 10 estén en main y en `staging`. Sin 6 y 8, un «no» injusto en un PR suyo solo lo anula Pablo.
 
 ## Pasos de Pablo
 
 1. Contestar A, B y C (hecho: consta en `intervenciones.md`, filas del 2026-10-29).
 2. Con A = 1: aceptar la petición de instalación de la App de Álvaro, solo en `pabloam89/MenuPlan`.
 3. No añadir a Álvaro a factory-am89 (decisión tomada, abajo).
-4. Los pasos 5 a 7 del puente 1 siguen pendientes. Sin el paso 6 (ruleset de `staging` con `revisor`), el juez corre pero no es obligatorio para nadie, tampoco para Álvaro.
+4. Del puente 1 solo queda el paso 7 (borrar la deploy key de `mercadona-sync`), que no bloquea nada de este plan. El juez ya es obligatorio en `staging` también para Álvaro.
 
 ## Pasos de Álvaro
 
@@ -187,21 +187,21 @@ Ya: nada de este plan. Ola 1, sin esperar a nadie: 3, luego 4. Tras A: 1, luego 
 
 ## Decisions for Pablo
 
-Las respuestas de Pablo a A, B y C están en `intervenciones.md` (filas del 2026-10-29), no aquí. Abajo quedan las preguntas como contexto de los trozos que dicen «Blocked by». Ya no hay ninguna abierta.
+Contestadas el 2026-10-29: A, B y C. Cada respuesta es una fila `decisión` de `intervenciones.md` con fecha 2026-10-29 (la de A abre con «ante las decisiones A, B y C» y las de B y C remiten a ella); aquí no se copian. Abajo quedan las preguntas como contexto de los trozos que dicen «Blocked by»: todos esos bloqueos ya están levantados. Ya no hay ninguna abierta.
 
-### A. ¿Con qué identidad abren PR en HoMenu las sesiones de Álvaro?
+### A. (contestada, `intervenciones.md`, fila de la decisión A) ¿Con qué identidad abren PR en HoMenu las sesiones de Álvaro?
 Por qué te lo pregunto: es dar o crear credenciales y permisos de Apps, que es tuyo.
 1. Con una App propia de Álvaro, que crea él, cuya clave solo guarda él y que instalas solo en MenuPlan. Ninguna clave tuya sale de tu bóveda, cada PR dice quién lo lanzó y la quitas desinstalándola. Coste: unos 20 minutos de Álvaro, un clic tuyo y los trozos 1, 2, 7 y 9 (recommended)
 2. Con su propia cuenta de GitHub, como hoy en su PC. Coste: nada que montar, pero los PR no salen de una App y una sesión suya podría aprobar PR ajenos como él, así que con esta opción Álvaro no puede tener la anulación
 3. Con tus claves (el constructor o `homenu-sesiones`), mediante una segunda cuenta de servicio de tu 1Password. Coste: lo más rápido, pero esa clave tiene más alcance que el trabajo de HoMenu
 
-### B. ¿Qué puede contestar Álvaro y puede anular al juez en HoMenu?
+### B. (contestada, `intervenciones.md`, fila de la decisión B) ¿Qué puede contestar Álvaro y puede anular al juez en HoMenu?
 Por qué te lo pregunto: es la lista cerrada de intención y autoridad, y la anulación es la única salida de un «no»; las dos son tuyas.
 1. En HoMenu, los dos contestáis y los dos podéis anular con un Approve, pero nunca un PR lanzado por vuestras propias sesiones (cuatro ojos). En la Fábrica solo tú. Coste: tus PR de HoMenu los anula Álvaro y al revés; trozos 5, 6 y 8 (recommended)
 2. Solo tú, en todo, como hoy. Coste: nada que construir; cada «no» injusto de Álvaro te espera a ti
 3. En HoMenu los dos, también sobre el trabajo propio. Coste: igual de rápido que la 1, pero cada uno puede saltarse al juez en lo suyo, y eso es juzgar tu propio trabajo, que está prohibido
 
-### C. ¿Das el OK a los trozos que tocan rutas cerradas (`CLAUDE.md` de la Fábrica, `anulacion.yml` de los dos repos, `revisor.yml` de HoMenu y un script nuevo en `apps/`)?
+### C. (contestada, `intervenciones.md`, fila de la decisión C) ¿Das el OK a los trozos que tocan rutas cerradas (`CLAUDE.md` de la Fábrica, `anulacion.yml` de los dos repos, `revisor.yml` de HoMenu y un script nuevo en `apps/`)?
 Por qué te lo pregunto: son rutas de la lista cerrada; el revisor sigue juzgando cada PR.
 1. Sí, OK al plan entero (recommended)
 2. Sí, pero trozo a trozo
