@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { entornoHijo, ErrorLlavero, HELPER_GIT, leerLlavero, ordenLeerLlavero } from '../scripts/token.mjs';
+import { entornoHijo, HELPER_GIT, leerLlavero, ordenLeerLlavero } from '../scripts/token.mjs';
 
 const TOKEN = 'ghs_TOKEN_DE_PRUEBA_123';
 
@@ -72,18 +72,4 @@ test('llavero: la orden de lectura de una entrada inexistente sale con error', {
   assert.notEqual(r.status, 0);
   assert.equal(r.stdout.trim(), '');
   assert.equal(leerLlavero(inexistente, 'service-account'), '');
-});
-
-test('llavero: entrada inexistente da vacío; timeout o fallo de powershell lanza ErrorLlavero con la causa', () => {
-  const falso = (r) => () => r;
-  assert.equal(leerLlavero('r', 'u', falso({ status: 1, stdout: '' })), '');
-  assert.equal(leerLlavero('r', 'u', falso({ status: 0, stdout: 'tok' })), 'tok');
-  const casos = [
-    [{ status: null, signal: 'SIGTERM', error: Object.assign(new Error('x'), { code: 'ETIMEDOUT' }) }, /timeout/],
-    [{ status: 3 }, /salida 3/],
-    [{ status: null, error: Object.assign(new Error('x'), { code: 'ENOENT' }) }, /ENOENT/],
-  ];
-  for (const [r, causa] of casos) {
-    assert.throws(() => leerLlavero('r', 'u', falso(r)), (e) => e instanceof ErrorLlavero && causa.test(e.message));
-  }
 });

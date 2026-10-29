@@ -6,11 +6,8 @@
 // carpeta-principal.mjs: un `git push` dentro de comillas, de un echo o de un heredoc no cuenta.
 // `gh pr view|checks|diff|list` y el resto de gh y git pasan. Entrada (JSON por stdin): { tool_name, tool_input }.
 import { fileURLToPath } from 'node:url';
-import { nombreDe, trocear } from './carpeta-principal.mjs';
+import { nombreDe, ordenDeShell, saltarPrefijos, SHELLS, TERMINAL, trocear } from './carpeta-principal.mjs';
 
-const TERMINAL = new Set(['Bash', 'PowerShell']);
-const ENVOLTORIOS = new Set(['command', 'exec', 'nohup', 'time', 'builtin']);
-const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'pwsh', 'powershell', 'cmd']);
 const PR_CON_ESCRITURA = new Set(['create', 'edit', 'merge']);
 
 export const MOTIVO = 'Esa orden va con la identidad de la App, no con las credenciales de la máquina (que son las de Pablo): envuélvela así: `node scripts/token.mjs -- git push -u origin <rama>` o `node scripts/token.mjs -- gh pr create|edit|merge …` (en un repo ajeno, `FABRICA_REPO=<dueño>/<repo> node <ruta de la Fábrica>/scripts/token.mjs -- …`).';
@@ -39,29 +36,14 @@ function subcomandoPr(args) {
 
 // ¿Esta orden simple (lista de palabras) es un push o un PR sin el envoltorio? Devuelve true/false.
 function sinEnvoltorio(p, profundidad) {
-  let i = 0;
-  while (i < p.length) {
-    const base = nombreDe(p[i]);
-    if (/^[A-Za-z_]\w*=/.test(p[i])) {
-      i += 1;
-    } else if (base === 'env') {
-      i += 1;
-      while (i < p.length && (p[i].startsWith('-') || /^[A-Za-z_]\w*=/.test(p[i]))) {
-        if (p[i] === '-C' || p[i] === '--chdir' || p[i] === '-u' || p[i] === '-S') i += 1;
-        i += 1;
-      }
-    } else if (ENVOLTORIOS.has(base)) {
-      i += 1;
-      while (p[i]?.startsWith('-')) i += 1;
-    } else break;
-  }
+  const i = saltarPrefijos(p);
   const base = nombreDe(p[i]);
   const args = p.slice(i + 1);
   if (base === 'git') return verboGit(args) === 'push';
   if (base === 'gh') return PR_CON_ESCRITURA.has(subcomandoPr(args));
   if (SHELLS.has(base) && profundidad < 3) {
-    const k = args.findIndex((a) => /^-[a-z]*c$/.test(a) || /^-command$/i.test(a) || /^\/[ck]$/i.test(a));
-    if (k >= 0 && args[k + 1] !== undefined) return hayIncumplimiento(args.slice(k + 1).join(' '), profundidad + 1);
+    const anidada = ordenDeShell(args);
+    if (anidada !== undefined) return hayIncumplimiento(anidada, profundidad + 1);
   }
   return false; // incluye `node …/token.mjs -- <orden>`: lo de detrás son argumentos del envoltorio
 }

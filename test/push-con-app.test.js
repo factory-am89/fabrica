@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { decidir } from '../.claude/hooks/push-con-app.mjs';
 
@@ -66,4 +67,16 @@ test('el hook de verdad: deny por stdout, nada si pasa, y falla en alto si no en
   const bueno = lanzar(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'node scripts/token.mjs -- git push' } }));
   assert.equal(bueno.stdout.trim(), '');
   assert.equal(JSON.parse(lanzar('no es json').stdout).hookSpecificOutput.permissionDecision, 'deny');
+});
+
+test('.claude/settings.json registra el hook para Bash y PowerShell, y la orden registrada niega de verdad', () => {
+  const ajustes = JSON.parse(readFileSync(new URL('../.claude/settings.json', import.meta.url), 'utf8'));
+  const entradas = ajustes.hooks.PreToolUse.filter((e) => e.hooks.some((h) => h.command.includes('push-con-app.mjs')));
+  assert.equal(entradas.length, 1, 'push-con-app.mjs debe estar registrado una vez en PreToolUse');
+  assert.equal(entradas[0].matcher, 'Bash|PowerShell');
+  // La orden tal como la lanza Claude Code (con $CLAUDE_PROJECT_DIR puesto), no llamando a decidir().
+  const raiz = fileURLToPath(new URL('..', import.meta.url));
+  const orden = entradas[0].hooks[0].command.replace('$CLAUDE_PROJECT_DIR', raiz.replace(/[\/]$/, ''));
+  const r = spawnSync(orden, { shell: true, input: JSON.stringify({ tool_name: 'PowerShell', tool_input: { command: 'git push' } }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: raiz } });
+  assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny', r.stderr);
 });
