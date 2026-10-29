@@ -33,7 +33,7 @@ Nombres que debe haber al final en `administrador`: `ADMIN_APP_KEY` y `ADMIN_CLI
 
 Tus respuestas del 28 oct 2026 (las filas de `intervenciones.md` las añade el PR #171 del plan): A1 (HoMenu se queda en tu cuenta `pabloam89`), B1 (nadie se salta el revisor: Dependabot espera, mercadona-sync abre PR), C1 (OK al plan entero) y D1 (HoMenu tiene su propio revisor: una App tuya, creada por ti). Solo se hace pública `fabrica-constructor`; `fabrica-revisor` se queda privada.
 
-**Estado a 29 oct 2026:** los pasos 1 a 6 están HECHOS y comprobados con `gh` (abajo). Solo queda el 7, que espera a que `mercadona-sync` abra un PR bueno. Un «no» injusto del revisor se anula con tu **Approve** sobre la cabeza del PR.
+**Estado a 29 oct 2026:** los pasos 1 a 6 están HECHOS; cada uno dice qué se comprobó con `gh` y qué no se pudo comprobar. Solo queda el 7, que espera a que `mercadona-sync` abra un PR bueno. Un «no» injusto del revisor se anula con tu **Approve** sobre la cabeza del PR.
 
 Nunca escribas el valor de un secreto en un chat ni en una orden: se escribe en el aviso de `gh` o se lee desde un fichero. Aquí solo van nombres.
 
