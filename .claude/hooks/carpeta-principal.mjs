@@ -11,13 +11,13 @@ import { existsSync, statSync } from 'node:fs';
 import { absoluta, norm, worktrees } from '../../scripts/lib/folders.mjs';
 
 const EDICION = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
-const TERMINAL = new Set(['Bash', 'PowerShell']);
+export const TERMINAL = new Set(['Bash', 'PowerShell']);
 // Verbos de git que mueven la rama o crean commits (`pull` solo vale con --ff-only).
 const PROHIBIDOS = new Set(['commit', 'checkout', 'switch', 'merge', 'cherry-pick', 'revert', 'rebase', 'am', 'reset', 'pull']);
 const CAMBIA_DE_CARPETA = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
 const VUELVE_A_ALGUNA = new Set(['popd', 'pop-location']);
 const ENVOLTORIOS = new Set(['command', 'exec', 'nohup', 'time', 'builtin']);
-const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'pwsh', 'powershell', 'cmd']);
+export const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'pwsh', 'powershell', 'cmd']);
 
 // Carpeta que no se sabe resolver (`cd $X`, `cd -`, `popd`): se trata como la principal.
 export const DESCONOCIDA = '\0desconocida';
@@ -45,7 +45,7 @@ const resolver = (dir, p) => {
 // Trocea una línea de shell (bash o PowerShell) en palabras y operadores. Respeta las comillas;
 // `;`, `&`, `|`, saltos de línea, `&&` y `||` separan órdenes; `(`, `$(` y `{` abren un ámbito y
 // `)` y `}` lo cierran.
-function trocear(s) {
+export function trocear(s) {
   const salida = [];
   let w = null;
   const suelta = () => {
@@ -86,7 +86,51 @@ function trocear(s) {
 }
 
 // Nombre de un ejecutable sin ruta ni .exe y en minúsculas: «C:\Git\bin\git.exe» → «git».
-const nombreDe = (w) => (w ?? '').split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase();
+export const nombreDe = (w) => (w ?? '').split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase();
+
+// Salta los prefijos de una orden simple (`VAR=valor`, `env` con sus opciones, `command`, `exec`…) y
+// devuelve el índice del ejecutable. `env -C dir` / `--chdir dir` avisa a `alCambiarDeCarpeta(dir)`.
+// Lo comparten este hook y push-con-app.mjs: un solo recorrido de prefijos.
+export function saltarPrefijos(p, alCambiarDeCarpeta = () => {}) {
+  let i = 0;
+  while (i < p.length) {
+    const base = nombreDe(p[i]);
+    if (/^[A-Za-z_]\w*=/.test(p[i])) {
+      i += 1;
+    } else if (base === 'env') {
+      i += 1;
+      while (i < p.length && (p[i].startsWith('-') || /^[A-Za-z_]\w*=/.test(p[i]))) {
+        if (p[i] === '-C' || p[i] === '--chdir') alCambiarDeCarpeta(p[++i] ?? '.');
+        else if (p[i] === '-u' || p[i] === '-S') i += 1;
+        i += 1;
+      }
+    } else if (ENVOLTORIOS.has(base)) {
+      i += 1;
+      while (p[i]?.startsWith('-')) i += 1;
+    } else break;
+  }
+  return i;
+}
+
+// Índice del verbo de git tras sus opciones globales (`-C ruta`, `-c clave=valor`, `--flag`), a partir
+// de `desde`. `-C` avisa a `alCambiarDeCarpeta(ruta)`. Lo comparten este hook y push-con-app.mjs.
+export function saltarOpcionesGit(p, desde, alCambiarDeCarpeta = () => {}) {
+  let i = desde;
+  while (i < p.length && p[i].startsWith('-')) {
+    if (p[i] === '-C') alCambiarDeCarpeta(p[++i] ?? '.');
+    else if (p[i] === '-c') i += 1;
+    i += 1;
+  }
+  return i;
+}
+
+// La orden que una shell ejecuta con `-c` / `-Command` / `/c` (`bash -c "…"`), o undefined.
+export function ordenDeShell(args) {
+  const esDeComando = (a) => /^-command$/i.test(a) || /^\/[ck]$/i.test(a);
+  const k = args.findIndex((a) => /^-[a-z]*c$/.test(a) || esDeComando(a));
+  if (k < 0 || args[k + 1] === undefined) return undefined;
+  return esDeComando(args[k]) ? args.slice(k + 1).join(' ') : args[k + 1];
+}
 
 // Recorre las órdenes de una línea siguiendo cd/Set-Location/pushd (con sus ámbitos de subshell),
 // `git -C`, los prefijos `VAR=valor`, `env` y `command`, y las shells anidadas (`bash -c "…"`);
@@ -98,12 +142,7 @@ export function carpetaDeCommit(orden, cwd, profundidad = 0) {
 
   const git = (p, desde) => {
     let donde = dir;
-    let i = desde;
-    while (i < p.length && p[i].startsWith('-')) {
-      if (p[i] === '-C') donde = resolver(donde, p[++i] ?? '.');
-      else if (p[i] === '-c') i += 1;
-      i += 1;
-    }
+    const i = saltarOpcionesGit(p, desde, (d) => { donde = resolver(donde, d); });
     const verbo = p[i];
     if (!PROHIBIDOS.has(verbo)) return null;
     if (verbo === 'pull' && p.slice(i + 1).includes('--ff-only')) return null;
@@ -111,23 +150,7 @@ export function carpetaDeCommit(orden, cwd, profundidad = 0) {
   };
 
   const simple = (p) => {
-    let i = 0;
-    while (i < p.length) {
-      const base = nombreDe(p[i]);
-      if (/^[A-Za-z_]\w*=/.test(p[i])) {
-        i += 1;
-      } else if (base === 'env') {
-        i += 1;
-        while (i < p.length && (p[i].startsWith('-') || /^[A-Za-z_]\w*=/.test(p[i]))) {
-          if (p[i] === '-C' || p[i] === '--chdir') dir = resolver(dir, p[++i] ?? '.');
-          else if (p[i] === '-u' || p[i] === '-S') i += 1;
-          i += 1;
-        }
-      } else if (ENVOLTORIOS.has(base)) {
-        i += 1;
-        while (p[i]?.startsWith('-')) i += 1;
-      } else break;
-    }
+    const i = saltarPrefijos(p, (d) => { dir = resolver(dir, d); });
     const base = nombreDe(p[i]);
     const args = p.slice(i + 1);
     if (CAMBIA_DE_CARPETA.has(base)) {
@@ -140,11 +163,8 @@ export function carpetaDeCommit(orden, cwd, profundidad = 0) {
     } else if (VUELVE_A_ALGUNA.has(base)) {
       dir = DESCONOCIDA;
     } else if (SHELLS.has(base) && profundidad < 3) {
-      const k = args.findIndex((a) => /^-[a-z]*c$/.test(a) || /^-command$/i.test(a) || /^\/[ck]$/i.test(a));
-      if (k >= 0 && args[k + 1] !== undefined) {
-        const resto = /^-command$/i.test(args[k]) || /^\/[ck]$/i.test(args[k]);
-        hallada = carpetaDeCommit(resto ? args.slice(k + 1).join(' ') : args[k + 1], dir, profundidad + 1);
-      }
+      const anidada = ordenDeShell(args);
+      if (anidada !== undefined) hallada = carpetaDeCommit(anidada, dir, profundidad + 1);
     } else if (base === 'git') {
       hallada = git(p, i + 1);
     }

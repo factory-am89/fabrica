@@ -28,7 +28,8 @@ Scratch files (body, file list) go to your own scratchpad, never to a shared `/t
    - `node scripts/token.mjs -- git push -u origin <branch>`
    - `node scripts/token.mjs -- gh pr create --title "<t>" --body-file <scratchpad>/body.md`
    Runbook rule, with NO machine check yet: never chain these with edits or a `cd` (one command, one result to read).
-   Machine-checked: git from the main folder is denied, chained or not (`.claude/hooks/carpeta-principal.mjs`,
+   Machine-checked: a bare `git push` or `gh pr create|edit|merge` (not wrapped in `scripts/token.mjs --`) is denied
+   (`.claude/hooks/push-con-app.mjs`). Machine-checked: git from the main folder is denied, chained or not (`.claude/hooks/carpeta-principal.mjs`,
    lesson `git-not-from-main-folder`).
 6. **Look at CI once** (rules: skill `github`, "La cuota de GitHub"): `node scripts/token.mjs -- gh pr view <n> --json statusCheckRollup`.
    The constructor App cannot rerun runs: to get a new run, push a new commit (then redo step 2 and the body).
