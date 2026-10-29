@@ -40,7 +40,7 @@ test('deja pasar lo envuelto en token.mjs, la lectura y los textos que solo menc
     'FABRICA_REPO=pabloam89/MenuPlan node C:/dev/fabrica/scripts/token.mjs -- gh pr create --fill',
     'node scripts/token.mjs -- gh pr merge 3 --auto --squash',
     'gh pr view 3',
-    'gh pr checks 3 --watch',
+    'gh pr checks 3',
     'gh pr diff 3',
     'gh pr list',
     'git status',
