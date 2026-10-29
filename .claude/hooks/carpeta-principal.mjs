@@ -112,6 +112,18 @@ export function saltarPrefijos(p, alCambiarDeCarpeta = () => {}) {
   return i;
 }
 
+// Índice del verbo de git tras sus opciones globales (`-C ruta`, `-c clave=valor`, `--flag`), a partir
+// de `desde`. `-C` avisa a `alCambiarDeCarpeta(ruta)`. Lo comparten este hook y push-con-app.mjs.
+export function saltarOpcionesGit(p, desde, alCambiarDeCarpeta = () => {}) {
+  let i = desde;
+  while (i < p.length && p[i].startsWith('-')) {
+    if (p[i] === '-C') alCambiarDeCarpeta(p[++i] ?? '.');
+    else if (p[i] === '-c') i += 1;
+    i += 1;
+  }
+  return i;
+}
+
 // La orden que una shell ejecuta con `-c` / `-Command` / `/c` (`bash -c "…"`), o undefined.
 export function ordenDeShell(args) {
   const esDeComando = (a) => /^-command$/i.test(a) || /^\/[ck]$/i.test(a);
@@ -130,12 +142,7 @@ export function carpetaDeCommit(orden, cwd, profundidad = 0) {
 
   const git = (p, desde) => {
     let donde = dir;
-    let i = desde;
-    while (i < p.length && p[i].startsWith('-')) {
-      if (p[i] === '-C') donde = resolver(donde, p[++i] ?? '.');
-      else if (p[i] === '-c') i += 1;
-      i += 1;
-    }
+    const i = saltarOpcionesGit(p, desde, (d) => { donde = resolver(donde, d); });
     const verbo = p[i];
     if (!PROHIBIDOS.has(verbo)) return null;
     if (verbo === 'pull' && p.slice(i + 1).includes('--ff-only')) return null;

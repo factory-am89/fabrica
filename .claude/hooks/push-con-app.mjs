@@ -6,7 +6,7 @@
 // carpeta-principal.mjs: un `git push` dentro de comillas, de un echo o de un heredoc no cuenta.
 // `gh pr view|checks|diff|list` y el resto de gh y git pasan. Entrada (JSON por stdin): { tool_name, tool_input }.
 import { fileURLToPath } from 'node:url';
-import { nombreDe, ordenDeShell, saltarPrefijos, SHELLS, TERMINAL, trocear } from './carpeta-principal.mjs';
+import { nombreDe, ordenDeShell, saltarOpcionesGit, saltarPrefijos, SHELLS, TERMINAL, trocear } from './carpeta-principal.mjs';
 
 const PR_CON_ESCRITURA = new Set(['create', 'edit', 'merge']);
 
@@ -14,15 +14,6 @@ export const MOTIVO = 'Esa orden va con la identidad de la App, no con las crede
 
 // Quita el cuerpo de los heredocs (`<<EOF … EOF`): es texto, no órdenes.
 const sinHeredocs = (s) => s.replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g, '');
-
-// Verbo de git tras sus opciones globales (`-C ruta`, `-c clave=valor`), o undefined.
-function verboGit(args) {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '-C' || args[i] === '-c') i += 1;
-    else if (!args[i].startsWith('-')) return args[i];
-  }
-  return undefined;
-}
 
 // Subcomando de `gh pr`, o undefined si no es `gh pr …` (salta -R/--repo y sus valores).
 function subcomandoPr(args) {
@@ -39,7 +30,7 @@ function sinEnvoltorio(p, profundidad) {
   const i = saltarPrefijos(p);
   const base = nombreDe(p[i]);
   const args = p.slice(i + 1);
-  if (base === 'git') return verboGit(args) === 'push';
+  if (base === 'git') return args[saltarOpcionesGit(args, 0)] === 'push';
   if (base === 'gh') return PR_CON_ESCRITURA.has(subcomandoPr(args));
   if (SHELLS.has(base) && profundidad < 3) {
     const anidada = ordenDeShell(args);
