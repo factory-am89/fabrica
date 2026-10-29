@@ -84,7 +84,7 @@ node --test test/principles-and-roles.test.js test/contrato.test.js && ! git gre
 ```
 
 ### 6. (Fábrica) Anulación con varios dueños por repo y nunca sobre el trabajo propio
-Files: `scripts/veredicto.mjs`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`, `test/anulacion-duenos.test.js`
+Files: `scripts/veredicto.mjs`, `scripts/lib/record.mjs`, `.github/workflows/anulacion.yml`, `test/anulacion.test.js`, `test/anulacion-duenos.test.js`
 Depends on: none
 Blocked by: B, C
 Existing: `aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN)` acepta un solo login (`scripts/veredicto.mjs:126`); `anulacion.yml` en `workflow_call` solo recibe `revisor-app-slug` (líneas 25-37). `grep -n "duenos" .github/workflows/anulacion.yml` -> sin salida.
@@ -132,7 +132,7 @@ Files: `scripts/comprobar-pc.mjs`, `test/comprobar-pc.test.js`, `package.json`
 Depends on: 1, 4
 Blocked by: none
 Existing: `npm run check-pc` solo compara la capa de usuario (`scripts/install-pc.mjs comprobar`); `ls scripts test | grep -i comprobar-pc` -> sin salida.
-Not done: comprueba `node` >= 22, `git`, `gh`, `op` y `claude` en el PATH; que `FABRICA_IDENTIDAD`, si está, sea válida para la ficha del repo que se le pase; que exista el fichero de valores; y `install-pc comprobar`. No lee ningún secreto ni abre el llavero (no entra en `PUERTAS`). Sale con 1 y nombra cada fallo. `package.json` es puerta (`GATE_FILES`): solo añade un script, sin tocar `ci` ni dependencias (C13). Lector: la persona que monta el PC; disparador: `manual`, declarado como deuda.
+Not done: comprueba `node` >= 22, `git`, `gh`, `op` y `claude` en el PATH; que `FABRICA_IDENTIDAD`, si está, sea válida para la ficha del repo que se le pase; que exista el fichero de valores; y `install-pc comprobar`. No lee ningún secreto ni abre el llavero (no entra en `PUERTAS`). Sale con 1 y nombra cada fallo. `package.json` es puerta (`GATE_FILES`): solo añade un script, sin tocar `ci` ni dependencias (C13); mantiene la comprobación de `test/comprobar-pc.test.js` y, si rompe, se revierte desde una rama nueva. Lector: la persona que monta el PC; disparador: `manual`, declarado como deuda.
 Done:
 ```sh
 node --test test/comprobar-pc.test.js
