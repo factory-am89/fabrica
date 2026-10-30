@@ -34,9 +34,10 @@ on:
       revisor-app-slug:
         type: string
         required: true
-      # Dueños que pueden anular en el repo que llama (decisión B1 del 2026-10-29 en intervenciones.md): «login:app,app»
-      # por dueño, separados por espacios o saltos de línea, con las Apps que lanzan las sesiones de ese dueño. Ninguno
-      # anula un PR abierto por él o por una de sus Apps (cuatro ojos). Sin ella (la propia Fábrica), solo OWNER_LOGIN.
+      # Dueños que pueden anular en el repo que llama (decisión B1 del 2026-10-29 en intervenciones.md), con las Apps que
+      # lanzan las sesiones de cada uno, en piezas separadas por comas: «login:app» abre un dueño y «app» suelta suma otra
+      # App al de antes (p. ej. `pabloam89:fabrica-constructor,homenu-sesiones,algbarc-design:<App>`). Ninguno anula un
+      # PR abierto por él o por una de sus Apps (cuatro ojos). Sin ella (la propia Fábrica), solo OWNER_LOGIN.
       duenos:
         type: string
         required: false

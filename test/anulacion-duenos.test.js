@@ -12,21 +12,25 @@ import { OVERRIDE_PREFIX, overrideTitle, readCheckRuns } from '../scripts/lib/re
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const ALVARO = 'algbarc-design';
-const DUENOS = `${OWNER_LOGIN}:fabrica-constructor,homenu-sesiones\n${ALVARO}:alvaro-sesiones`;
+const DUENOS = `${OWNER_LOGIN}:fabrica-constructor,homenu-sesiones,${ALVARO}:alvaro-sesiones`;
 const duenos = leerDuenos(DUENOS);
 const review = (login, extra = {}) => ({ id: 7, user: { login }, state: 'APPROVED', commit_id: SHA, ...extra });
 
-test('leerDuenos: «login:app,app» separados por espacios o saltos de línea; vacío o sin la variable es null (la Fábrica)', () => {
+test('leerDuenos: piezas con comas, «login:app» abre un dueño y «app» suelta se suma al de antes; vacío o sin la variable es null (la Fábrica)', () => {
   assert.deepEqual(duenos, [
     { login: OWNER_LOGIN, apps: ['fabrica-constructor', 'homenu-sesiones'] },
     { login: ALVARO, apps: ['alvaro-sesiones'] },
   ]);
-  assert.deepEqual(leerDuenos(`${OWNER_LOGIN}:a ${ALVARO}:b`).map((d) => d.login), [OWNER_LOGIN, ALVARO]);
+  assert.deepEqual(leerDuenos(`${OWNER_LOGIN}:a, ${ALVARO}:b`).map((d) => d.login), [OWNER_LOGIN, ALVARO], 'espacios junto a las comas');
+  assert.deepEqual(leerDuenos(`${OWNER_LOGIN}:fabrica-constructor,${ALVARO}:alvaro-sesiones`), [
+    { login: OWNER_LOGIN, apps: ['fabrica-constructor'] },
+    { login: ALVARO, apps: ['alvaro-sesiones'] },
+  ], 'el ejemplo del plan, tal cual');
   for (const vacio of [undefined, '', '  \n ']) assert.equal(leerDuenos(vacio), null, JSON.stringify(vacio));
 });
 
 test('leerDuenos: una entrada mal formada o un dueño repetido fallan en alto, nunca se ignoran', () => {
-  for (const malo of ['pabloam89', 'pabloam89:', ':app', 'pabloam89:a:b', 'pabloam89:a,,b', 'pablo am89:a', 'pab/lo:a', 'pabloam89:a PabloAM89:b']) {
+  for (const malo of ['pabloam89', 'app,pabloam89:a', 'pabloam89:', ':app', 'pabloam89:a:b', 'pabloam89:a,,b', 'pablo am89:a', 'pab/lo:a', 'pabloam89:a,PabloAM89:b']) {
     assert.throws(() => leerDuenos(malo), /DUENOS/, malo);
   }
 });

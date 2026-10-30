@@ -134,20 +134,20 @@ export function aprobacionDe(reviews, cabeza, dueno = OWNER_LOGIN) {
 }
 
 // Los dueños de un repo que llama a anulacion.yml con la entrada `duenos` (variable DUENOS; decisión B1 del 2026-10-29 en
-// intervenciones.md): «login:app,app» por dueño, separados por espacios o saltos de línea; las Apps son las que lanzan las
-// sesiones de ese dueño. Vacío o sin la variable: null (la propia Fábrica, solo OWNER_LOGIN). Algo mal formado lanza.
+// intervenciones.md), con la forma del plan: piezas separadas por comas; una pieza «login:app» abre un dueño y una pieza «app»
+// suelta añade otra App al dueño de antes (`pabloam89:fabrica-constructor,homenu-sesiones,algbarc-design:<App>`). Las Apps son
+// las que lanzan las sesiones de ese dueño. Vacío o sin la variable: null (la propia Fábrica, solo OWNER_LOGIN). Algo mal formado lanza.
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 export function leerDuenos(texto) {
   if (texto === undefined || !texto.trim()) return null;
-  const duenos = texto.trim().split(/\s+/).map((entrada) => {
-    const partes = entrada.split(':');
-    const apps = partes[1]?.split(',') ?? [];
-    if (partes.length !== 2 || !LOGIN.test(partes[0]) || apps.length === 0 || !apps.every((a) => SLUG.test(a))) {
-      throw new Error(`DUENOS: «${entrada}» no es login:app[,app]`);
-    }
-    return { login: partes[0], apps };
-  });
+  const duenos = [];
+  for (const pieza of texto.split(',').map((p) => p.trim())) {
+    const partes = pieza.split(':');
+    if (partes.length === 2 && LOGIN.test(partes[0]) && SLUG.test(partes[1])) duenos.push({ login: partes[0], apps: [partes[1]] });
+    else if (partes.length === 1 && SLUG.test(pieza) && duenos.length > 0) duenos.at(-1).apps.push(pieza);
+    else throw new Error(`DUENOS: «${pieza}» no encaja en login:app[,app][,login:app[,app]]`);
+  }
   const logins = duenos.map((d) => d.login.toLowerCase());
   const repetido = logins.find((l, i) => logins.indexOf(l) !== i);
   if (repetido) throw new Error(`DUENOS: el dueño ${repetido} está repetido`);

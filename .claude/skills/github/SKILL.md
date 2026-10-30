@@ -22,7 +22,7 @@ comprobado: 2026-10-15
 - **`revisor.yml` usa `pull_request_target`**: corre la versión de `main`, tiene secretos y **nunca
   ejecuta código del PR** (ese lo ejecuta `tests.yml`, sin secretos). Sus secretos viven en el environment
   `revisor`, limitado a `main`, no en el repo. Claude no ve el token de la App: se crea después de él.
-- **Decide el check `revisor`; solo el Approve de Pablo sobre la cabeza anula un «no»; pausar el ruleset está prohibido.**
+- **Decide el check `revisor`; solo el Approve de un dueño sobre la cabeza anula un «no» (en la Fábrica, solo Pablo); pausar el ruleset está prohibido.**
   Regla y mecanismo: `standards/intervention.md`, «Who decides a merge». Rutas que vigila C13: `standards/code.md`.
 - **`revisor` está «juzgando» mientras se juzga (#155).** `pendiente` (`revisor.yml`) publica `revisor` en `in_progress` (`PENDING_TITLE`, `scripts/lib/record.mjs`) con `external_id` = `RUN_ID`; `juzgar` lo cierra con PATCH y, si `juzgar` no sale bien (run cancelado), `cerrar` lo cierra en `failure` «juicio cortado» (`CUT_TITLE`, #162).
   Medido en #161: `in_progress` y `blocked` 10:27:27Z-10:28:31Z (antes, #156: `unstable`). Tras #168, en #169: 55 runs cancelados, 7 cerrados por `cerrar` en «juicio cortado» (2 con cabeza vieja), 0 huérfanos; `cerrar` corrió en 44. Test: `test/revisor-pendiente.test.js`.
