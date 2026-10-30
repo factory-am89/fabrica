@@ -9,6 +9,17 @@ export const TESTS_WORKFLOW = 'tests.yml';
 export const JUDGE_WORKFLOW = 'revisor.yml';
 export const CORPUS_WORKFLOW = 'golden.yml';
 export const NODE_TEST_SCRIPT = 'node --test';
+// The suite may cap how many test files run at once (the reason and the measure are in scripts/lib/turno.mjs, next to
+// the memory figures of one suite); the cap only changes how many run together, never which files run.
+export const TEST_CONCURRENCY_FLAG = '--test-concurrency';
+const CAPPED_TEST_SCRIPT = new RegExp(`^${NODE_TEST_SCRIPT} ${TEST_CONCURRENCY_FLAG}=([1-9]\\d*)$`);
+// The cap in a `test` script: a number, or null when the script is the bare `node --test` (or anything else).
+export const testConcurrency = (script) => {
+  const m = typeof script === 'string' ? CAPPED_TEST_SCRIPT.exec(script) : null;
+  return m ? Number(m[1]) : null;
+};
+// A `test` script that runs `node --test` over the files it collects by default: bare, or with the cap.
+export const isNodeTestScript = (script) => script === NODE_TEST_SCRIPT || testConcurrency(script) !== null;
 export const NPM_TEST = 'npm test';
 export const PR_EVENT = 'pull_request';
 export const JUDGE_EVENT = 'pull_request_target';

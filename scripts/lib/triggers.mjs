@@ -9,7 +9,7 @@ import { PASOS } from '../al-arrancar.mjs';
 import { MACHINE_KINDS, SIGNAL_MACHINE, STANDARDS, mechanismKind, readLessons } from './lessons.mjs';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './questions.mjs';
 import { collectedByNodeTest } from './node-test.mjs';
-import { JUDGE_EVENT, JUDGE_WORKFLOW, NODE_TEST_SCRIPT, PR_EVENT, STANDARD_VARIABLE, TESTS_WORKFLOW, readWiring } from './wiring.mjs';
+import { JUDGE_EVENT, JUDGE_WORKFLOW, NODE_TEST_SCRIPT, PR_EVENT, STANDARD_VARIABLE, TEST_CONCURRENCY_FLAG, TESTS_WORKFLOW, isNodeTestScript, readWiring } from './wiring.mjs';
 
 export const TRIGGER = Object.freeze({ CI_TEST: 'ci-test', CI_JUDGE: 'ci-judge', CORPUS: 'corpus', MANUAL: 'manual', ARRANQUE: 'arranque', CRON: 'cron' });
 export const TRIGGERS = Object.freeze(Object.values(TRIGGER));
@@ -19,7 +19,7 @@ export const TRIGGER_FAULTS = Object.freeze(
     'TRIGGER_READER_UNFIRED', // a question that no workflow answers
     'TRIGGER_TEST_UNCOLLECTED', // a test that `node --test` does not collect
     'TRIGGER_LESSON_UNFIRED', // the mechanism of a lesson that nothing fires
-    'TRIGGER_NO_NODE_TEST', // package.json `test` is not `node --test`
+    'TRIGGER_NO_NODE_TEST', // package.json `test` is not `node --test` (bare or with its concurrency cap)
     'TRIGGER_NO_NPM_TEST', // tests.yml does not run `npm test`
     'TRIGGER_WORKFLOW_SILENT', // tests.yml or revisor.yml no longer fires on a PR, or the judge no longer reads code.md
     'TRIGGER_PLAN_NO_BRIDGE', // a reviewer question of plan.md while code.md has no C16: no judge reaches it
@@ -37,7 +37,7 @@ function readContext(root, pasos) {
     for (const q of readQuestions(readFileSync(path.join(root, standard), 'utf8'))) questions.set(q.id, { ...q, standard });
   }
   const w = readWiring(root);
-  const testsWired = w.testScript === NODE_TEST_SCRIPT && w.runsNpmTest && w.testsEvents.includes(PR_EVENT);
+  const testsWired = isNodeTestScript(w.testScript) && w.runsNpmTest && w.testsEvents.includes(PR_EVENT);
   const judgeWired = w.judgeEvents.includes(JUDGE_EVENT) && w.judgeStandards.some((s) => s.endsWith(CODE_STANDARD));
   return { questions, w, pasos, testsWired, judgeWired };
 }
@@ -93,7 +93,7 @@ export function triggerFaults(root) {
   const ctx = readContext(root, PASOS);
   const { w } = ctx;
   const out = [];
-  if (w.testScript !== NODE_TEST_SCRIPT) out.push(fault(TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST, 'package.json', `the test script is ${JSON.stringify(w.testScript)}, not ${JSON.stringify(NODE_TEST_SCRIPT)}`));
+  if (!isNodeTestScript(w.testScript)) out.push(fault(TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST, 'package.json', `the test script is ${JSON.stringify(w.testScript)}, not ${JSON.stringify(NODE_TEST_SCRIPT)} (bare or with ${TEST_CONCURRENCY_FLAG}=<n>)`));
   if (!w.runsNpmTest) out.push(fault(TRIGGER_FAULTS.TRIGGER_NO_NPM_TEST, TESTS_WORKFLOW, 'no step runs `npm test`'));
   if (!w.testsEvents.includes(PR_EVENT)) out.push(fault(TRIGGER_FAULTS.TRIGGER_WORKFLOW_SILENT, TESTS_WORKFLOW, `does not fire on ${PR_EVENT}`));
   if (!w.judgeEvents.includes(JUDGE_EVENT)) out.push(fault(TRIGGER_FAULTS.TRIGGER_WORKFLOW_SILENT, JUDGE_WORKFLOW, `does not fire on ${JUDGE_EVENT}`));
