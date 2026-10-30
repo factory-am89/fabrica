@@ -76,7 +76,9 @@ test('los dos roles tienen su modelo y el revisor no escribe', () => {
 test('el constructor empieza en esfuerzo medio y sube a alto solo tras un no del revisor', () => {
   const texto = leer('.claude/agents/constructor.md');
   assert.match(texto.split('---')[1], /^effort: medium$/m);
-  assert.ok(texto.includes('effort: high'), 'constructor.md no dice cómo escalar el arreglo a esfuerzo alto');
+  const paso7 = texto.split('\n').find((linea) => linea.startsWith('7. Si el revisor dice no'));
+  assert.ok(paso7, 'constructor.md perdió el paso 7 (el arreglo tras un no del revisor)');
+  assert.ok(paso7.includes('effort: high'), 'el paso 7 no sube a effort: high el arreglo tras un no');
 });
 
 test('el constructor planifica primero y parte por tamaño: un trozo lo construye él, más de uno abre el plan y para', () => {
