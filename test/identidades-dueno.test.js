@@ -7,6 +7,7 @@ import path from 'node:path';
 import { leerFicha } from '../scripts/lib/repo-card.mjs';
 import { IDENTIDADES } from '../scripts/lib/identities.mjs';
 import { REPO, OWNER_LOGIN } from '../scripts/lib/repo.mjs';
+import './apoyo/sin-identidad.mjs'; // the result must not depend on the FABRICA_IDENTIDAD of the PC
 
 const ficha = (repo, identidad = 'fabrica-constructor') => {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'duenos-')));

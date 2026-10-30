@@ -112,3 +112,15 @@ test('token.mjs de verdad: FABRICA_IDENTIDAD elige; una que no existe, sin App o
     assert.match(r.stderr, motivo);
   }
 });
+
+// The test files that failed when the whole suite ran with FABRICA_IDENTIDAD=ninguna (2026-10-30, 11 tests in these 7 files):
+// they reach leerFicha or token.mjs through process.env, so they import test/apoyo/sin-identidad.mjs. This only catches one
+// of them losing the import; a new file of the same kind is caught by running the suite with the variable set, as that day.
+const DEPENDEN_DEL_ENTORNO = ['clean', 'identidades-dueno', 'presupuesto-lecturas', 'proyecto-nuevo', 'tarea-ficha', 'token-lecturas', 'token-salida'];
+
+test('los tests que leen la identidad de process.env no dependen de la del PC: importan sin-identidad.mjs', () => {
+  for (const n of DEPENDEN_DEL_ENTORNO) {
+    const src = readFileSync(new URL(`./${n}.test.js`, import.meta.url), 'utf8');
+    assert.match(src, /^import '\.\/apoyo\/sin-identidad\.mjs';/m, `test/${n}.test.js`);
+  }
+});

@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { lecturasRecientes, VENTANA_MS } from '../scripts/lib/op-log.mjs';
 import { clavePrivada, comprobarPresupuesto, ErrorToken, MOTIVOS, obtenerToken, PRESUPUESTO_LECTURAS, presupuestoDe, VARIABLE_PRESUPUESTO } from '../scripts/token.mjs';
 import { escribirCache, MARGEN_MS } from '../scripts/lib/token-cache.mjs';
+import './apoyo/sin-identidad.mjs'; // the result must not depend on the FABRICA_IDENTIDAD of the PC
 
 const PEM = '-----BEGIN RSA PRIVATE KEY-----\nVALOR-SECRETO-DE-PRUEBA\n-----END RSA PRIVATE KEY-----\n';
 const AHORA = Date.UTC(2026, 9, 16, 12, 0, 0);
