@@ -1,4 +1,4 @@
-# Intervention: when an agent asks Pablo
+# Intervention: when an agent asks the owner
 
 Principle 6 (CLAUDE.md) says to ask before a shortcut. This file is the closed list of what counts as one. Everything else an agent decides and writes down (a row in `intervenciones.md` when it is a decision of Pablo's).
 
@@ -14,16 +14,25 @@ One source for this rule; the skill `github`, `PASOS-PABLO.md`, C13 of `standard
 - `OWNER_LOGIN` is `pabloam89`, the owner account. Checked on 2026-10-16: `gh api repos/factory-am89/fabrica/collaborators/pabloam89/permission --jq .permission` printed `admin`.
 - Why the reviewer may accept this widening (C13): Pablo decided it (the rows of 2026-10-16 in `intervenciones.md`, PR #63: «Decidida, pendiente de implementar en el PR #61»), and the machine limits it to his login, the current head and his latest decisive review; `test/anulacion.test.js` goes red if any of the three is removed.
 
+## Who answers
+
+Who answers the residue depends on the repo the session works on (Pablo's decision B, option 1, row of 2026-10-29 in `intervenciones.md`; `plans/puente-2-alvaro.md`).
+
+- In the Fábrica (`factory-am89/fabrica`: its gate, its Apps, its vault, its permissions) only Pablo (`OWNER_LOGIN`) answers.
+- In HoMenu (`pabloam89/MenuPlan`) either of its two owners answers: Pablo (`pabloam89`) or Álvaro (`algbarc-design`). What only the GitHub admin of the repo can do (rulesets, App installations, collaborators, secrets) stays Pablo's.
+- How to phrase a question for each one is in their personal layer, `usuario/personas/<login>.md`; each question is a row in `intervenciones.md`.
+- This section says who answers before work starts. Who overrides a «no» is «Who decides a merge», above, and it does not change here.
+
 ## Classes
 
-An agent stops and asks Pablo, in the terminal, before it does any of these:
+An agent stops and asks the owner who answers (above), in the terminal, before it does any of these:
 
 - **Weaken a check**: lower a threshold, delete or relax a test, turn a «no» into a warning.
-- **Bypass the gate**: the «Prohibido» line of `CLAUDE.md` says what is forbidden; here the agent asks Pablo instead of doing it.
+- **Bypass the gate**: the «Prohibido» line of `CLAUDE.md` says what is forbidden; here the agent asks the owner instead of doing it.
 - **Change permissions or secrets**: same pointer, «Prohibido» in `CLAUDE.md`.
 - **Do something irreversible**: delete data or history that cannot be recovered from git.
 
-The «Qué requiere el OK de Pablo» sections of the skills are these four classes applied to each tool; they add none. How to phrase a question for Pablo is in `usuario/CLAUDE.md`, «Cómo responder a Pablo»; each question is a row in `intervenciones.md`.
+The «Qué requiere el OK de Pablo» sections of the skills are these four classes applied to each tool; they add none. How to phrase a question is in «Who answers», above.
 
 ## Closed paths
 

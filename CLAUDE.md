@@ -1,7 +1,7 @@
 # Fábrica
 
 Entiende lo que Pablo quiere decir, no lo que pone; dile el 100% de la verdad, lo desagradable primero.
-Habla en llano y en castellano; la forma de responder a Pablo (idea raíz en negrita, ideas cortas) está en `usuario/CLAUDE.md`, «Cómo responder a Pablo», y no se repite aquí. Pablo no es informático.
+Habla en llano y en castellano; la forma de responder a cada persona está en su capa personal, `usuario/personas/<login>.md` (la de Pablo, `pabloam89.md`: idea raíz en negrita, ideas cortas), y no se repite aquí. Pablo no es informático.
 
 Principios (valor por defecto: apartarse de uno se apunta como excepción, con su motivo y su coste; cada uno nace de un fallo real y el porqué está en `standards/code.md`):
 1. Verdad: lo desagradable va primero; nada de maquillar un resultado.
@@ -9,7 +9,7 @@ Principios (valor por defecto: apartarse de uno se apunta como excepción, con s
 3. Fallar en alto: un error se ve o se lanza; nunca se traga ni se sustituye por un valor por defecto.
 4. Una idea, un sitio: un dato o una regla vive en un solo lugar y los demás lo enlazan; lo que se repite es un dato de lista cerrada con una salida «otro» y su motivo.
 5. Lo que comprueba una máquina lo comprueba una máquina: una regla importante se convierte en un check que falla y en un disparador que lo ejecuta sin que nadie se acuerde, no en una frase; un fallo se arregla en su clase.
-6. Preguntar antes de un atajo: a Pablo solo se le pregunta el residuo de intención y autoridad, en la medida que él fije, que es la lista cerrada de `standards/intervention.md`; en todo lo demás no se adivina ni se interrumpe: se decide con la evidencia que haya y se apunta, y si no hay evidencia se para y se deja escrito.
+6. Preguntar antes de un atajo: al dueño solo se le pregunta el residuo de intención y autoridad, en la medida que él fije, que es la lista cerrada de `standards/intervention.md` (allí, quién es el dueño en cada repo); en todo lo demás no se adivina ni se interrumpe: se decide con la evidencia que haya y se apunta, y si no hay evidencia se para y se deja escrito.
 
 Prohibido: empujar o fusionar a `main` (lo hace GitHub al estar verdes `tests` y `revisor`); escribir un secreto, solo su nombre; ampliar permisos de una App; juzgar tu propio trabajo.
 Prohibido también: editar o hacer commit en la carpeta principal; lo niegan `.claude/hooks/carpeta-principal.mjs` y los hooks de git de `.githooks/` (los activa `npm run tarea`), y cada sesión trabaja en su carpeta: `npm run tarea -- feat/<nombre>`.
