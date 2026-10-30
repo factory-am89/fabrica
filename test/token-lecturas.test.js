@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { contarLecturas, rutaDeRegistro } from '../scripts/lib/op-log.mjs';
+import './apoyo/sin-identidad.mjs'; // the result must not depend on the FABRICA_IDENTIDAD of the PC
 
 const LLAMADAS = 10;
 const raiz = (r) => fileURLToPath(new URL(r, import.meta.url));

@@ -3,16 +3,18 @@
 //   repo       owner/name en GitHub
 //   base       rama a la que se fusionan los PR (main, staging)
 //   identidad  con quién se habla a GitHub:
-//              las del mapa de scripts/lib/identities.mjs (la única lista)
+//              las del mapa de scripts/lib/identities.mjs (la única lista). Es la de por defecto del repo: una persona
+//              puede usar otra en su PC con FABRICA_IDENTIDAD (identidadActiva, en ese mismo fichero)
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { NOMBRES_IDENTIDAD, IDENTIDADES } from './identities.mjs';
+import { NOMBRES_IDENTIDAD, identidadActiva } from './identities.mjs';
 
 const CLAVES = ['repo', 'base', 'identidad'];
 export const NOMBRE_FICHA = '.fabrica.json';
 
 // Lee y valida la ficha. `fichero` fuerza otra ruta (para probar un repo antes de darle ficha propia).
-export function leerFicha(raiz, fichero = path.join(raiz, NOMBRE_FICHA)) {
+// Devuelve la identidad activa (identidadActiva): la de la ficha, o la que la persona fija en `env`.
+export function leerFicha(raiz, fichero = path.join(raiz, NOMBRE_FICHA), env = process.env) {
   if (!existsSync(fichero)) {
     throw new Error(`Falta la ficha ${fichero}: sin ella no sé qué repo, qué rama base ni qué identidad usar. Crea un ${NOMBRE_FICHA} con ${CLAVES.join(', ')}.`);
   }
@@ -28,9 +30,5 @@ export function leerFicha(raiz, fichero = path.join(raiz, NOMBRE_FICHA)) {
   for (const k of CLAVES) if (typeof f[k] !== 'string' || !f[k].trim()) throw new Error(`La ficha ${fichero} no tiene «${k}» (texto no vacío).`);
   if (!/^[\w.-]+\/[\w.-]+$/.test(f.repo)) throw new Error(`La ficha ${fichero}: «repo» debe ser owner/name, y es «${f.repo}».`);
   if (!NOMBRES_IDENTIDAD.includes(f.identidad)) throw new Error(`La ficha ${fichero}: «identidad» debe ser una de ${NOMBRES_IDENTIDAD.join(', ')}, y es «${f.identidad}».`);
-  const { duenos } = IDENTIDADES[f.identidad];
-  if (duenos && !duenos.some((d) => d.toLowerCase() === f.repo.split('/')[0].toLowerCase())) {
-    throw new Error(`La ficha ${fichero}: la identidad ${f.identidad} solo vale en repos de ${duenos.join(', ')}; ${f.repo} no vale.`);
-  }
-  return { repo: f.repo, base: f.base, identidad: f.identidad };
+  return { repo: f.repo, base: f.base, identidad: identidadActiva(env, f, `La ficha ${fichero}`).nombre };
 }

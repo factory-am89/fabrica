@@ -9,7 +9,12 @@ import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BLOQUEO_VIEJO_MS, conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, principalesDeIcacls, protegerFichero, rutaDeCache } from '../scripts/lib/token-cache.mjs';
-import { avisoCache, clavePrivada, DOCUMENTO_CLAVE, ErrorToken, MOTIVOS, obtenerToken } from '../scripts/token.mjs';
+import { avisoCache, clavePrivada, DOCUMENTO_CLAVE, ErrorToken, IDENTIDAD_POR_DEFECTO, MOTIVOS, obtenerToken } from '../scripts/token.mjs';
+import { IDENTIDADES, VARIABLE_IDENTIDAD } from '../scripts/lib/identities.mjs';
+import { OWNER_LOGIN } from '../scripts/lib/repo.mjs';
+
+// A repo whose owner is not REPO's (the cache cannot tell owners apart) and where fabrica-constructor is valid (identidadActiva refuses any other).
+const OTRO_DUENO = `${OWNER_LOGIN}/MenuPlan`;
 
 const TOKEN = `ghs_${'a1B2c3D4'.repeat(5)}`;
 const OTRO = `ghs_${'Z9y8X7w6'.repeat(5)}`;
@@ -242,8 +247,8 @@ test('obtenerToken: the .pem and the token never leak beyond the one token field
 test('obtenerToken: another owner\'s repo bypasses the cache (the cache cannot tell owners apart)', async () => {
   const e = entorno();
   try {
-    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' } });
-    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' } });
+    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: OTRO_DUENO } });
+    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: OTRO_DUENO } });
     assert.equal(e.lecturas, 2);
     assert.equal(existsSync(e.ruta), false);
   } finally { e.limpiar(); }
@@ -282,7 +287,7 @@ test('obtenerToken: a disabled cache is reported (sin-ruta, otro-dueno) and stil
     assert.deepEqual(e.avisos, ['sin-ruta']);
     e.avisos.length = 0;
     e.cache.ruta = e.ruta;
-    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' } });
+    await e.pedir({ env: { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: OTRO_DUENO } });
     assert.deepEqual(e.avisos, ['otro-dueno']);
   } finally { e.limpiar(); }
 });
@@ -327,6 +332,18 @@ test('clavePrivada: the read log records the same document that op is asked for'
   assert.deepEqual(pedidos, [DOCUMENTO_CLAVE]);
 });
 
+// FABRICA_IDENTIDAD (test/identidad-activa.test.js has the rest): the document and the vault are those of the active identity.
+test('clavePrivada: document and vault come from the active identity; OP_VAULT only changes the vault; no App fails before op', () => {
+  const { app } = IDENTIDADES[IDENTIDAD_POR_DEFECTO];
+  const pedidos = [];
+  const op = (args) => { pedidos.push(args); return { status: 0, stdout: PEM, stderr: '' }; };
+  clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', [VARIABLE_IDENTIDAD]: IDENTIDAD_POR_DEFECTO }, op, nadie, LIBRE);
+  clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', OP_VAULT: 'Otra' }, op, nadie, LIBRE);
+  assert.deepEqual(pedidos, [['document', 'get', app.documento, '--vault', app.boveda], ['document', 'get', app.documento, '--vault', 'Otra']]);
+  const nunca = () => { throw new Error('op must not run'); };
+  assert.throws(() => clavePrivada({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_x', [VARIABLE_IDENTIDAD]: 'ninguna' }, nunca, nadie, LIBRE), /no tiene App/);
+});
+
 test('obtenerToken: rate limited with no saved token -> limite-de-1password, one read, no second attempt', async () => {
   const e = entorno();
   const op = opFalso(LIMITE);
@@ -358,7 +375,7 @@ test('MOTIVOS: a closed list with a distinct non-zero exit code for each reason'
 
 test('MOTIVOS_CACHE: one case per reason of the vocabulary, run here, each producing exactly that reason', async () => {
   const leer = (e, extra = {}) => leerCache({ ruta: e.ruta, ids: { appId: CLIENT }, reloj: e.reloj.ahora, permisosBien: () => true, ...extra }).motivo;
-  const otroDueno = { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: 'otro-dueno/x' };
+  const otroDueno = { FABRICA_CONSTRUCTOR_CLIENT_ID: CLIENT, FABRICA_REPO: OTRO_DUENO };
   const casos = {
     ok: (e) => { guardado(e); return leer(e); },
     ausente: (e) => leer(e),

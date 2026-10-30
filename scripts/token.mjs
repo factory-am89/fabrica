@@ -1,13 +1,16 @@
 // Token de instalación de fabrica-constructor, a demanda y de un solo uso.
 //   node scripts/token.mjs -- gh pr create --fill
-// Saca la clave privada de 1Password (bóveda Fabrica) en memoria, firma un JWT, canjea un
+// Saca la clave privada de 1Password (la caja de la identidad activa; Fabrica la de fabrica-constructor) en memoria, firma un JWT, canjea un
 // token de instalación (dura una hora) y lanza la orden con GH_TOKEN puesto. El token y la
 // clave no se imprimen ni van por argumentos. La clave nunca se guarda; el token sí, en
 // scripts/lib/token-cache.mjs, hasta MARGEN_MS antes de caducar (así 1Password se lee una vez por token, no una por llamada).
 // Read budget: before each read it counts the last hour's reads (all scripts); at PRESUPUESTO_LECTURAS it does not read and exits with its code in MOTIVOS.
 // gh calls: every `gh` run leaves one line in the gh log (api and result, nothing else; path: rutaDeRegistroGh in scripts/lib/gh-log.mjs); count with `npm run gh-calls`.
-// Variables: FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id por defecto, CLIENT_ID_CONSTRUCTOR de
-// scripts/lib/repo.mjs), FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (por defecto Fabrica).
+// La App, su clave y su caja salen de la identidad activa (identidadActiva en scripts/lib/identities.mjs): la de
+// FABRICA_IDENTIDAD si la persona la fija en su PC, y si no fabrica-constructor (IDENTIDAD_POR_DEFECTO), como siempre.
+// Variables: FABRICA_IDENTIDAD (la identidad de esta persona), FABRICA_CONSTRUCTOR_CLIENT_ID (cambia el client id de
+// fabrica-constructor, CLIENT_ID_CONSTRUCTOR de scripts/lib/repo.mjs; con otra identidad no vale y falla en alto),
+// FABRICA_REPO (por defecto, REPO de scripts/lib/repo.mjs), OP_VAULT (cambia la caja de la identidad activa).
 import { createSign } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import * as fsReal from 'node:fs';
@@ -17,10 +20,28 @@ import { fileURLToPath } from 'node:url';
 import { conBloqueo, escribirCache, leerCache, MARGEN_MS, MOTIVO, MOTIVOS_CACHE, permisosDelUsuario, protegerFichero, rutaDeCache } from './lib/token-cache.mjs';
 import { lecturasRecientes, registrarLectura, rutaDeRegistro } from './lib/op-log.mjs';
 import { clasificarApi, registrarLlamada, resultadoDe } from './lib/gh-log.mjs';
-import { REPO, CLIENT_ID_CONSTRUCTOR } from './lib/repo.mjs';
+import { REPO } from './lib/repo.mjs';
+import { IDENTIDADES, identidadActiva } from './lib/identities.mjs';
 
-export function clientId(env = process.env) {
-  return (env.FABRICA_CONSTRUCTOR_CLIENT_ID ?? '').trim() || CLIENT_ID_CONSTRUCTOR;
+// The identity this script signs with when nobody picks another: token.mjs reads no .fabrica.json, so this is its «ficha».
+export const IDENTIDAD_POR_DEFECTO = 'fabrica-constructor';
+const VARIABLE_CLIENT_ID = 'FABRICA_CONSTRUCTOR_CLIENT_ID';
+
+// The active identity for the repo of this call (FABRICA_REPO or REPO). One with no App (e.g. `ninguna`) fails loudly.
+export function identidadDelToken(env = process.env) {
+  const repo = env.FABRICA_REPO ?? REPO;
+  const activa = identidadActiva(env, { repo, identidad: IDENTIDAD_POR_DEFECTO }, 'token.mjs');
+  if (!activa.app) throw new Error(`La identidad ${activa.nombre} (${activa.origen}) no tiene App: token.mjs no puede firmar con ella.`);
+  return activa;
+}
+
+// The client id of the active identity. FABRICA_CONSTRUCTOR_CLIENT_ID only replaces that of fabrica-constructor; set
+// together with another identity it would sign as the wrong App, so it fails loudly.
+export function clientId(env = process.env, activa = identidadDelToken(env)) {
+  const propio = (env[VARIABLE_CLIENT_ID] ?? '').trim();
+  if (!propio) return activa.app.clientId;
+  if (activa.nombre !== IDENTIDAD_POR_DEFECTO) throw new Error(`${VARIABLE_CLIENT_ID} solo cambia el client id de ${IDENTIDAD_POR_DEFECTO}, y la identidad activa es ${activa.nombre}: quita una de las dos.`);
+  return propio;
 }
 
 const b64 = (o) => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
@@ -136,13 +157,13 @@ function ejecutarOp(args, env) {
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
-// The 1Password document that holds the App key: what is read and what the read log records.
-export const DOCUMENTO_CLAVE = 'fabrica-constructor.pem';
+// The 1Password document that holds the key of fabrica-constructor (the default identity); each identity names its own in IDENTIDADES.
+export const DOCUMENTO_CLAVE = IDENTIDADES[IDENTIDAD_POR_DEFECTO].app.documento;
 
 // A failing log must be seen, but it must not hide the read that did happen.
-function anotarLectura(registrar, resultado) {
+function anotarLectura(registrar, documento, resultado) {
   try {
-    registrar({ script: 'token.mjs', nombre: DOCUMENTO_CLAVE, resultado });
+    registrar({ script: 'token.mjs', nombre: documento, resultado });
   } catch (e) {
     console.error(`op-reads log not written: ${e.message}`);
   }
@@ -178,17 +199,19 @@ export function comprobarPresupuesto(env = process.env, contar = () => lecturasR
 }
 
 export function clavePrivada(env = process.env, ejecutar = ejecutarOp, registrar = registrarLectura, contar = undefined) {
+  const { documento, boveda: suya } = identidadDelToken(env).app;
+  const boveda = env.OP_VAULT ?? suya;
   comprobarPresupuesto(env, contar);
-  const args = ['document', 'get', DOCUMENTO_CLAVE, '--vault', env.OP_VAULT ?? 'Fabrica'];
+  const args = ['document', 'get', documento, '--vault', boveda];
   const r = ejecutar(args, { ...env, OP_SERVICE_ACCOUNT_TOKEN: tokenServicio(env) });
   const limitado = r.status !== 0 && LIMITE_OP.test(r.stderr);
   const sinClave = r.status !== 0 || !r.stdout.includes('PRIVATE KEY');
-  anotarLectura(registrar, limitado ? 'limite-de-1password' : sinClave ? 'sin-clave' : 'ok');
+  anotarLectura(registrar, documento, limitado ? 'limite-de-1password' : sinClave ? 'sin-clave' : 'ok');
   if (limitado) {
     throw new ErrorToken('limite-de-1password', '1Password is rate limiting this account (Too many requests); not retrying.');
   }
   if (sinClave) {
-    throw new ErrorToken('sin-clave', `No pude leer ${DOCUMENTO_CLAVE} de 1Password (bóveda Fabrica). Quizá el token de la cuenta de servicio no tiene acceso a la caja Fabrica.`);
+    throw new ErrorToken('sin-clave', `No pude leer ${documento} de 1Password (bóveda ${boveda}). Quizá el token de la cuenta de servicio no tiene acceso a la caja ${boveda}.`);
   }
   return r.stdout;
 }

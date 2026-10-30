@@ -12,6 +12,7 @@ import { leerFicha, NOMBRE_FICHA } from '../scripts/lib/repo-card.mjs';
 import { IDENTIDADES, identidadDe } from '../scripts/lib/identities.mjs';
 import { consultar, rutaDe } from '../scripts/lib/gh-public.mjs';
 import { REPO } from '../scripts/lib/repo.mjs';
+import './apoyo/sin-identidad.mjs'; // the result must not depend on the FABRICA_IDENTIDAD of the PC
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const FALSO = path.join(AQUI, 'fixtures', 'token-falso.mjs');

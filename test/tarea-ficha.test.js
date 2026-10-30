@@ -12,6 +12,7 @@ import { retirar, cliRetirar } from '../scripts/retire.mjs';
 import { leerFicha } from '../scripts/lib/repo-card.mjs';
 import { HOOK_MARCA } from '../scripts/install-hooks.mjs';
 import { git, repo, FICHA_FABRICA } from './apoyo/repo.mjs';
+import './apoyo/sin-identidad.mjs'; // the result must not depend on the FABRICA_IDENTIDAD of the PC
 
 const FALSO = fileURLToPath(new URL('./fixtures/token-falso.mjs', import.meta.url));
 
