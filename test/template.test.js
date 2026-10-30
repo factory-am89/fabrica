@@ -2,7 +2,7 @@
 // y un settings de prueba (test/fixtures/settings-base.json): ningún dato real.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -63,6 +63,7 @@ const esperado = () => rellenar(plantilla(), VALORES_PRUEBA);
 function origenConPlantilla(s = plantilla()) {
   const o = mkdtempSync(path.join(tmpdir(), 'usuario-'));
   cpSync(ORIGEN, o, { recursive: true });
+  rmSync(path.join(o, 'personas'), { recursive: true }); // aquí se prueba la plantilla; la persona, en install-pc-persona.test.js
   writeFileSync(path.join(o, 'settings.json'), `${JSON.stringify(s, null, 2)}\n`);
   return o;
 }

@@ -76,12 +76,16 @@ export function cargarValores(ruta = process.env.FABRICA_VALORES ?? VALORES_POR_
 function contenidos(origen, valores) {
   let cargados;
   const leerValores = () => (cargados ??= valores ?? cargarValores());
-  const sinPersona = () => Object.fromEntries(Object.entries(leerValores()).filter(([k]) => k !== 'persona'));
+  const sinPersona = () => {
+    const v = leerValores();
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return v; // rellenar() lo rechaza con su mensaje
+    return Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'persona'));
+  };
   return Object.fromEntries(
     listar(origen).map((fichero) => {
       const bruto = readFileSync(path.join(origen, fichero));
       if (fichero === 'CLAUDE.md' && existsSync(path.join(origen, PERSONAS))) {
-        return [fichero, Buffer.concat([bruto, Buffer.from('\n'), capaPersonal(origen, leerValores().persona)])];
+        return [fichero, Buffer.concat([bruto, Buffer.from('\n'), capaPersonal(origen, leerValores()?.persona)])];
       }
       if (fichero !== 'settings.json') return [fichero, bruto];
       const plantilla = leerJson(path.join(origen, fichero));
