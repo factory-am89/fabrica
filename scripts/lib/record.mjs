@@ -9,8 +9,15 @@ export const ANSWER = { yes: 'sí', no: 'no', notApplicable: 'no aplica' };
 export const ANSWERS = Object.values(ANSWER);
 export const ERROR = { standardUnloadable: 'standard-unloadable', outputUnreadable: 'output-unreadable' };
 export const ERRORS = Object.values(ERROR);
-// Title of the check-run that scripts/veredicto.mjs publishes when Pablo's approval overrides a no; it has no record (the round it overrides has its own).
-export const OVERRIDE_TITLE = 'override by Pablo';
+// Title of the check-run that scripts/veredicto.mjs publishes when an owner's approval overrides a no: the prefix and the login of who
+// overrides (plans/puente-2-alvaro.md, chunk 6). It has no record (the round it overrides has its own). The old fixed title,
+// «override by Pablo», has the same prefix, so the check-runs published before still count as overrides.
+export const OVERRIDE_PREFIX = 'override by ';
+export const overrideTitle = (login) => {
+  if (typeof login !== 'string' || !login.trim()) throw new Error('overrideTitle: no login');
+  return `${OVERRIDE_PREFIX}${login}`;
+};
+export const isOverrideTitle = (title) => typeof title === 'string' && title.startsWith(OVERRIDE_PREFIX);
 // Title of the in_progress `revisor` check-run that marks a judgment under way; it has no record yet, and it is not a round (counted in `pending`).
 export const PENDING_TITLE = 'juzgando';
 // Title of the `revisor` check-run that closes, in failure, a judgment that was cut before its verdict (run cancelled); it has no record and is not a round (counted in `cut`).
@@ -110,7 +117,7 @@ export function readCheckRuns(checkRuns) {
   let pending = 0;
   let cut = 0;
   checkRuns.forEach((c, index) => {
-    if (c?.output?.title === OVERRIDE_TITLE) {
+    if (isOverrideTitle(c?.output?.title)) {
       overrides += 1;
       return;
     }

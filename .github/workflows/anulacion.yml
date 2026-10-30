@@ -1,9 +1,10 @@
 name: anulacion
 
-# La anulación por Pablo: la única salida cuando el revisor rechaza por error (pausar el ruleset está prohibido).
-# Pablo pulsa «Approve» en la pestaña Files changed del PR; este workflow lo comprueba y, si es suya y de la
-# cabeza actual, publica el check `revisor` en verde con el título «override by Pablo» (scripts/veredicto.mjs,
-# MODO=anulacion; la regla está allí, en aprobacionDePablo).
+# La anulación por un dueño: la única salida cuando el revisor rechaza por error (pausar el ruleset está prohibido).
+# El dueño pulsa «Approve» en la pestaña Files changed del PR; este workflow lo comprueba y, si es suya y de la
+# cabeza actual, publica el check `revisor` en verde con el título «override by <login>» (scripts/veredicto.mjs,
+# MODO=anulacion; la regla está allí, en aprobacionDe y aprobacionDeDueno). En la Fábrica el dueño es solo Pablo;
+# un repo que llama puede pasar varios con la entrada `duenos` (abajo).
 #
 # Por qué workflow_run y no pull_request_review: pull_request_review ejecuta el workflow tal como lo trae el PR y su
 # rama no puede usar el environment `revisor` (limitado a main). workflow_run corre siempre la versión de main, con
@@ -33,6 +34,14 @@ on:
       revisor-app-slug:
         type: string
         required: true
+      # Dueños que pueden anular en el repo que llama (decisión B1 del 2026-10-29 en intervenciones.md), con las Apps que
+      # lanzan las sesiones de cada uno, en piezas separadas por comas: «login:app» abre un dueño y «app» suelta suma otra
+      # App al de antes (p. ej. `pabloam89:fabrica-constructor,homenu-sesiones,algbarc-design:<App>`). Ninguno anula un
+      # PR abierto por él o por una de sus Apps (cuatro ojos). Sin ella (la propia Fábrica), solo OWNER_LOGIN.
+      duenos:
+        type: string
+        required: false
+        default: ''
     secrets:
       REVISOR_CLIENT_ID:
         required: true
@@ -81,6 +90,7 @@ jobs:
         env:
           MODO: anulacion
           REVISOR_APP_SLUG: ${{ inputs.revisor-app-slug }}
+          DUENOS: ${{ inputs.duenos }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           TOKEN: ${{ steps.app.outputs.token }}

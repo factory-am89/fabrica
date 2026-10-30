@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { PENDING_TITLE, OVERRIDE_TITLE, CUT_TITLE, readCheckRuns, extractRecord } from '../scripts/lib/record.mjs';
+import { PENDING_TITLE, overrideTitle, CUT_TITLE, readCheckRuns, extractRecord } from '../scripts/lib/record.mjs';
 import { TITULO } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
@@ -141,7 +141,7 @@ test('veredicto: un sí con un `revisor` más nuevo de la App en la cabeza cierr
 });
 
 test('veredicto: un `revisor` más viejo, uno de otra App o un override no impiden el sí', () => {
-  const otros = [deLaApp(100), deLaApp(6000, { app: { slug: 'otra' } }), deLaApp(7000, { output: { title: OVERRIDE_TITLE, summary: 'x' } }), deLaApp(4242, { status: 'in_progress', conclusion: null })];
+  const otros = [deLaApp(100), deLaApp(6000, { app: { slug: 'otra' } }), deLaApp(7000, { output: { title: overrideTitle(OWNER_LOGIN), summary: 'x' } }), deLaApp(4242, { status: 'in_progress', conclusion: null })];
   const { r, checks } = juzga({ CHECKS_FALSOS: JSON.stringify(otros) });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(checks.map((c) => c.cuerpo.conclusion), ['success']);
@@ -172,7 +172,7 @@ test('anulación: con un juicio en curso encima de un no no anula; espera a que 
   assert.match(esperando.r.stdout, /juicio en curso/);
   const sinCurso = con([no]);
   assert.equal(sinCurso.checks.length, 1, 'sin juicio en curso, el no se anula como siempre');
-  assert.equal(sinCurso.checks[0].cuerpo.output.title, OVERRIDE_TITLE);
+  assert.equal(sinCurso.checks[0].cuerpo.output.title, overrideTitle(OWNER_LOGIN));
 });
 
 // El workflow: el trabajo `pendiente` marca el juicio, `juzgar` espera por él y el token de ese trabajo no sale de él.

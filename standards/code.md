@@ -23,7 +23,7 @@ Solo 30 de los 118 llevan etiqueta `causa:`, así que no cuenta la etiqueta: agr
 | Secreto o dato sensible expuesto | 8 | C10 |
 | Regla solo en texto, sin check | 7 | principio 5 y C4 |
 
-C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) y C13 (no rebajar comprobaciones, la contrapartida de que ningún cambio pase por una persona; la única anulación de un «no» es el Approve de Pablo, regla en `standards/intervention.md`, «Who decides a merge») no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños. C14 a C17 salen de los invariantes de `goals.json` (I2, I4 e I3): lo repetido es dato, lo decidido queda apuntado, el plan cumple su estándar y un check se dispara por su entrada real; C16 es la puente que da juez a las preguntas de revisor de `standards/plan.md` sin tocar `revisor.yml` (el registro guarda «C16», no la P que falla).
+C1 a C3 son lo mínimo de cualquier repo. C4 (acciones por SHA, permisos), C11 y C12 (tamaño y alcance del PR) y C13 (no rebajar comprobaciones, la contrapartida de que ningún cambio pase por una persona; la única anulación de un «no» es el Approve de un dueño, regla en `standards/intervention.md`, «Who decides a merge») no salen de un caso contado: vienen del diseño de la Fábrica (#875 en MenuPlan) y de partir el trabajo en trozos pequeños. C14 a C17 salen de los invariantes de `goals.json` (I2, I4 e I3): lo repetido es dato, lo decidido queda apuntado, el plan cumple su estándar y un check se dispara por su entrada real; C16 es la puente que da juez a las preguntas de revisor de `standards/plan.md` sin tocar `revisor.yml` (el registro guarda «C16», no la P que falla).
 
 ## Preguntas
 
