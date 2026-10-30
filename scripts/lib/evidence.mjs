@@ -9,8 +9,10 @@ export class EvidenceError extends Error {}
 const KEPT_PREFIXES = ['ℹ tests', 'ℹ pass', 'ℹ fail', '✖'];
 const DURATION_AT_END = / \(\d+(?:\.\d+)?ms\)$/;
 const BASE = 'origin/main';
+// The tests go through `npm test`, so they run with the same `node --test` options as `npm run done` and CI (the `test`
+// script of package.json, which caps how many files run at once; scripts/lib/turno.mjs says why). `--` hands the reporter to node.
 // The spec reporter is the one that prints the "ℹ tests" lines; Node's default for piped output differs between versions (TAP on 22).
-const TEST_ARGS = ['--test', '--test-reporter=spec'];
+const TEST_ARGS = ['test', '--', '--test-reporter=spec'];
 
 // Keeps the counter and failure lines of `node --test` and removes the duration at the end of each.
 export function filterTestOutput(text) {
@@ -75,7 +77,7 @@ function header(head, mergeBase) {
     '',
     `Produced by \`npm run evidence\`. ${headMark(head)}; merge-base with ${BASE} ${mergeBase}.`,
     '',
-    `Filter, applied in code: for \`node --test\` (run with \`--test-reporter=spec\`) only lines starting with ${KEPT_PREFIXES.map((p) => `\`${p}\``).join(', ').replace(/, (`✖`)$/, ' and $1')} are kept, and a duration at the end of a kept line, such as \` (12.3ms)\`, is removed so the block is reproducible; every other command is raw. Output is stdout followed by stderr.`,
+    `Filter, applied in code: for \`node --test\` (through \`npm test\`, run with \`--test-reporter=spec\`) only lines starting with ${KEPT_PREFIXES.map((p) => `\`${p}\``).join(', ').replace(/, (`✖`)$/, ' and $1')} are kept, and a duration at the end of a kept line, such as \` (12.3ms)\`, is removed so the block is reproducible; every other command is raw. Output is stdout followed by stderr.`,
   ].join('\n');
 }
 
@@ -94,8 +96,8 @@ export function collectEvidence({ cwd, focus, runner = defaultRunner }) {
 
   const steps = [
     { cmd: 'npm', args: ['run', 'lint'] },
-    { cmd: 'node', args: TEST_ARGS, filter: true },
-    ...focus.map((f) => ({ cmd: 'node', args: [...TEST_ARGS, f], filter: true })),
+    { cmd: 'npm', args: TEST_ARGS, filter: true },
+    ...focus.map((f) => ({ cmd: 'npm', args: [...TEST_ARGS, f], filter: true })),
     { cmd: 'git', args: ['diff', '--shortstat', `${BASE}...HEAD`] },
   ];
   let failed = false;
