@@ -27,6 +27,7 @@ const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ORIGEN = path.join(RAIZ, 'usuario');
 export const HUELLA = 'fabrica-huella.json'; // dentro de ~/.claude/
 const SOLO_REPO = ['settings.motivos.json']; // viven en usuario/ pero no se instalan
+export const CLAVE_PERSONA = 'persona'; // clave de los valores que elige la capa personal; no es un hueco
 export const PERSONAS = 'personas'; // usuario/personas/<persona>.md: capa personal, se une a CLAUDE.md al instalar y no se copia sola
 const NOMBRE_PERSONA = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 export const VALORES_POR_DEFECTO = path.join(RAIZ, '..', 'fabrica-privado', 'usuario', 'valores.json');
@@ -79,13 +80,13 @@ function contenidos(origen, valores) {
   const sinPersona = () => {
     const v = leerValores();
     if (v === null || typeof v !== 'object' || Array.isArray(v)) return v; // rellenar() lo rechaza con su mensaje
-    return Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'persona'));
+    return Object.fromEntries(Object.entries(v).filter(([k]) => k !== CLAVE_PERSONA));
   };
   return Object.fromEntries(
     listar(origen).map((fichero) => {
       const bruto = readFileSync(path.join(origen, fichero));
       if (fichero === 'CLAUDE.md' && existsSync(path.join(origen, PERSONAS))) {
-        return [fichero, Buffer.concat([bruto, Buffer.from('\n'), capaPersonal(origen, leerValores()?.persona)])];
+        return [fichero, Buffer.concat([bruto, Buffer.from('\n'), capaPersonal(origen, leerValores()?.[CLAVE_PERSONA])])];
       }
       if (fichero !== 'settings.json') return [fichero, bruto];
       const plantilla = leerJson(path.join(origen, fichero));

@@ -1,18 +1,18 @@
 ## Pablo (pabloam89): reglas personales
 
+Completan las reglas comunes de arriba con lo que solo vale en su PC.
+
 ### Dónde trabajo
 
-- El repo de MenuPlan vive en `C:\dev\MenuPlan`. Nunca dentro de OneDrive.
-- Los worktrees nuevos van al lado, en `C:\dev\MenuPlan-<tema>`. Nunca en
-  `OneDrive`, ni en el Escritorio.
+- El repo de MenuPlan vive en `C:\dev\MenuPlan`.
+- Los worktrees nuevos van al lado, en `C:\dev\MenuPlan-<tema>`.
 - El hook de usuario de limpieza es `C:\Users\pablo\.claude\hooks\limpiar-worktrees.mjs`
-  (el `~` de las reglas comunes).
+  (el `~/.claude/hooks/...` de las reglas comunes).
 
 ### La hora
 
-- Pablo vive en Madrid. La zona de la hora es `Europe/Madrid`:
-  `node -e "console.log(new Date().toLocaleString('es-ES',{timeZone:'Europe/Madrid'}))"`,
-  o `npm run hora` en MenuPlan.
+- Pablo vive en Madrid: la `<zona>` de las reglas comunes es `Europe/Madrid`.
+  En MenuPlan, `npm run hora` da la hora sin escribir la orden.
 
 ### Cómo responder a Pablo
 
