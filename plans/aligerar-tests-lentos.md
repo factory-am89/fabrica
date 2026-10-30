@@ -35,7 +35,24 @@ Dónde se va el tiempo (todo medido; el contador envuelve `spawnSync` de `child_
 - `clean`: 468 procesos en 47 s; `git push origin` 41 veces y 14,5 s, el comando más caro; `node` (el token falso y los scripts) 24 veces, 4,0 s.
 - `tarea-ficha`: 244 procesos en 24 s; `git push origin` 18 veces y 7,7 s.
 - `principal`: 144 procesos en 16 s; 80 son `node .claude/hooks/carpeta-principal.mjs` y suman 12,4 s, lanzados uno detrás de otro.
-- Un `git push` a un remoto local tarda 186 a 333 ms; `git update-ref` en el remoto, apuntando a los objetos de la carpeta con `objects/info/alternates`, tarda 26 a 28 ms y `git fsck` del remoto sale limpio (probado en una carpeta temporal, 3 pruebas de cada).
+- Un `git push` a un remoto local tarda 186 a 333 ms; `git update-ref` en el remoto, apuntando a los objetos de la carpeta con `objects/info/alternates`, tarda 26 a 28 ms y `git fsck` del remoto sale limpio (probado en una carpeta temporal, 3 pruebas de cada). La prueba, `node pp.mjs` sobre una carpeta vacía, con su salida:
+```js
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+const g = (cwd, ...a) => { const s = performance.now(); const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8' }); if (r.status) throw new Error(r.stderr); return [r.stdout.trim(), Math.round(performance.now() - s)]; };
+rmSync('pp', { recursive: true, force: true });
+mkdirSync('pp');
+g('pp', 'init', '-q', '-b', 'main', 'a'); g('pp/a', 'commit', '-q', '--allow-empty', '-m', 'x'); g('pp', 'init', '-q', '--bare', '-b', 'main', 'r.git'); g('pp/a', 'remote', 'add', 'origin', '../r.git');
+for (let i = 1; i <= 3; i++) console.log('push', g('pp/a', 'push', '-q', 'origin', `main:b${i}`)[1], 'ms');
+const sha = g('pp/a', 'rev-parse', 'HEAD')[0];
+writeFileSync('pp/r.git/objects/info/alternates', `${path.resolve('pp/a/.git/objects').replaceAll('\', '/')}
+`);
+for (let i = 1; i <= 3; i++) console.log('update-ref', g('pp/r.git', 'update-ref', `refs/heads/c${i}`, sha)[1], 'ms');
+console.log(g('pp/r.git', 'fsck')[0] || 'fsck ok', g('pp/r.git', 'branch')[0].split('
+').length, 'ramas');
+```
+  Salida: `push 198 ms`, `push 186 ms`, `push 333 ms`, `update-ref 27 ms`, `update-ref 26 ms`, `update-ref 28 ms`, `fsck ok 6 ramas`.
 - El contador (misma salida con `node <contador> file:///.../test/<fichero>.test.js`; envuelve `spawnSync` y suma por comando; son 14 líneas que el trozo 4 deja en `test/apoyo/` si hacen falta):
 ```js
 import cp from 'node:child_process';
@@ -123,7 +140,7 @@ Ola 1: 1. Ola 2: 2, 3, 4 (ficheros distintos, sin dependencia entre ellos). Ola 
 - principio 2 | eligió: dejar las 10 rondas de `arranque-a-la-vez` y de `pull-main` («bucle de fetch»), y las 3 de «dos arranques a la vez» | descartó: bajarlas a 3, que ahorraría unos 25 s de 64 pero verían menos veces una carrera que falló 26 de 30 arranques con `git pull` (comentario de `test/pull-main.test.js:155`, 23 oct 2026) | motivo: decidido
 - principio 5 | eligió: lanzar a la vez las órdenes del hook y de los casos de `invariants` | descartó: llamar a `decidir` y a las funciones de cada script dentro del proceso del test, que es más rápido pero deja de probar la entrada real que lanza Claude y CI | motivo: decidido
 - principio 2 | eligió: en el trozo 4 cambiar solo el montaje del mundo y dejar los `push` del código bajo prueba | descartó: sustituir también esos, que dejaría de probar el borrado real de ramas remotas | motivo: decidido
-- principio 2 | eligió: el montaje del trozo 4 enlaza los objetos con `objects/info/alternates` y escribe las ramas con `update-ref` | descartó: copiar con `cpSync` un remoto plantilla ya montado, que guarda rutas absolutas en su configuración y obliga a reescribirlas en cada test | motivo: decidido
+- principio 2 | eligió: el montaje del trozo 4 enlaza los objetos con `objects/info/alternates` y escribe las ramas con `update-ref` | descartó: copiar con `cpSync` un remoto plantilla ya montado, que no se midió y se elegiría por intuición, sin la cifra de antes y de después que sí tienen `update-ref` (27 ms) y `push` (186 a 333 ms) | motivo: decidido
 - principio 2 | eligió: el número de copias (`SLOTS`) y el tope de procesos (`TOPE`) son constantes con nombre fijadas al medir en el PR de cada trozo | descartó: derivarlos de `os.availableParallelism()`, que da otro valor en CI que en el PC de Pablo y hace que la cifra no se reproduzca | motivo: decidido
 - principio 2 | eligió: no mover ningún test a un grupo «lento» que no corra en local | descartó: un grupo aparte para `golden-run` e `invariants`, que quita de la vista de cada PR lo que el revisor de CI sí corre | motivo: decidido
 
