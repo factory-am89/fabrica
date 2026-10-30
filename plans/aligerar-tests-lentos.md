@@ -35,7 +35,7 @@ Dónde se va el tiempo (todo medido; el contador envuelve `spawnSync` de `child_
 - `clean`: 468 procesos en 47 s; `git push origin` 41 veces y 14,5 s, el comando más caro; `node` (el token falso y los scripts) 24 veces, 4,0 s.
 - `tarea-ficha`: 244 procesos en 24 s; `git push origin` 18 veces y 7,7 s.
 - `principal`: 144 procesos en 16 s; 80 son `node .claude/hooks/carpeta-principal.mjs` y suman 12,4 s, lanzados uno detrás de otro.
-- Un `git push` a un remoto local tarda 186 a 333 ms; `git update-ref` en el remoto, apuntando a los objetos de la carpeta con `objects/info/alternates`, tarda 26 a 28 ms y `git fsck` del remoto sale limpio (probado en una carpeta temporal, 3 pruebas de cada). La prueba, `node pp.mjs` sobre una carpeta vacía, con su salida:
+- Un `git push` a un remoto local tarda 186 a 430 ms (dos pasadas del script de abajo); `git update-ref` en el remoto, apuntando a los objetos de la carpeta con `objects/info/alternates`, tarda 26 a 34 ms y `git fsck` del remoto sale limpio (probado en una carpeta temporal, 3 pruebas de cada). La prueba, `node pp.mjs` sobre una carpeta vacía, con su salida:
 ```js
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -46,14 +46,12 @@ mkdirSync('pp');
 g('pp', 'init', '-q', '-b', 'main', 'a'); g('pp/a', 'commit', '-q', '--allow-empty', '-m', 'x'); g('pp', 'init', '-q', '--bare', '-b', 'main', 'r.git'); g('pp/a', 'remote', 'add', 'origin', '../r.git');
 for (let i = 1; i <= 3; i++) console.log('push', g('pp/a', 'push', '-q', 'origin', `main:b${i}`)[1], 'ms');
 const sha = g('pp/a', 'rev-parse', 'HEAD')[0];
-writeFileSync('pp/r.git/objects/info/alternates', `${path.resolve('pp/a/.git/objects').replaceAll('\', '/')}
-`);
+writeFileSync('pp/r.git/objects/info/alternates', `${path.resolve('pp/a/.git/objects').replaceAll('\\', '/')}\n`);
 for (let i = 1; i <= 3; i++) console.log('update-ref', g('pp/r.git', 'update-ref', `refs/heads/c${i}`, sha)[1], 'ms');
-console.log(g('pp/r.git', 'fsck')[0] || 'fsck ok', g('pp/r.git', 'branch')[0].split('
-').length, 'ramas');
+console.log(g('pp/r.git', 'fsck')[0] || 'fsck ok', g('pp/r.git', 'branch')[0].split('\n').length, 'ramas');
 ```
-  Salida: `push 198 ms`, `push 186 ms`, `push 333 ms`, `update-ref 27 ms`, `update-ref 26 ms`, `update-ref 28 ms`, `fsck ok 6 ramas`.
-- El contador (misma salida con `node <contador> file:///.../test/<fichero>.test.js`; envuelve `spawnSync` y suma por comando; son 14 líneas que el trozo 4 deja en `test/apoyo/` si hacen falta):
+  Salida, pasada 1: `push 198 ms`, `push 186 ms`, `push 333 ms`, `update-ref 27 ms`, `update-ref 26 ms`, `update-ref 28 ms`, `fsck ok 6 ramas`. Pasada 2, con el bloque extraído de este plan: `push 430`, `277`, `237 ms`; `update-ref 34`, `32`, `32 ms`; `fsck ok 6 ramas`.
+- El contador (misma salida con `node <contador> file:///.../test/<fichero>.test.js`; envuelve `spawnSync` y suma por comando; vive solo en este plan y se pega a mano en una carpeta temporal, no se añade al repo):
 ```js
 import cp from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
@@ -63,7 +61,7 @@ syncBuiltinESMExports();
 await import(process.argv[2]);
 process.on('exit', () => console.error(Object.entries(by).sort((a, b) => b[1][1] - a[1][1]).slice(0, 8).map(([k, [n, ms]]) => `${n} ${Math.round(ms)} ms ${k}`).join(String.fromCharCode(10))));
 ```
-  Salida sobre `clean`: `41 14491 ms git push origin`, `24 3970 ms node …`, `22 3859 ms git fetch origin`, `24 2960 ms git ls-remote origin`; sobre `tarea-ficha`: `18 7664 ms git push origin`; sobre `principal`: `80 12401 ms node ….claudehookscarpeta-principal.mjs`.
+  Salida sobre `clean`: `41 14491 ms git push origin`, `24 3970 ms node …`, `22 3859 ms git fetch origin`, `24 2960 ms git ls-remote origin`; sobre `tarea-ficha`: `18 7664 ms git push origin`; sobre `principal`: `80 12401 ms node` (los 80 son el hook `carpeta-principal.mjs`).
 - `invariants`: ~50 procesos `node` uno detrás de otro (34 casos más sus controles, que se guardan por orden); `node --test test/goals.test.js` solo tarda 1,0 s y `node scripts/audit.mjs --json` 3,7 s. Todos usan una sola copia del repo, por eso no pueden ir a la vez.
 - `golden-run`: una llamada con el `claude` falso cuesta ~0,66 s (17,9 s / 27) y el fichero hace 64 (27 + 9 + 2 + 1 + 12 + 1 + 3 + 3 + 6, contadas de los `pasada(...)` del test); cada una copia el juez entero a una carpeta nueva (`layWorkspace`, `scripts/golden-run.mjs`) y lanza `node`.
 - `pull-main` (bucle, ~3 s por ronda) y `arranque-a-la-vez` (~1,7 s por ronda): cada ronda es un commit y un push en el remoto, un proceso `node` que carga `pull-main.mjs` o el arranque entero, y el bucle de `git fetch` compitiendo. Es el coste de lo que prueban.
@@ -86,11 +84,11 @@ Files: `test/invariants.test.js`
 Depends on: 1
 Blocked by: none
 Existing: `git grep -n -E "concurrency|Promise.all" -- test/invariants.test.js` (en c41d449) -> sin salida, exit 1; `git grep -n -i "alternates\|update-ref" -- test` -> solo `test/evidence.test.js:252` (otra cosa). Hoy todos los casos usan la misma copia (`const repo`, línea 45) y `runWith` es `spawnSync`.
-Not done: no quita ningún caso ni ningún control, no cambia `cases.json` ni las fixtures, no estrecha `--test` a un solo test de cada fichero (eso sí sería ver menos), no toca el resto de ficheros. Qué hace: `SLOTS` copias del repo (`repo-0`… en la misma carpeta temporal, cada una con su unión a `node_modules` que se quita como enlace antes de borrar, como hoy), `runWith` asíncrono con `spawn`, y una cola de casos que cada copia va vaciando; un control se guarda como promesa para que lo corra solo una. Cada copia aplica sus ediciones y las devuelve como ahora, así que dos casos nunca editan el mismo fichero a la vez. Lector: el propio test, disparador `ci-test`; la regla «cada caso malo sale en rojo por su entrada real y su control en verde» no cambia. Mantiene C13: el test sigue fallando por un caso sin atrapar o un control en rojo. Si rompe `main`: revertir el PR desde una rama nueva.
+Not done: no quita ningún caso ni ningún control, no cambia `cases.json` ni las fixtures, no estrecha `--test` a un solo test de cada fichero (eso sí sería ver menos), no toca el resto de ficheros. Qué hace: `SLOTS` copias del repo (`repo-0`… en la misma carpeta temporal, cada una con su unión a `node_modules` que se quita como enlace antes de borrar, como hoy), `runWith` asíncrono con `spawn`, y una cola de casos que cada copia va vaciando; un control se guarda como promesa para que lo corra solo una. El test cuenta cuántos casos estuvieron en marcha a la vez y exige al menos 2 (una aserción que no depende de la carga y que hoy daría 1). Cada copia aplica sus ediciones y las devuelve como ahora, así que dos casos nunca editan el mismo fichero a la vez. Lector: el propio test, disparador `ci-test`; la regla «cada caso malo sale en rojo por su entrada real y su control en verde» no cambia. Mantiene C13: el test sigue fallando por un caso sin atrapar o un control en rojo. Si rompe `main`: revertir el PR desde una rama nueva.
 Done:
 ```sh
 node --test --test-reporter=spec test/invariants.test.js
-# criterio: la duración de «every machine case…» baja de 20000 ms; con c41d449 sale 26 8xx ms (2.ª pasada), o sea rojo contra ese criterio; la cifra va en el PR del trozo
+# el test gana una aserción que no depende de la carga: el máximo de procesos a la vez que llegó a haber es al menos 2 (con c41d449 es siempre 1, así que rojo antes y verde después); la duración antes (26,8 s) y después va en el PR del trozo, como cifra y no como criterio
 # caso malo en rojo: con un caso de cases.json que ninguna orden atrapa, o con un control roto, el test falla igual que antes y el PR enseña la salida
 ```
 
@@ -99,11 +97,11 @@ Files: `test/principal.test.js`
 Depends on: 1
 Blocked by: none
 Existing: `git grep -n -E "concurrency|Promise.all" -- test/principal.test.js` (en c41d449) -> sin salida, exit 1. La función `hook` (línea 42) y `hookEdicion` (línea 102) son `spawnSync` de `node .claude/hooks/carpeta-principal.mjs`; 80 lanzamientos en el fichero, 12,4 s medidos.
-Not done: no llama a `decidir` dentro del proceso (se pierde la entrada real del hook, P12), no quita ninguna orden de las listas `negadas` y `vale`, no toca `.claude/hooks/carpeta-principal.mjs` ni los hooks de git. Qué hace: una función `hooks(lista)` que lanza con `spawn` hasta `TOPE` procesos a la vez y devuelve las decisiones en el orden de la lista; las listas `negadas`, `vale` y las de `hookEdicion` se evalúan con ella y se comparan una a una con el mensaje de la orden, como hoy. Es el mismo proceso real con el mismo JSON por stdin. Lector: el propio test (`ci-test`). Mantiene C13: cada orden sigue teniendo su aserción con su mensaje.
+Not done: no llama a `decidir` dentro del proceso (se pierde la entrada real del hook, P12), no quita ninguna orden de las listas `negadas` y `vale`, no toca `.claude/hooks/carpeta-principal.mjs` ni los hooks de git. Qué hace: una función `hooks(lista)` que lanza con `spawn` hasta `TOPE` procesos a la vez y devuelve las decisiones en el orden de la lista; las listas `negadas`, `vale` y las de `hookEdicion` se evalúan con ella y se comparan una a una con el mensaje de la orden, como hoy. El test cuenta cuántos procesos del hook estuvieron en marcha a la vez y exige al menos 2 (hoy daría 1). Es el mismo proceso real con el mismo JSON por stdin. Lector: el propio test (`ci-test`). Mantiene C13: cada orden sigue teniendo su aserción con su mensaje.
 Done:
 ```sh
 node --test --test-reporter=spec test/principal.test.js
-# criterio: «hook: no se deja engañar…» baja de 5000 ms; con c41d449 sale 9,7 s (2.ª pasada), rojo contra ese criterio; la cifra va en el PR del trozo
+# el test gana la misma aserción de procesos a la vez (al menos 2; con c41d449 siempre 1, rojo antes y verde después); la duración antes (9,7 s) y después va en el PR del trozo, como cifra y no como criterio
 # caso malo en rojo: quitar «Set-Location» de PROHIBIDOS en .claude/hooks/carpeta-principal.mjs hace fallar el test con el mensaje de la orden, antes y después
 ```
 
@@ -116,7 +114,7 @@ Not done: no toca los `git push` de `pull-main` ni `arranque-a-la-vez` (cada ron
 Done:
 ```sh
 node --test test/apoyo-remoto.test.js test/clean.test.js test/tarea-ficha.test.js
-# criterio: el contador de «Dónde se va el tiempo» cuenta menos de 10 `git push` en clean y menos de 5 en tarea-ficha; con c41d449 cuenta 41 y 18, rojo contra ese criterio; las duraciones de los ficheros (47,0 s y 20,4 s antes) van en el PR del trozo
+# además: git grep -c "'push'" -- test/clean.test.js test/tarea-ficha.test.js da 6 y 2 con c41d449 y debe dar menos en el PR (las llamadas de montaje pasan a `publicar`); el contador de «Dónde se va el tiempo» (41 y 18 `git push` antes) y las duraciones (47,0 s y 20,4 s antes) van en el PR del trozo como cifras
 # caso malo en rojo: sin test/apoyo/remoto.mjs el test nuevo no carga; con una `publicar` que no escribe alternates, `git clone` del remoto falla y el test sale en rojo
 ```
 
@@ -128,8 +126,8 @@ Existing: `git grep -n -E "NUEVE|CHICO" -- test/golden-run.test.js` (en c41d449)
 Not done: no toca `scripts/golden-run.mjs` ni la copia del juez por llamada (producción), no cambia `claude-falso.mjs`, no baja los intentos de los tests de varianza. Qué hace (opción 1 de A): el test «9 casos por 3 intentos son 27 llamadas» pasa a 3 casos por 3 intentos (9 llamadas) y comprueba el mismo producto casos x intentos, el anuncio antes de la primera llamada, el coste por llamada y el total; el del espacio de trabajo pasa de 9 a 3 llamadas. El título deja de decir «9» y «27». Se pierde que esas dos comprobaciones se hagan con seis casos más (`caso-03`, `04`, `05`, `06`, `08`, `09`) cuya diferencia con los tres que quedan es el contenido de `pr.diff` y `body.md`, que esas comprobaciones no leen. Ahorro esperado: 24 de 64 llamadas, ~16 s del fichero de 60 s (a 0,66 s la llamada; sin medir después). Lector: el propio test (`ci-test`).
 Done:
 ```sh
-node --test --test-reporter=spec test/golden-run.test.js
-# criterio: el fichero baja de 45000 ms y hace 40 llamadas; con c41d449 sale 60,1 s y 64 llamadas (2.ª pasada), rojo contra ese criterio; las llamadas se cuentan del log del claude falso, y la cifra va en el PR del trozo
+node --test --test-reporter=spec --test-name-pattern="3 casos por 3 intentos son 9 llamadas" test/golden-run.test.js | grep -c "3 casos por 3 intentos son 9 llamadas"
+# con c41d449 imprime 0 (ese test no existe, rojo) y después 1 (verde); la duración del fichero antes (60,1 s, 64 llamadas) y después va en el PR del trozo, como cifra
 # caso malo en rojo: con GOLDEN_CLAUDE_BIN que cuenta una llamada de menos el test del producto falla
 ```
 
@@ -140,7 +138,7 @@ Ola 1: 1. Ola 2: 2, 3, 4 (ficheros distintos, sin dependencia entre ellos). Ola 
 - principio 2 | eligió: dejar las 10 rondas de `arranque-a-la-vez` y de `pull-main` («bucle de fetch»), y las 3 de «dos arranques a la vez» | descartó: bajarlas a 3, que ahorraría unos 25 s de 64 pero verían menos veces una carrera que falló 26 de 30 arranques con `git pull` (comentario de `test/pull-main.test.js:155`, 23 oct 2026) | motivo: decidido
 - principio 5 | eligió: lanzar a la vez las órdenes del hook y de los casos de `invariants` | descartó: llamar a `decidir` y a las funciones de cada script dentro del proceso del test, que es más rápido pero deja de probar la entrada real que lanza Claude y CI | motivo: decidido
 - principio 2 | eligió: en el trozo 4 cambiar solo el montaje del mundo y dejar los `push` del código bajo prueba | descartó: sustituir también esos, que dejaría de probar el borrado real de ramas remotas | motivo: decidido
-- principio 2 | eligió: el montaje del trozo 4 enlaza los objetos con `objects/info/alternates` y escribe las ramas con `update-ref` | descartó: copiar con `cpSync` un remoto plantilla ya montado, que no se midió y se elegiría por intuición, sin la cifra de antes y de después que sí tienen `update-ref` (27 ms) y `push` (186 a 333 ms) | motivo: decidido
+- principio 2 | eligió: el montaje del trozo 4 enlaza los objetos con `objects/info/alternates` y escribe las ramas con `update-ref` | descartó: copiar con `cpSync` un remoto plantilla ya montado, que no se midió y se elegiría por intuición, sin la cifra de antes y de después que sí tienen `update-ref` (26 a 34 ms) y `push` (186 a 430 ms) | motivo: decidido
 - principio 2 | eligió: el número de copias (`SLOTS`) y el tope de procesos (`TOPE`) son constantes con nombre fijadas al medir en el PR de cada trozo | descartó: derivarlos de `os.availableParallelism()`, que da otro valor en CI que en el PC de Pablo y hace que la cifra no se reproduzca | motivo: decidido
 - principio 2 | eligió: no mover ningún test a un grupo «lento» que no corra en local | descartó: un grupo aparte para `golden-run` e `invariants`, que quita de la vista de cada PR lo que el revisor de CI sí corre | motivo: decidido
 
@@ -153,7 +151,7 @@ Por qué te lo pregunto: es recortar un test (la clase «Weaken a check» de `st
 3. No: se queda como está y el fichero sigue en 60 s
 
 ## Not verified
-- Ninguna cifra de «después»: este plan solo mide el antes. Cada trozo trae la suya en su PR, con la misma orden. Los criterios de los Done (invariants bajo 20 s, el hook de principal bajo 5 s, golden-run bajo 45 s) son metas puestas a ojo desde las causas medidas, no cifras medidas después.
+- Ninguna cifra de «después»: este plan solo mide el antes. Cada trozo trae la suya en su PR, con la misma orden. Que los Done no usan un tope de segundos (depende de la carga, 6,7 veces entre sola y suite): prueban el cambio (procesos a la vez, nombre del test, `push` contados) y las duraciones se dan como cifras de antes y después, sin criterio de paso.
 - Que los trozos 2 y 3 acorten la suite entera: lanzar a la vez no baja el trabajo total del procesador, solo el reloj de ese fichero, y ayuda si hay núcleos libres (en esta máquina `nproc` da 12) y `invariants` está en el camino crítico. Con la máquina justa de memoria puede no notarse. Los trozos 4 y 5 sí bajan trabajo (menos procesos), el 4 sin alcanzar a `pull-main` ni `arranque-a-la-vez`.
 - La suite entera: una sola pasada (280,1 s), la de `npm run done` de este PR; no hay segunda. La cifra de 464 s de Pablo salió con el PC justo de memoria y dos sesiones, y por lo medido aquí es sobre todo carga, pero con una pasada no se separa cuánto.
 - Que lanzar a la vez los casos de `invariants` (trozo 2) baje su 179,5 s dentro de la suite: con todos los ficheros compitiendo por el procesador, más procesos a la vez de un mismo fichero pueden repartirse la misma máquina y no acortar nada. Se sabrá al medir la suite entera en el PR del trozo 2; si no baja, se descarta ese trozo.
