@@ -2,6 +2,8 @@
 //   node scripts/install-pc.mjs instalar              copia lo que falta o difiere y apunta la huella
 //   node scripts/install-pc.mjs instalar --ampliar    igual, aunque settings.json amplíe permisos: SOLO desde una
 //                                                      terminal interactiva y tecleando AMPLIAR (solo Pablo)
+//   node scripts/install-pc.mjs instalar --reemplazar  un fichero que no instaló la Fábrica (sin huella) no se pisa
+//                                                      nunca solo: así sí, tras guardar <fichero>.antes-de-fabrica
 //   node scripts/install-pc.mjs comprobar             sale con 1 y nombra cada fichero que no coincide
 // Si el settings.json nuevo AMPLÍA permisos respecto al instalado (scripts/lib/settings-widening.mjs), instalar sale
 // con 1 sin escribir NADA. --ampliar no basta: sin terminal (las sesiones de Claude no la tienen) o sin la
@@ -13,7 +15,7 @@
 // Sin fichero, hueco sin valor o valor sobrante: error y no se escribe nada. Se instala y se comprueba el resultado RELLENO.
 // Fuera de alcance a propósito: memorias.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,7 +83,8 @@ function contenidos(origen, valores) {
 
 const sitio = (home) => path.join(home ?? process.env.FABRICA_HOME ?? homedir(), '.claude');
 
-// Estado de cada fichero de usuario/ en el destino: ok, falta, editado-a-mano o desactualizado.
+// Estado de cada fichero de usuario/ en el destino: ok, falta, ajeno (existe, difiere y no lo instaló la Fábrica),
+// editado-a-mano o desactualizado.
 export function estado({ home, origen = ORIGEN, valores } = {}) {
   const destino = sitio(home);
   const huella = leerHuella(destino);
@@ -92,9 +95,22 @@ export function estado({ home, origen = ORIGEN, valores } = {}) {
     if (!existsSync(f)) return { fichero, estado: 'falta', fuente, contenido: todos[fichero] };
     const actual = hash(readFileSync(f));
     if (actual === fuente) return { fichero, estado: 'ok', fuente, contenido: todos[fichero] };
-    // Igual a lo que se instaló: el repo avanzó. Distinto: alguien lo tocó en destino.
-    return { fichero, estado: actual === huella[fichero] ? 'desactualizado' : 'editado-a-mano', fuente, contenido: todos[fichero] };
+    // Sin huella: nunca lo instaló la Fábrica, es de quien lo puso. Igual a lo que se instaló: el repo avanzó.
+    // Distinto: alguien lo tocó en destino después de instalar.
+    const e = huella[fichero] === undefined ? 'ajeno' : actual === huella[fichero] ? 'desactualizado' : 'editado-a-mano';
+    return { fichero, estado: e, fuente, contenido: todos[fichero] };
   });
+}
+
+export class FicheroAjeno extends Error {
+  constructor(ficheros) {
+    const lista = ficheros.map((f) => `  - ${f}`).join('\n');
+    super(
+      `Hay ficheros en ~/.claude que no instaló la Fábrica y no se ha escrito nada:\n${lista}\n` +
+        'Repasa tu copia y, si quieres reemplazarlos, repite con --reemplazar (deja <fichero>.antes-de-fabrica).',
+    );
+    this.ficheros = ficheros;
+  }
 }
 
 export const CONFIRMACION = 'AMPLIAR';
@@ -143,9 +159,12 @@ const leerJson = (f) => {
 };
 
 // `confirmar`: función que da el visto bueno a una ampliación o lanza; sin ella, una ampliación no se aplica.
-export function instalar({ home, origen = ORIGEN, confirmar, valores } = {}) {
+// `reemplazar`: sobrescribe también los ficheros ajenos, guardando antes <fichero>.antes-de-fabrica.
+export function instalar({ home, origen = ORIGEN, confirmar, valores, reemplazar = false } = {}) {
   const destino = sitio(home);
   const previo = estado({ home, origen, valores });
+  const ajenos = previo.filter((p) => p.estado === 'ajeno').map((p) => p.fichero);
+  if (ajenos.length && !reemplazar) throw new FicheroAjeno(ajenos);
   const ajustes = previo.find((p) => p.fichero === 'settings.json');
   if (ajustes && ajustes.estado !== 'ok') {
     const actual = ajustes.estado === 'falta' ? {} : leerJson(path.join(destino, 'settings.json'));
@@ -157,6 +176,7 @@ export function instalar({ home, origen = ORIGEN, confirmar, valores } = {}) {
     if (e === 'ok') continue;
     const f = path.join(destino, fichero);
     mkdirSync(path.dirname(f), { recursive: true });
+    if (e === 'ajeno') copyFileSync(f, `${f}.antes-de-fabrica`);
     writeFileSync(f, contenido);
     cambiados.push({ fichero, antes: e });
   }
@@ -179,6 +199,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       const c = instalar({
         origen: process.env.FABRICA_USUARIO,
         confirmar: process.argv.includes('--ampliar') ? confirmarEnTerminal() : undefined,
+        reemplazar: process.argv.includes('--reemplazar'),
       });
       if (!c.length) console.log('install-pc: sin cambios');
       for (const { fichero, antes } of c) console.log(`install-pc: ${fichero} (${antes})`);
@@ -188,10 +209,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       if (mal.length) process.exit(1);
       console.log('check-pc: coincide');
     } else {
-      throw new Error('Uso: install-pc.mjs instalar [--ampliar] | comprobar');
+      throw new Error('Uso: install-pc.mjs instalar [--ampliar] [--reemplazar] | comprobar');
     }
   } catch (e) {
     console.error(e.message);
-    process.exit(e instanceof AmpliaPermisos ? 1 : 2);
+    process.exit(e instanceof AmpliaPermisos || e instanceof FicheroAjeno ? 1 : 2);
   }
 }
