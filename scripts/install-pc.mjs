@@ -13,6 +13,7 @@
 // Los valores viven en un repo privado, clonado aparte: fichero JSON nombre -> valor en FABRICA_VALORES, o por defecto
 // <carpeta de los repos>/fabrica-privado/usuario/valores.json (C:\dev\fabrica-privado\usuario\valores.json).
 // Sin fichero, hueco sin valor o valor sobrante: error y no se escribe nada. Se instala y se comprueba el resultado RELLENO.
+// CLAUDE.md = usuario/CLAUDE.md (común) + usuario/personas/<persona>.md; `persona` es una clave más de los valores (no un hueco).
 // Fuera de alcance a propósito: memorias.
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readSync, readdirSync, writeFileSync } from 'node:fs';
@@ -26,6 +27,8 @@ const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ORIGEN = path.join(RAIZ, 'usuario');
 export const HUELLA = 'fabrica-huella.json'; // dentro de ~/.claude/
 const SOLO_REPO = ['settings.motivos.json']; // viven en usuario/ pero no se instalan
+export const PERSONAS = 'personas'; // usuario/personas/<persona>.md: capa personal, se une a CLAUDE.md al instalar y no se copia sola
+const NOMBRE_PERSONA = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 export const VALORES_POR_DEFECTO = path.join(RAIZ, '..', 'fabrica-privado', 'usuario', 'valores.json');
 
 const hash = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -36,7 +39,7 @@ function listar(dir, rel = '') {
   for (const e of readdirSync(path.join(dir, rel), { withFileTypes: true })) {
     const r = rel ? `${rel}/${e.name}` : e.name;
     if (e.isDirectory()) salida.push(...listar(dir, r));
-    else if (!SOLO_REPO.includes(r)) salida.push(r);
+    else if (!SOLO_REPO.includes(r) && r.split('/')[0] !== PERSONAS) salida.push(r);
   }
   return salida.sort();
 }
@@ -66,19 +69,40 @@ export function cargarValores(ruta = process.env.FABRICA_VALORES ?? VALORES_POR_
   }
 }
 
-// Contenido que se instala de cada fichero de usuario/: tal cual, salvo settings.json si es plantilla, que se rellena.
-// `valores` (objeto) se inyecta en tests; si no, se leen del fichero solo cuando la plantilla tiene huecos.
+// Contenido que se instala de cada fichero de usuario/: tal cual, salvo dos. settings.json, si es plantilla, se rellena.
+// CLAUDE.md, si usuario/ tiene personas/, es la parte común seguida de personas/<persona>.md (la `persona` de los valores).
+// `valores` (objeto) se inyecta en tests; si no, se leen del fichero solo cuando hacen falta. `persona` no es un hueco:
+// se aparta antes de rellenar.
 function contenidos(origen, valores) {
+  let cargados;
+  const leerValores = () => (cargados ??= valores ?? cargarValores());
+  const sinPersona = () => Object.fromEntries(Object.entries(leerValores()).filter(([k]) => k !== 'persona'));
   return Object.fromEntries(
     listar(origen).map((fichero) => {
       const bruto = readFileSync(path.join(origen, fichero));
+      if (fichero === 'CLAUDE.md' && existsSync(path.join(origen, PERSONAS))) {
+        return [fichero, Buffer.concat([bruto, Buffer.from('\n'), capaPersonal(origen, leerValores().persona)])];
+      }
       if (fichero !== 'settings.json') return [fichero, bruto];
       const plantilla = leerJson(path.join(origen, fichero));
       if (!huecos(plantilla).length && valores === undefined) return [fichero, bruto];
-      const rellena = rellenar(plantilla, valores ?? cargarValores());
+      const rellena = rellenar(plantilla, sinPersona());
       return [fichero, Buffer.from(`${JSON.stringify(rellena, null, 2)}\n`)];
     }),
   );
+}
+
+// La capa personal de `persona`: usuario/personas/<persona>.md. Sin persona, nombre raro o fichero que falta: error.
+function capaPersonal(origen, persona) {
+  if (typeof persona !== 'string' || !NOMBRE_PERSONA.test(persona)) {
+    throw new Error(
+      'Falta la clave "persona" (su login de GitHub) en el fichero de valores, o no es un nombre válido: ' +
+        `${JSON.stringify(persona)}. Es la capa personal que se une a CLAUDE.md (usuario/${PERSONAS}/<persona>.md).`,
+    );
+  }
+  const f = path.join(origen, PERSONAS, `${persona}.md`);
+  if (!existsSync(f)) throw new Error(`No existe la capa personal ${f}: escríbela (un PR) o corrige "persona" en el fichero de valores.`);
+  return readFileSync(f);
 }
 
 const sitio = (home) => path.join(home ?? process.env.FABRICA_HOME ?? homedir(), '.claude');
