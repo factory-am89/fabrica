@@ -22,7 +22,8 @@ export const PICO_SUITE_BYTES = 1.7 * 1024 ** 3;
 // Measured that day on this machine, `node --test` alone, private memory of its whole process tree sampled every 1.5 s:
 // default 11 at once -> peak 1.29 GiB (37 processes), 336 s; 6 -> 0.80 GiB (23), 363 s; 4 -> 0.62 GiB (16), 443 s, with
 // another session loading the machine at the end (a run with free memory only, without the tree: 259 s at 11, 314 s at 4).
-// 4 halves the peak for about one to two more minutes. On CI (4 cores, default 3) it changes nothing that matters.
+// The cap chosen from these figures is the lowest one measured: it halves the peak for about one to two more minutes. On CI
+// (4 cores, node's default there is 3 at once) the cap changes little. Changing the cap means measuring again and updating this.
 // Safety factor over that peak: the suite grows, other programs move while it runs, and 3 runs are a small sample.
 export const MARGEN_UMBRAL = 1.25;
 // Free memory below which the suite does not start: the measured peak times the margin (about 2.1 GiB). The lock already
