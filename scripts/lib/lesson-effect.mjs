@@ -7,7 +7,7 @@ import { CORPUS, MIN_CASES_PER_CELL, STANDARD, answersOf, loadCorpus, loadOutput
 import { variance } from '../golden-run.mjs';
 import { cargarPreguntas } from '../veredicto.mjs';
 import { NO_QUESTION, readLessons, sourceNumber } from './lessons.mjs';
-import { ANSWER, OVERRIDE_TITLE, aggregate, readCheckRuns } from './record.mjs';
+import { ANSWER, aggregate, isOverrideTitle, readCheckRuns } from './record.mjs';
 import { OUTCOME_NOISE, REVIEWER_NO_KEYS, readReviewerNo } from './reviewer-no.mjs';
 
 // Why a lesson has no conclusive effect (a list: it can be several).
@@ -56,7 +56,7 @@ export const localInputs = (root, golden) => ({ lessons: readLessonSources(root)
 function readRounds(checkRuns) {
   const { records, unreadable } = readCheckRuns(checkRuns);
   if (unreadable.length > 0) throw new Error(`check-runs without a readable record (index: ${unreadable.map((u) => u.index).join(', ')})`);
-  const overrideShas = checkRuns.filter((c) => c.output?.title === OVERRIDE_TITLE).map((c) => c.head_sha);
+  const overrideShas = checkRuns.filter((c) => isOverrideTitle(c.output?.title)).map((c) => c.head_sha);
   if (overrideShas.some((s) => typeof s !== 'string')) throw new Error('an override check-run has no head_sha: it cannot be placed in a round');
   return { records, overrideShas };
 }

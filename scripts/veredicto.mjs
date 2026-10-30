@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
 import { checkGolden } from './lib/golden-guard.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO as REPO_FABRICA } from './lib/repo.mjs';
-import { ANSWER, ANSWERS, CUT_TITLE, ERROR, OVERRIDE_TITLE as TITULO_ANULACION, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWER, ANSWERS, CUT_TITLE, ERROR, isOverrideTitle, overrideTitle, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
 // (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
@@ -118,12 +118,12 @@ async function api(token, metodo, ruta, cuerpo) {
   return res.json();
 }
 
-// La anulación por Pablo: la única salida cuando el revisor rechaza por error. Una review cuenta si y solo si
-// (1) su autor es OWNER_LOGIN, (2) su última review decisiva (APPROVED, CHANGES_REQUESTED o DISMISSED; las COMMENTED
-// no cuentan) es APPROVED y (3) su commit_id es exactamente la cabeza actual del PR. Un push posterior cambia la cabeza
-// y la anulación deja de valer. `reviews` viene en orden cronológico, como la API. Devuelve la review o null.
+// La anulación por un dueño: la única salida cuando el revisor rechaza por error. Una review cuenta si y solo si
+// (1) su autor es el dueño (`dueno`; en la Fábrica, OWNER_LOGIN), (2) su última review decisiva (APPROVED, CHANGES_REQUESTED
+// o DISMISSED; las COMMENTED no cuentan) es APPROVED y (3) su commit_id es exactamente la cabeza actual del PR. Un push
+// posterior cambia la cabeza y la anulación deja de valer. `reviews` viene en orden cronológico, como la API. Devuelve la review o null.
 const DECISIVAS = ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'];
-export function aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN) {
+export function aprobacionDe(reviews, cabeza, dueno = OWNER_LOGIN) {
   if (!/^[0-9a-f]{40}$/.test(String(cabeza))) return null;
   if (!Array.isArray(reviews)) throw new Error('reviews: la API no devolvió una lista');
   const suyas = reviews.filter(
@@ -131,6 +131,38 @@ export function aprobacionDePablo(reviews, cabeza, dueno = OWNER_LOGIN) {
   );
   const ultima = suyas.at(-1);
   return ultima?.state === 'APPROVED' && ultima.commit_id === cabeza ? ultima : null;
+}
+
+// Los dueños de un repo que llama a anulacion.yml con la entrada `duenos` (variable DUENOS; decisión B1 del 2026-10-29 en
+// intervenciones.md): «login:app,app» por dueño, separados por espacios o saltos de línea; las Apps son las que lanzan las
+// sesiones de ese dueño. Vacío o sin la variable: null (la propia Fábrica, solo OWNER_LOGIN). Algo mal formado lanza.
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
+const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+export function leerDuenos(texto) {
+  if (texto === undefined || !texto.trim()) return null;
+  const duenos = texto.trim().split(/\s+/).map((entrada) => {
+    const partes = entrada.split(':');
+    const apps = partes[1]?.split(',') ?? [];
+    if (partes.length !== 2 || !LOGIN.test(partes[0]) || apps.length === 0 || !apps.every((a) => SLUG.test(a))) {
+      throw new Error(`DUENOS: «${entrada}» no es login:app[,app]`);
+    }
+    return { login: partes[0], apps };
+  });
+  const logins = duenos.map((d) => d.login.toLowerCase());
+  const repetido = logins.find((l, i) => logins.indexOf(l) !== i);
+  if (repetido) throw new Error(`DUENOS: el dueño ${repetido} está repetido`);
+  return duenos;
+}
+
+// Con varios dueños, la aprobación de cada uno vale como la de aprobacionDe salvo sobre su trabajo propio (cuatro ojos): no cuenta
+// si el autor del PR es él o una de sus Apps (`<slug>[bot]`). Si valen varias, la más reciente. Devuelve la review o null.
+export function aprobacionDeDueno(reviews, cabeza, duenos, autor) {
+  if (!Array.isArray(duenos) || duenos.length === 0) throw new Error('aprobacionDeDueno: sin dueños');
+  if (typeof autor !== 'string' || !autor.trim()) throw new Error('aprobacionDeDueno: el PR no trae autor; no se puede saber si es trabajo propio de un dueño');
+  const quien = autor.toLowerCase();
+  const propio = (d) => quien === d.login.toLowerCase() || d.apps.some((a) => quien === `${a}[bot]`);
+  const validas = duenos.filter((d) => !propio(d)).map((d) => aprobacionDe(reviews, cabeza, d.login)).filter(Boolean);
+  return validas.sort((a, b) => reviews.indexOf(b) - reviews.indexOf(a))[0] ?? null;
 }
 
 // Resumen del check de anulación: quién, sobre qué cabeza y qué hallazgos del revisor se anulan.
@@ -152,7 +184,7 @@ async function reviewsDe({ repo, pr, token }) {
 
 async function leerContexto({ repo, pr, sha, token }) {
   const datosPr = await api(token, 'GET', `/repos/${repo}/pulls/${pr}`);
-  return { sha, cabeza: datosPr.head.sha, reviews: await reviewsDe({ repo, pr, token }) };
+  return { sha, cabeza: datosPr.head.sha, autor: datosPr.user?.login, reviews: await reviewsDe({ repo, pr, token }) };
 }
 
 // El freno del corpus dorado: lee el PR por la API con el token de solo lectura del workflow (LECTOR; el de la App no tiene
@@ -226,28 +258,37 @@ async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkR
   await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
   estado.cerrado = true;
   // Si Pablo aprobó esta cabeza, el «no» (ya publicado, con su registro) queda anulado por un segundo check, el último.
-  const aprobacion = !veredicto.ok && ctx.sha === ctx.cabeza ? aprobacionDePablo(ctx.reviews, ctx.cabeza) : null;
-  if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
+  // Solo en la Fábrica (juicioAnula): en un repo ajeno el juicio no conoce sus dueños (DUENOS solo llega a anulacion.yml).
+  const aprobacion = juicioAnula(repo) && !veredicto.ok && ctx.sha === ctx.cabeza ? aprobacionDe(ctx.reviews, ctx.cabeza) : null;
+  if (aprobacion) await publicarCheck(repo, sha, token, 'success', { title: overrideTitle(aprobacion.user.login), summary: resumenAnulacion(aprobacion, sha, veredicto.fallos) });
   // La aprobación de la App solo si el PR sigue en el SHA juzgado.
   if (veredicto.ok && ctx.sha === ctx.cabeza) {
     await api(token, 'POST', `/repos/${repo}/pulls/${pr}/reviews`, { commit_id: sha, event: 'APPROVE', body: `${TITULO.yes}.` });
   }
 }
 
-// MODO=anulacion (lo lanza anulacion.yml tras una review): sin modelo. Solo si Pablo aprobó la cabeza actual y el
-// último check `revisor` de esa cabeza (de cualquier estado), publicado por la App, está completado y no en verde, publica el check de anulación; si está en curso espera: lo aplica el juicio al terminar.
-async function anular({ REPO, PR, TOKEN }) {
+// Si el juicio (revisor.yml) aplica él mismo una aprobación que llegó antes del veredicto: solo en la Fábrica, donde el dueño es
+// OWNER_LOGIN. En un repo ajeno el juicio no recibe DUENOS y no podría aplicar la regla de cuatro ojos: allí solo anula anulacion.yml.
+const juicioAnula = (repo) => repo === REPO_FABRICA;
+const ESPERA = (repo) => (juicioAnula(repo) ? 'lo aplicará el juicio al terminar' : 'cuando el juicio termine, aprueba otra vez para anular');
+
+// MODO=anulacion (lo lanza anulacion.yml tras una review): sin modelo. Solo si un dueño aprobó la cabeza actual (sin DUENOS, OWNER_LOGIN;
+// con DUENOS, cualquiera de ellos salvo sobre su trabajo propio) y el último check `revisor` de esa cabeza (de cualquier estado),
+// publicado por la App, está completado y no en verde, publica el check de anulación, con el login de quien anula en el título.
+async function anular({ REPO, PR, TOKEN, DUENOS }) {
+  const duenos = leerDuenos(DUENOS);
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: null, token: TOKEN });
-  const aprobacion = aprobacionDePablo(ctx.reviews, ctx.cabeza);
-  if (!aprobacion) return console.log('anulación: no hay aprobación de Pablo sobre la cabeza actual; nada que hacer');
+  const aprobacion = duenos ? aprobacionDeDueno(ctx.reviews, ctx.cabeza, duenos, ctx.autor) : aprobacionDe(ctx.reviews, ctx.cabeza);
+  if (!aprobacion) return console.log('anulación: no hay aprobación de un dueño sobre la cabeza actual que valga; nada que hacer');
   const ultimo = (await revisoresDeLaApp(REPO, ctx.cabeza, TOKEN))[0];
-  if (!ultimo) return console.log('anulación: aún no hay veredicto de la App sobre esta cabeza; lo aplicará el juicio en curso al terminar');
-  if (ultimo.status !== 'completed') return console.log('anulación: hay un juicio en curso sobre esta cabeza; lo aplicará al terminar');
+  if (!ultimo) return console.log(`anulación: aún no hay veredicto de la App sobre esta cabeza; ${ESPERA(REPO)}`);
+  if (ultimo.status !== 'completed') return console.log(`anulación: hay un juicio en curso sobre esta cabeza; ${ESPERA(REPO)}`);
   if (ultimo.conclusion === 'success') return console.log('anulación: el check revisor ya está en verde; nada que hacer');
   if (typeof ultimo.output?.summary !== 'string' || !ultimo.output.summary.trim()) throw new Error(`el check revisor ${ultimo.id} no trae resumen: no se sabe qué hallazgos se anulan`);
   const hallazgos = ultimo.output.summary.split('\n').map((l) => l.replace(/^- /, '')).filter(Boolean);
-  await publicarCheck(REPO, ctx.cabeza, TOKEN, 'success', { title: TITULO_ANULACION, summary: resumenAnulacion(aprobacion, ctx.cabeza, hallazgos) });
-  console.log(TITULO_ANULACION);
+  const titulo = overrideTitle(aprobacion.user.login);
+  await publicarCheck(REPO, ctx.cabeza, TOKEN, 'success', { title: titulo, summary: resumenAnulacion(aprobacion, ctx.cabeza, hallazgos) });
+  console.log(titulo);
 }
 
 // MODO=pendiente (primer trabajo de revisor.yml, con su propio token de la App: Claude nunca lo ve): publica `revisor` en curso y deja
@@ -322,7 +363,7 @@ async function juzgarPr({ SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, 
   // Un estándar inválido es un no publicado (nunca un sí) y el script sale con error.
   let veredicto = errorEstandar ? { ok: false, fallos: ['el estándar no se pudo cargar', ...ctx.golden] } : decidir(SALIDA ?? '', preguntas, ctx);
   // Un run viejo (cancelado, o relanzado) aún publica: un sí solo cierra en verde si la App no abrió otro `revisor` más nuevo en esta cabeza.
-  if (veredicto.ok && (await revisoresDeLaApp(REPO, SHA, TOKEN)).some((c) => c.id > Number(CHECK_RUN) && c.output?.title !== TITULO_ANULACION)) {
+  if (veredicto.ok && (await revisoresDeLaApp(REPO, SHA, TOKEN)).some((c) => c.id > Number(CHECK_RUN) && !isOverrideTitle(c.output?.title))) {
     veredicto = { ...veredicto, ok: false, fallos: [...veredicto.fallos, FALLO_JUICIO_MAS_NUEVO] };
   }
   // El registro nunca cambia el veredicto: si no se puede construir, el veredicto se publica igual (sin registro) y el script falla en alto.

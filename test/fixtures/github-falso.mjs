@@ -3,13 +3,14 @@
 // COMPARE_FALSO: los ficheros del compare (por defecto, solo el workflow); CONTENIDOS_FALSOS: {"<ref>:<ruta>": texto} para /contents (lo que no está, 404).
 // Check-runs: un POST crea y devuelve el id 4242; un PATCH a /check-runs/<id> cierra uno; el GET sin filter=all devuelve solo el último, como la API real.
 // Un PR que toca el workflow del revisor, sin ninguna review de Pablo salvo que REVIEWS_FALSAS diga otra cosa. Una ruta que no conoce es un 404.
-const { REPO, PR, SHA } = process.env;
+// AUTOR_FALSO: el login de quien abrió el PR (user.login); sin él, el PR no trae `user`.
+const { REPO, PR, SHA, AUTOR_FALSO } = process.env;
 const base = `/repos/${REPO}/pulls/${PR}`;
 const compare = JSON.parse(process.env.COMPARE_FALSO ?? '[{"filename":".github/workflows/revisor.yml","status":"modified"}]');
 const contenidos = JSON.parse(process.env.CONTENIDOS_FALSOS ?? '{}');
 const checksDelCommit = JSON.parse(process.env.CHECKS_FALSOS ?? '[]');
 const respuestas = {
-  [`GET ${base}`]: { head: { sha: SHA } },
+  [`GET ${base}`]: { head: { sha: SHA }, ...(AUTOR_FALSO ? { user: { login: AUTOR_FALSO } } : {}) },
   [`GET ${base}/files`]: [{ filename: '.github/workflows/revisor.yml', status: 'modified' }],
   [`GET ${base}/reviews`]: JSON.parse(process.env.REVIEWS_FALSAS ?? '[]'),
   [`POST /repos/${REPO}/check-runs`]: { id: 4242 },

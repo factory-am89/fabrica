@@ -12,7 +12,7 @@ import { MIN_CASES_PER_CELL, STANDARD } from '../scripts/golden.mjs';
 import { DATA_IDS, humanData } from '../scripts/lib/audit-data.mjs';
 import { WHY, lessonIndicators, readTriagedNo } from '../scripts/lib/lesson-effect.mjs';
 import { LESSONS_DIR, NO_QUESTION } from '../scripts/lib/lessons.mjs';
-import { ANSWER, ERROR, OVERRIDE_TITLE, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
+import { ANSWER, ERROR, overrideTitle, answersSummary, buildRecord, formatBlock } from '../scripts/lib/record.mjs';
 import { KINDS, OUTCOME_NOISE, REVIEWER_NO_FILE, REVIEWER_NO_KEYS } from '../scripts/lib/reviewer-no.mjs';
 
 // A «no» that ended in a lesson (outcome = the id of a lesson) and one that ended as noise of the judge.
@@ -36,7 +36,7 @@ const round = (pr, answers, { error = null, shaOf = sha(pr) } = {}) => ({
   head_sha: shaOf,
   output: { title: 'x', summary: 'x', text: formatBlock(buildRecord({ repo: REPO_NAME, pr, sha: shaOf, standard: STANDARD, veredicto: { ok: !Object.values(answers).includes(ANSWER.no) && error === null }, respuestas: answersSummary(answers), run: null, error })) },
 });
-const override = (shaOf) => ({ head_sha: shaOf, output: { title: OVERRIDE_TITLE, summary: 'x', text: '' } });
+const override = (shaOf) => ({ head_sha: shaOf, output: { title: overrideTitle('pabloam89'), summary: 'x', text: '' } });
 
 // A root with the lessons ([{id, question, sources: ['#n']}]) and the triaged «no» ([{source, question, outcome}]) the indicators read.
 function root(t, { lessons = [], entries = [] } = {}) {
@@ -198,7 +198,7 @@ test('the triaged «no» are read in one place and come out normalised; broken i
     assert.throws(() => measure(t, {}, [], [], { root: entry }), /must be #<n>/, String(bad));
   }
   assert.throws(() => measure(t, {}, [pull(1, T0)], [round(2, { [Q]: ANSWER.yes })]), /PR #2 has no PR/);
-  assert.throws(() => measure(t, {}, [], [{ output: { title: OVERRIDE_TITLE } }]), /override check-run has no head_sha/);
+  assert.throws(() => measure(t, {}, [], [{ output: { title: overrideTitle('pabloam89') } }]), /override check-run has no head_sha/);
   assert.throws(() => measure(t, {}, [], [{ head_sha: sha(1), output: { text: 'sin registro' } }]), /readable record/);
   assert.throws(() => lessonIndicators([], [{ head_sha: sha(1), output: { text: 'sin registro' } }], { lessons: [], triaged: [], unstable: null }), /readable record/);
 });

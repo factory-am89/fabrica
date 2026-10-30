@@ -1,38 +1,39 @@
 // The owner override: Pablo's approval of the current head turns a revisor "no" into a green check titled
-// "override by Pablo". Rule in aprobacionDePablo (scripts/veredicto.mjs); workflows anulacion.yml and senal-review.yml.
+// "override by <his login>". Rule in aprobacionDe (scripts/veredicto.mjs); workflows anulacion.yml and senal-review.yml.
+// Several owners per repo (input `duenos`) and the four-eyes rule: test/anulacion-duenos.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
-import { aprobacionDePablo } from '../scripts/veredicto.mjs';
+import { aprobacionDe } from '../scripts/veredicto.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO } from '../scripts/lib/repo.mjs';
-import { readCheckRuns } from '../scripts/lib/record.mjs';
+import { overrideTitle, readCheckRuns } from '../scripts/lib/record.mjs';
 import { buenas, SHA, leer, esCheck } from './apoyo/fabrica.mjs';
 
 const VIEJA = 'b'.repeat(40);
 const review = (extra = {}) => ({ id: 7, user: { login: OWNER_LOGIN }, state: 'APPROVED', commit_id: SHA, ...extra });
 
-test('aprobacionDePablo: su aprobación sobre la cabeza actual anula; el login no distingue mayúsculas', () => {
-  assert.equal(aprobacionDePablo([review()], SHA)?.id, 7);
-  assert.equal(aprobacionDePablo([review({ user: { login: OWNER_LOGIN.toUpperCase() } })], SHA)?.id, 7);
+test('aprobacionDe: su aprobación sobre la cabeza actual anula; el login no distingue mayúsculas', () => {
+  assert.equal(aprobacionDe([review()], SHA)?.id, 7);
+  assert.equal(aprobacionDe([review({ user: { login: OWNER_LOGIN.toUpperCase() } })], SHA)?.id, 7);
 });
 
-test('aprobacionDePablo: cabeza vieja, otro autor, review descartada, sin commit_id, cambios pedidos después o sin reviews no anulan', () => {
-  assert.equal(aprobacionDePablo([review({ commit_id: VIEJA })], SHA), null, 'cabeza vieja');
-  assert.equal(aprobacionDePablo([review({ commit_id: undefined })], SHA), null, 'sin commit_id');
-  assert.equal(aprobacionDePablo([review({ user: { login: 'otra-persona' } })], SHA), null, 'otro autor');
-  assert.equal(aprobacionDePablo([review({ user: { login: 'fabrica-revisor[bot]' } })], SHA), null, 'la App no es Pablo');
-  assert.equal(aprobacionDePablo([review(), review({ id: 8, state: 'DISMISSED' })], SHA), null, 'descartada');
-  assert.equal(aprobacionDePablo([review(), review({ id: 8, state: 'CHANGES_REQUESTED' })], SHA), null, 'cambios pedidos después');
-  assert.equal(aprobacionDePablo([review({ state: 'COMMENTED' })], SHA), null, 'un comentario no aprueba');
-  assert.equal(aprobacionDePablo([], SHA), null);
-  assert.equal(aprobacionDePablo([review()], undefined), null, 'sin cabeza');
-  assert.equal(aprobacionDePablo([review({ commit_id: 'abc' })], 'abc'), null, 'una cabeza que no es un SHA completo');
+test('aprobacionDe: cabeza vieja, otro autor, review descartada, sin commit_id, cambios pedidos después o sin reviews no anulan', () => {
+  assert.equal(aprobacionDe([review({ commit_id: VIEJA })], SHA), null, 'cabeza vieja');
+  assert.equal(aprobacionDe([review({ commit_id: undefined })], SHA), null, 'sin commit_id');
+  assert.equal(aprobacionDe([review({ user: { login: 'otra-persona' } })], SHA), null, 'otro autor');
+  assert.equal(aprobacionDe([review({ user: { login: 'fabrica-revisor[bot]' } })], SHA), null, 'la App no es Pablo');
+  assert.equal(aprobacionDe([review(), review({ id: 8, state: 'DISMISSED' })], SHA), null, 'descartada');
+  assert.equal(aprobacionDe([review(), review({ id: 8, state: 'CHANGES_REQUESTED' })], SHA), null, 'cambios pedidos después');
+  assert.equal(aprobacionDe([review({ state: 'COMMENTED' })], SHA), null, 'un comentario no aprueba');
+  assert.equal(aprobacionDe([], SHA), null);
+  assert.equal(aprobacionDe([review()], undefined), null, 'sin cabeza');
+  assert.equal(aprobacionDe([review({ commit_id: 'abc' })], 'abc'), null, 'una cabeza que no es un SHA completo');
 });
 
-test('aprobacionDePablo: un comentario posterior no borra su aprobación', () => {
-  assert.equal(aprobacionDePablo([review(), review({ id: 8, state: 'COMMENTED' })], SHA)?.id, 7);
+test('aprobacionDe: un comentario posterior no borra su aprobación', () => {
+  assert.equal(aprobacionDe([review(), review({ id: 8, state: 'COMMENTED' })], SHA)?.id, 7);
 });
 
 const corre = (extra) => {
@@ -47,13 +48,14 @@ const corre = (extra) => {
 };
 const reviews = (...rs) => JSON.stringify(rs);
 const SALIDA_NO = JSON.stringify({ respuestas: buenas().map((r, i) => (i === 0 ? { ...r, respuesta: 'no' } : r)) });
-const juicio = (reviewsFalsas) => corre({ STANDARD: 'standards/code.md', SALIDA: SALIDA_NO, REVIEWS_FALSAS: reviewsFalsas });
+// En la Fábrica (REPO): solo allí el juicio aplica él mismo una aprobación temprana; en un repo ajeno, test/anulacion-duenos.test.js.
+const juicio = (reviewsFalsas) => corre({ REPO, STANDARD: 'standards/code.md', SALIDA: SALIDA_NO, REVIEWS_FALSAS: reviewsFalsas });
 
-test('juicio: un no con la aprobación de Pablo sobre la cabeza publica el no y, después, el verde «override by Pablo» con los hallazgos', () => {
+test('juicio: un no con la aprobación de Pablo sobre la cabeza publica el no y, después, el verde «override by <su login>» con los hallazgos', () => {
   const { r, checks } = juicio(reviews(review()));
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(checks.map((c) => c.conclusion), ['failure', 'success'], 'el último check es el verde');
-  assert.equal(checks[1].output.title, 'override by Pablo');
+  assert.equal(checks[1].output.title, overrideTitle(OWNER_LOGIN));
   assert.match(checks[1].output.summary, new RegExp(`${OWNER_LOGIN}.*review 7.*${SHA}`));
   assert.ok(checks[1].output.summary.includes(`- ${buenas()[0].id}: no`), checks[1].output.summary);
   assert.equal(checks[1].head_sha, SHA);
@@ -88,9 +90,9 @@ test('anulación (tras una review): su aprobación sobre la cabeza convierte el 
   assert.equal(r.status, 0, r.stderr);
   assert.equal(checks.length, 1);
   assert.equal(checks[0].conclusion, 'success');
-  assert.equal(checks[0].output.title, 'override by Pablo');
+  assert.equal(checks[0].output.title, overrideTitle(OWNER_LOGIN));
   assert.match(checks[0].output.summary, /- C5: no\n- C9: sin prueba/);
-  assert.match(r.stdout, /override by Pablo/);
+  assert.ok(r.stdout.includes(overrideTitle(OWNER_LOGIN)), r.stdout);
 });
 
 for (const [nombre, rs] of [
@@ -148,8 +150,8 @@ test('anulacion.yml: workflow_run o workflow_call, sin bajar nunca el código de
   const on = doc.on ?? doc[true];
   assert.deepEqual(Object.keys(on).sort(), ['workflow_call', 'workflow_run'], 'cualquier otro evento ejecutaría el workflow tal como lo trae el PR');
   assert.deepEqual(on.workflow_run.workflows, ['senal-review']);
-  assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'el único input es el slug de su App: nada del llamador decide qué se baja');
-  assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug']);
+  assert.deepEqual(Object.keys(on.workflow_call).sort(), ['inputs', 'secrets'], 'solo inputs y secretos: nada del llamador decide qué se baja');
+  assert.deepEqual(Object.keys(on.workflow_call.inputs), ['revisor-app-slug', 'duenos'], 'el slug de su App y, opcional, sus dueños; nada del llamador decide qué código se baja');
   assert.equal(on.workflow_call.inputs['revisor-app-slug'].required, true, 'quien llama dice cuál es su App; el valor de la Fábrica no se copia aquí');
   assert.deepEqual(Object.keys(on.workflow_call.secrets).sort(), ['REVISOR_APP_KEY', 'REVISOR_CLIENT_ID'], 'el check lo publica la App del repo que llama');
   assert.doesNotMatch(texto, /head_sha|head_branch|pull_request\.head/, 'nada del PR decide qué código se baja');
@@ -177,15 +179,15 @@ test('senal-review.yml: solo despierta; sin secretos, sin permisos, sin checkout
   assert.equal((doc.on ?? doc[true]).workflow_call, null, 'workflow_call sin secretos ni inputs');
 });
 
-test('records: un check «override by Pablo» se cuenta aparte y no es un registro ilegible', () => {
+test('records: un check «override by Pablo» (el título viejo) se cuenta aparte y no es un registro ilegible', () => {
   const r = readCheckRuns([{ output: { title: 'override by Pablo', summary: 'x' } }]);
   assert.equal(r.overrides, 1);
   assert.deepEqual(r.unreadable, []);
   assert.equal(readCheckRuns([{ output: { title: 'otro' } }]).unreadable.length, 1);
 });
 
-test('aprobacionDePablo: una lista de reviews que no es una lista lanza, no cuenta como «sin reviews»', () => {
-  for (const mala of [undefined, null, {}, 'x']) assert.throws(() => aprobacionDePablo(mala, SHA), /lista/, String(mala));
+test('aprobacionDe: una lista de reviews que no es una lista lanza, no cuenta como «sin reviews»', () => {
+  for (const mala of [undefined, null, {}, 'x']) assert.throws(() => aprobacionDe(mala, SHA), /lista/, String(mala));
 });
 
 test('anulación: un check rojo sin resumen falla en alto y no publica nada', () => {
