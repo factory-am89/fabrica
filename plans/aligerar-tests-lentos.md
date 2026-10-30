@@ -88,7 +88,7 @@ Not done: no quita ningún caso ni ningún control, no cambia `cases.json` ni la
 Done:
 ```sh
 node --test --test-reporter=spec test/invariants.test.js
-# el test gana una aserción que no depende de la carga: el máximo de procesos a la vez que llegó a haber es al menos 2 (con c41d449 es siempre 1, así que rojo antes y verde después); la duración antes (26,8 s) y después va en el PR del trozo, como cifra y no como criterio
+# el test gana una aserción que no depende de la carga: el máximo de procesos a la vez que llegó a haber es al menos 2. Rojo antes: el PR enseña la salida con `SLOTS = 1` (equivale a c41d449, siempre 1 a la vez), que falla con ese mensaje; verde después; la duración antes (26,8 s) y después va en el PR del trozo, como cifra y no como criterio
 # caso malo en rojo: con un caso de cases.json que ninguna orden atrapa, o con un control roto, el test falla igual que antes y el PR enseña la salida
 ```
 
@@ -101,7 +101,7 @@ Not done: no llama a `decidir` dentro del proceso (se pierde la entrada real del
 Done:
 ```sh
 node --test --test-reporter=spec test/principal.test.js
-# el test gana la misma aserción de procesos a la vez (al menos 2; con c41d449 siempre 1, rojo antes y verde después); la duración antes (9,7 s) y después va en el PR del trozo, como cifra y no como criterio
+# el test gana la misma aserción de procesos a la vez (al menos 2). Rojo antes: el PR enseña la salida con `TOPE = 1` (equivale a c41d449), que falla con ese mensaje; verde después; la duración antes (9,7 s) y después va en el PR del trozo, como cifra y no como criterio
 # caso malo en rojo: quitar «Set-Location» de PROHIBIDOS en .claude/hooks/carpeta-principal.mjs hace fallar el test con el mensaje de la orden, antes y después
 ```
 
@@ -126,8 +126,8 @@ Existing: `git grep -n -E "NUEVE|CHICO" -- test/golden-run.test.js` (en c41d449)
 Not done: no toca `scripts/golden-run.mjs` ni la copia del juez por llamada (producción), no cambia `claude-falso.mjs`, no baja los intentos de los tests de varianza. Qué hace (opción 1 de A): el test «9 casos por 3 intentos son 27 llamadas» pasa a 3 casos por 3 intentos (9 llamadas) y comprueba el mismo producto casos x intentos, el anuncio antes de la primera llamada, el coste por llamada y el total; el del espacio de trabajo pasa de 9 a 3 llamadas. El título deja de decir «9» y «27». Se pierde que esas dos comprobaciones se hagan con seis casos más (`caso-03`, `04`, `05`, `06`, `08`, `09`) cuya diferencia con los tres que quedan es el contenido de `pr.diff` y `body.md`, que esas comprobaciones no leen. Ahorro esperado: 24 de 64 llamadas, ~16 s del fichero de 60 s (a 0,66 s la llamada; sin medir después). Lector: el propio test (`ci-test`).
 Done:
 ```sh
-node --test --test-reporter=spec --test-name-pattern="3 casos por 3 intentos son 9 llamadas" test/golden-run.test.js | grep -c "3 casos por 3 intentos son 9 llamadas"
-# con c41d449 imprime 0 (ese test no existe, rojo) y después 1 (verde); la duración del fichero antes (60,1 s, 64 llamadas) y después va en el PR del trozo, como cifra
+node --test --test-reporter=spec --test-name-pattern="3 casos por 3 intentos son 9 llamadas" test/golden-run.test.js | grep -c "✔ 3 casos por 3 intentos son 9 llamadas"
+# cuenta solo los que pasan (✔): con c41d449 imprime 0 (ese test no existe, rojo) y después 1 (verde); la duración del fichero antes (60,1 s, 64 llamadas) y después va en el PR del trozo, como cifra
 # caso malo en rojo: con GOLDEN_CLAUDE_BIN que cuenta una llamada de menos el test del producto falla
 ```
 
@@ -135,12 +135,12 @@ node --test --test-reporter=spec --test-name-pattern="3 casos por 3 intentos son
 Ola 1: 1. Ola 2: 2, 3, 4 (ficheros distintos, sin dependencia entre ellos). Ola 3: 5, cuando Pablo conteste A.
 
 ## Decisions taken
-- principio 2 | eligió: dejar las 10 rondas de `arranque-a-la-vez` y de `pull-main` («bucle de fetch»), y las 3 de «dos arranques a la vez» | descartó: bajarlas a 3, que ahorraría unos 25 s de 64 pero verían menos veces una carrera que falló 26 de 30 arranques con `git pull` (comentario de `test/pull-main.test.js:155`, 23 oct 2026) | motivo: decidido
+- principio 5 | eligió: dejar las 10 rondas de `arranque-a-la-vez` y de `pull-main` («bucle de fetch»), y las 3 de «dos arranques a la vez» | descartó: bajarlas a 3, que ahorraría unos 25 s de 64 pero verían menos veces una carrera que falló 26 de 30 arranques con `git pull` (comentario de `test/pull-main.test.js:155`, 23 oct 2026) | motivo: decidido
 - principio 5 | eligió: lanzar a la vez las órdenes del hook y de los casos de `invariants` | descartó: llamar a `decidir` y a las funciones de cada script dentro del proceso del test, que es más rápido pero deja de probar la entrada real que lanza Claude y CI | motivo: decidido
-- principio 2 | eligió: en el trozo 4 cambiar solo el montaje del mundo y dejar los `push` del código bajo prueba | descartó: sustituir también esos, que dejaría de probar el borrado real de ramas remotas | motivo: decidido
+- principio 5 | eligió: en el trozo 4 cambiar solo el montaje del mundo y dejar los `push` del código bajo prueba | descartó: sustituir también esos, que dejaría de probar el borrado real de ramas remotas | motivo: decidido
 - principio 2 | eligió: el montaje del trozo 4 enlaza los objetos con `objects/info/alternates` y escribe las ramas con `update-ref` | descartó: copiar con `cpSync` un remoto plantilla ya montado, que no se midió y se elegiría por intuición, sin la cifra de antes y de después que sí tienen `update-ref` (26 a 34 ms) y `push` (186 a 430 ms) | motivo: decidido
 - principio 2 | eligió: el número de copias (`SLOTS`) y el tope de procesos (`TOPE`) son constantes con nombre fijadas al medir en el PR de cada trozo | descartó: derivarlos de `os.availableParallelism()`, que da otro valor en CI que en el PC de Pablo y hace que la cifra no se reproduzca | motivo: decidido
-- principio 2 | eligió: no mover ningún test a un grupo «lento» que no corra en local | descartó: un grupo aparte para `golden-run` e `invariants`, que quita de la vista de cada PR lo que el revisor de CI sí corre | motivo: decidido
+- principio 5 | eligió: no mover ningún test a un grupo «lento» que no corra en local | descartó: un grupo aparte para `golden-run` e `invariants`, que quita de la vista de cada PR lo que el revisor de CI sí corre | motivo: decidido
 
 ## Decisions for Pablo
 
