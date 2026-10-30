@@ -220,3 +220,53 @@ test('settings: un settings.json mal formado en usuario/ hace salir a instalar c
   assert.match(r.stderr, /permissions\.allow debe ser una lista/);
   assert.equal(readFileSync(ajustes(home), 'utf8'), antes);
 });
+
+// --- un fichero que no instaló la Fábrica (sin huella) no se pisa ---
+
+test('ajeno: un CLAUDE.md propio sin huella no se escribe; instalar sale con 1 y lo nombra', () => {
+  const home = nuevoHome();
+  mkdirSync(claude(home), { recursive: true });
+  writeFileSync(claude(home, 'CLAUDE.md'), '# mío, de antes\n');
+  const r = pc(home, 'instalar');
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /CLAUDE\.md/);
+  assert.match(r.stderr, /--reemplazar/);
+  assert.equal(readFileSync(claude(home, 'CLAUDE.md'), 'utf8'), '# mío, de antes\n');
+  assert.equal(existsSync(claude(home, HUELLA)), false);
+  assert.equal(existsSync(claude(home, 'CLAUDE.md.antes-de-fabrica')), false);
+  assert.deepEqual(comprobar({ home, origen: SOLO_CLAUDE }).map((c) => `${c.fichero} ${c.estado}`), ['CLAUDE.md ajeno']);
+});
+
+test('ajeno: un ajeno frena también lo demás (no se escribe NADA)', () => {
+  const home = nuevoHome();
+  const origen = mkdtempSync(path.join(tmpdir(), 'origen-ajeno-'));
+  writeFileSync(path.join(origen, 'a.md'), 'a\n');
+  writeFileSync(path.join(origen, 'b.md'), 'b\n');
+  mkdirSync(claude(home), { recursive: true });
+  writeFileSync(claude(home, 'b.md'), 'propio\n');
+  assert.throws(() => instalar({ home, origen }), /b\.md/);
+  assert.equal(existsSync(claude(home, 'a.md')), false);
+});
+
+test('ajeno: --reemplazar guarda antes una copia .antes-de-fabrica y luego instala', () => {
+  const home = nuevoHome();
+  mkdirSync(claude(home), { recursive: true });
+  writeFileSync(claude(home, 'CLAUDE.md'), '# mío, de antes\n');
+  const r = spawnSync('node', [SCRIPT, 'instalar', '--reemplazar'], {
+    env: { ...process.env, FABRICA_HOME: home, FABRICA_USUARIO: SOLO_CLAUDE },
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /CLAUDE\.md \(ajeno\)/);
+  assert.equal(readFileSync(claude(home, 'CLAUDE.md.antes-de-fabrica'), 'utf8'), '# mío, de antes\n');
+  assert.equal(readFileSync(claude(home, 'CLAUDE.md'), 'utf8'), readFileSync(path.join(ORIGEN, 'CLAUDE.md'), 'utf8'));
+  assert.equal(pc(home, 'comprobar').status, 0);
+});
+
+test('ajeno: con --reemplazar, un fichero editado tras instalar se sobrescribe sin copia (ya era de la Fábrica)', () => {
+  const home = nuevoHome();
+  pc(home, 'instalar');
+  writeFileSync(claude(home, 'CLAUDE.md'), 'a mano\n');
+  instalar({ home, origen: SOLO_CLAUDE, reemplazar: true });
+  assert.equal(existsSync(claude(home, 'CLAUDE.md.antes-de-fabrica')), false);
+});
