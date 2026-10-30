@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { ORIGEN, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
+import { CLAVE_PERSONA, ORIGEN, confirmarEnTerminal, instalar } from '../scripts/install-pc.mjs';
 import { ampliaciones } from '../scripts/lib/settings-widening.mjs';
 import { huecos, rellenar } from '../scripts/lib/template.mjs';
 import { FUENTE, PRECARGA } from '../scripts/sin-emsign.mjs';
@@ -62,7 +62,7 @@ test('toda clave de la plantilla rellena está en la lista cerrada o la miran la
 test('instalar con valores de prueba escribe CLAUDE.md, settings.json relleno, hooks/, la precarga tls/ y la huella, y no los motivos', () => {
   const home = mkdtempSync(path.join(tmpdir(), 'install-pc-'));
   const confirmar = confirmarEnTerminal({ tty: true, leerLinea: () => 'AMPLIAR', escribir: () => {} });
-  instalar({ home, valores: { ...VALORES_PRUEBA, persona: 'pabloam89' }, confirmar });
+  instalar({ home, valores: { ...VALORES_PRUEBA, [CLAVE_PERSONA]: 'pabloam89' }, confirmar });
   assert.deepEqual(readdirSync(path.join(home, '.claude')).sort(), ['CLAUDE.md', 'fabrica-huella.json', 'hooks', 'settings.json', 'tls']);
   assert.equal(readFileSync(PRECARGA(home), 'utf8'), readFileSync(FUENTE, 'utf8')); // donde sin-emsign la busca
   const instalado = readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8');
