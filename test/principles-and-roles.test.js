@@ -63,6 +63,25 @@ test('el principio 6 conserva las obligaciones del viejo: no adivinar, no interr
   }
 });
 
+// Quién contesta el residuo (decisión B1 del 2026-10-29, plans/puente-2-alvaro.md, trozo 5): el principio 6 dice «el dueño»,
+// standards/intervention.md dice quién es en cada repo, y los dos apuntan a la capa personal que existe, no a una sección
+// de usuario/CLAUDE.md que el trozo 4 movió a usuario/personas/.
+test('el residuo lo contesta el dueño de cada repo y los punteros van a la capa personal, que existe', () => {
+  const claude = leer('CLAUDE.md');
+  const intervencion = leer('standards/intervention.md');
+  for (const [nombre, texto] of [['CLAUDE.md', claude], ['standards/intervention.md', intervencion]]) {
+    assert.ok(!texto.includes('Cómo responder a Pablo'), `${nombre} aún apunta a «Cómo responder a Pablo» en usuario/CLAUDE.md`);
+    assert.ok(texto.includes('usuario/personas/<login>.md'), `${nombre} no apunta a la capa personal`);
+  }
+  assert.ok(leer('usuario/personas/pabloam89.md').includes('Cómo responder a Pablo'), 'la capa personal de Pablo perdió cómo responderle');
+  assert.ok(principio(claude, 6).includes('al dueño'), 'el principio 6 aún pregunta solo a Pablo');
+  const quien = intervencion.split(/^## /m).find((s) => s.startsWith('Who answers'));
+  assert.ok(quien, 'standards/intervention.md sin la sección «Who answers»');
+  for (const frase of ['factory-am89/fabrica', 'only Pablo', 'pabloam89/MenuPlan', 'algbarc-design', 'GitHub admin', '2026-10-29']) {
+    assert.ok(quien.includes(frase), `«Who answers» no dice ${frase}`);
+  }
+});
+
 test('los dos roles tienen su modelo y el revisor no escribe', () => {
   const modelos = { constructor: 'opus', revisor: 'opus' };
   for (const [rol, modelo] of Object.entries(modelos)) {
