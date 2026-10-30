@@ -21,7 +21,7 @@ test('hora: en invierno (CET, UTC+1) es una hora más que UTC', () => {
 test('hora: el paso del arranque imprime la hora de Madrid con el reloj inyectado', () => {
   const lineas = [];
   assert.equal(arrancar([pasoHora(() => new Date('2026-10-16T09:05:00Z'))], (l) => lineas.push(l)), 0);
-  assert.deepEqual(lineas, ['Hora local de Pablo (Madrid): 16/10/2026, 11:05:00']);
+  assert.deepEqual(lineas, ['Hora local (Madrid): 16/10/2026, 11:05:00']);
 });
 
 test('hora: PASOS la incluye y package.json tiene `npm run hora`', () => {
@@ -33,5 +33,5 @@ test('hora: PASOS la incluye y package.json tiene `npm run hora`', () => {
 test('hora: lanzado de verdad imprime una sola línea con la hora de Madrid y sale 0', () => {
   const r = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /^Hora local de Pablo \(Madrid\): \d+\/\d+\/\d{4}, \d{1,2}:\d{2}:\d{2}\r?\n$/);
+  assert.match(r.stdout, /^Hora local \(Madrid\): \d+\/\d+\/\d{4}, \d{1,2}:\d{2}:\d{2}\r?\n$/);
 });
