@@ -5,13 +5,15 @@
 // with no C16 in code.md (TRIGGER_PLAN_NO_BRIDGE) has its own case; that the judge then answers C16 is for the pass of the corpus, not here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { CHECKED_BY } from '../scripts/lib/questions.mjs';
 import { LESSONS_DIR, SIGNAL_MACHINE, SIGNAL_NONE } from '../scripts/lib/lessons.mjs';
 import { PLAN_BRIDGE_QUESTION, TRIGGER, TRIGGERS, TRIGGER_FAULTS, triggerFaults, triggerOf } from '../scripts/lib/triggers.mjs';
 import {
-  CORPUS_WORKFLOW, JUDGE_EVENT, JUDGE_WORKFLOW, NODE_TEST_SCRIPT, NPM_TEST, PR_EVENT, SCHEDULE_EVENT, STANDARD_VARIABLE, TESTS_WORKFLOW, WORKFLOWS_DIR,
+  CORPUS_WORKFLOW, JUDGE_EVENT, JUDGE_WORKFLOW, NODE_TEST_SCRIPT, NPM_TEST, PR_EVENT, SCHEDULE_EVENT, STANDARD_VARIABLE, TEST_CONCURRENCY_FLAG, TESTS_WORKFLOW, WORKFLOWS_DIR,
+  testConcurrency,
 } from '../scripts/lib/wiring.mjs';
 import { CODE, PLAN, at, codes, lesson, question, repo, tests, workflow } from './apoyo/triggers-repo.mjs';
 
@@ -136,6 +138,23 @@ test('TRIGGER_NO_NODE_TEST: the test script is not node --test (and the machine 
   assert.deepEqual(at(root, TRIGGER_FAULTS.TRIGGER_READER_UNFIRED).sort(), ['C1', 'P1'], 'only the machine questions, not C2 or P2');
   assert.deepEqual(at(root, TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST), ['package.json']);
   assert.deepEqual(codes(repo(t, { 'package.json': JSON.stringify({ scripts: {} }) })).slice(0, 1), [TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST]);
+});
+
+test('TRIGGER_NO_NODE_TEST: a concurrency cap keeps node --test wired; anything else after it does not', (t) => {
+  const script = (s) => repo(t, { 'package.json': JSON.stringify({ scripts: { test: s } }) });
+  assert.deepEqual(codes(script(`${NODE_TEST_SCRIPT} ${TEST_CONCURRENCY_FLAG}=4`)), [], 'the cap only changes how many files run together');
+  for (const bad of [`${TEST_CONCURRENCY_FLAG}=0`, `${TEST_CONCURRENCY_FLAG}=x`, `${TEST_CONCURRENCY_FLAG}=4 test/a.test.js`, `${TEST_CONCURRENCY_FLAG} 4`, 'test/a.test.js']) {
+    assert.deepEqual(at(script(`${NODE_TEST_SCRIPT} ${bad}`), TRIGGER_FAULTS.TRIGGER_NO_NODE_TEST), ['package.json'], bad);
+  }
+  assert.equal(testConcurrency(`${NODE_TEST_SCRIPT} ${TEST_CONCURRENCY_FLAG}=12`), 12);
+  assert.equal(testConcurrency(NODE_TEST_SCRIPT), null);
+  assert.equal(testConcurrency(undefined), null);
+});
+
+test('the real package.json caps the suite: npm test, npm run done and npm run evidence never run every file at once', () => {
+  const pkg = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+  const cap = testConcurrency(pkg.scripts.test);
+  assert.ok(Number.isInteger(cap) && cap >= 1, `package.json test is ${JSON.stringify(pkg.scripts.test)}: it needs ${TEST_CONCURRENCY_FLAG}=<n> (why: scripts/lib/turno.mjs)`);
 });
 
 test('TRIGGER_NO_NPM_TEST: no step runs npm test (a line that only mentions it does not count)', (t) => {

@@ -14,7 +14,15 @@ export const rutaDeCandadoDone = (casa = homedir) => join(casa(), '.fabrica', 'd
 // Peak private memory of the whole process tree of one suite (`npm run lint` + `npm test`), the highest of 3 runs measured
 // 21 oct 2026 on the 16 GB machine (private: 1.70, 1.48, 1.42 GiB; working set, which counts shared pages twice: 2.02, 1.90,
 // 1.86 GiB; the fall of free memory during a run was 0.51, 1.11, 0.88 GiB). Re-measure if the suite grows.
+// That peak was with every test file the machine allows at once (node's default, cores - 1 = 11 here).
 export const PICO_SUITE_BYTES = 1.7 * 1024 ** 3;
+// How many test files run at once: the `--test-concurrency` of the `test` script in package.json (the only place of the
+// number; npm test, npm run done, npm run evidence and CI all go through it, and test/triggers.test.js fails without it).
+// Why: on 30 oct 2026 Claude Code killed `npm run done` and `npm run evidence` twice for memory pressure, with 3.4 GB free.
+// Measured that day on this machine, `node --test` alone, private memory of its whole process tree sampled every 1.5 s:
+// default 11 at once -> peak 1.29 GiB (37 processes), 336 s; 6 -> 0.80 GiB (23), 363 s; 4 -> 0.62 GiB (16), 443 s, with
+// another session loading the machine at the end (a run with free memory only, without the tree: 259 s at 11, 314 s at 4).
+// 4 halves the peak for about one to two more minutes. On CI (4 cores, default 3) it changes nothing that matters.
 // Safety factor over that peak: the suite grows, other programs move while it runs, and 3 runs are a small sample.
 export const MARGEN_UMBRAL = 1.25;
 // Free memory below which the suite does not start: the measured peak times the margin (about 2.1 GiB). The lock already

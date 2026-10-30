@@ -23,7 +23,7 @@ function defaults(key) {
   if (key === 'git rev-parse --short HEAD') return 'aaaaaaa\n';
   if (key === `git rev-parse --short ${MERGE_BASE}`) return 'bbbbbbb\n';
   if (key === 'npm run lint') return '> lint\n> eslint .\n';
-  if (key.startsWith('node --test --test-reporter=spec')) return SPEC;
+  if (key.startsWith('npm test -- --test-reporter=spec')) return SPEC;
   if (key === 'git diff --shortstat origin/main...HEAD') return ' 1 file changed, 1 insertion(+)\n';
   return undefined;
 }
@@ -51,28 +51,28 @@ test('block format: header SHAs come from git, one fenced block per command, in 
   assert.match(markdown, /^## Evidence\n/);
   assert.ok(markdown.includes('HEAD aaaaaaa; merge-base with origin/main bbbbbbb.'));
   assert.deepEqual(commandsIn(markdown), [
-    'npm run lint', 'node --test --test-reporter=spec', 'git diff --shortstat origin/main...HEAD',
+    'npm run lint', 'npm test -- --test-reporter=spec', 'git diff --shortstat origin/main...HEAD',
   ]);
   assert.equal([...markdown.matchAll(/^\(exit 0\)$/gm)].length, 3);
   assert.equal([...markdown.matchAll(/^```$/gm)].length, 6);
   assert.ok(markdown.includes('> eslint .'));
 });
 
-test('focus files get one node --test block each, after the full suite', () => {
+test('focus files get one npm test block each, after the full suite', () => {
   const { markdown } = collect(fakeRunner(), ['test/one.test.js', 'test/two.test.js']);
   assert.deepEqual(commandsIn(markdown), [
-    'npm run lint', 'node --test --test-reporter=spec',
-    'node --test --test-reporter=spec test/one.test.js', 'node --test --test-reporter=spec test/two.test.js',
+    'npm run lint', 'npm test -- --test-reporter=spec',
+    'npm test -- --test-reporter=spec test/one.test.js', 'npm test -- --test-reporter=spec test/two.test.js',
     'git diff --shortstat origin/main...HEAD',
   ]);
 });
 
-test('the spec reporter is pinned on every node --test command', () => {
+test('the tests go through npm test (package.json options) with the spec reporter pinned on every run', () => {
   const runner = fakeRunner();
   collect(runner, ['test/one.test.js']);
-  const testCalls = runner.calls.filter((c) => c.startsWith('node --test'));
+  const testCalls = runner.calls.filter((c) => c.startsWith('npm test'));
   assert.equal(testCalls.length, 2);
-  for (const c of testCalls) assert.match(c, /^node --test --test-reporter=spec( |$)/);
+  for (const c of testCalls) assert.match(c, /^npm test -- --test-reporter=spec( |$)/);
 });
 
 test('header states the filter, and the filter keeps only counters and failure lines', () => {
@@ -119,7 +119,7 @@ test('a non-zero command is reported with its exit code, later commands still ru
 });
 
 test('a failing focus file shows the failure line and the counters', () => {
-  const key = 'node --test --test-reporter=spec test/bad.test.js';
+  const key = 'npm test -- --test-reporter=spec test/bad.test.js';
   const runner = fakeRunner({ [key]: { code: 1, output: '✖ f (2.5ms)\nℹ tests 1\nℹ pass 0\nℹ fail 1\n✖ failing tests:\n' } });
   const { markdown, failed } = collect(runner, ['test/bad.test.js']);
   assert.equal(failed, true);
@@ -130,11 +130,11 @@ test('a failing focus file shows the failure line and the counters', () => {
 
 test('node --test output without an "ℹ tests" line (TAP, empty) is an error, not an empty block', () => {
   const tap = 'TAP version 13\n# Subtest: x\nok 1 - x\n1..1\n# tests 1\n# pass 1\n# fail 0\n';
-  assert.throws(() => collect(fakeRunner({ 'node --test --test-reporter=spec': tap })), (e) => e instanceof EvidenceError && /no "ℹ tests" line/.test(e.message));
-  assert.throws(() => collect(fakeRunner({ 'node --test --test-reporter=spec': '' })), /no "ℹ tests" line/);
-  const focusTap = fakeRunner({ 'node --test --test-reporter=spec test/a.test.js': tap });
+  assert.throws(() => collect(fakeRunner({ 'npm test -- --test-reporter=spec': tap })), (e) => e instanceof EvidenceError && /no "ℹ tests" line/.test(e.message));
+  assert.throws(() => collect(fakeRunner({ 'npm test -- --test-reporter=spec': '' })), /no "ℹ tests" line/);
+  const focusTap = fakeRunner({ 'npm test -- --test-reporter=spec test/a.test.js': tap });
   assert.throws(() => collect(focusTap, ['test/a.test.js']), /test\/a\.test\.js printed no "ℹ tests" line/);
-  assert.doesNotThrow(() => collect(fakeRunner({ 'node --test --test-reporter=spec': SPEC })));
+  assert.doesNotThrow(() => collect(fakeRunner({ 'npm test -- --test-reporter=spec': SPEC })));
 });
 
 test('a command that cannot start is an error, not a block', () => {
@@ -246,7 +246,8 @@ test('end to end: a real repo with a real lint script and a real test file', (t)
     return r.stdout.trim();
   };
   git('init', '-q', '-b', 'main');
-  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'fake', scripts: { lint: 'node -e "console.log(\'lint-marker\')"' } }));
+  // The test script carries a cap like the real one: the suite runs through it, and the reporter still reaches node.
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'fake', scripts: { lint: 'node -e "console.log(\'lint-marker\')"', test: 'node --test --test-concurrency=1' } }));
   git('add', '.');
   git('commit', '-q', '-m', 'base');
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');

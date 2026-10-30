@@ -27,7 +27,7 @@
     "done": "node scripts/done.mjs",
     "audit": "node scripts/audit.mjs",
     "lint": "eslint . --max-warnings 0",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=4"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
