@@ -73,6 +73,12 @@ test('los dos roles tienen su modelo y el revisor no escribe', () => {
   }
 });
 
+test('el constructor empieza en esfuerzo medio y sube a alto solo tras un no del revisor', () => {
+  const texto = leer('.claude/agents/constructor.md');
+  assert.match(texto.split('---')[1], /^effort: medium$/m);
+  assert.ok(texto.includes('effort: high'), 'constructor.md no dice cómo escalar el arreglo a esfuerzo alto');
+});
+
 test('el constructor planifica primero y parte por tamaño: un trozo lo construye él, más de uno abre el plan y para', () => {
   const texto = leer('.claude/agents/constructor.md');
   for (const frase of ['standards/plan.md', 'scripts/check-plan.mjs', 'Con un trozo', 'Con más de un trozo', 'plans/', 'una sesión nueva', 'se resume']) {
