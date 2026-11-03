@@ -3,7 +3,7 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MOTIVO, readPrevious } from './lib/ronda.mjs';
+import { MOTIVO, ROUND_FILE, readPrevious } from './lib/ronda.mjs';
 import { buscarRonda } from './veredicto.mjs';
 
 // El paso `ronda` de juzgar (revisor.yml), antes de Claude, con el token de solo lectura del workflow y ningún token de la App: deja para Claude
@@ -20,8 +20,8 @@ export async function preparaRonda({ REPO, PR, SHA, BASE, ANTES, LECTOR, RUNNER_
   }
   const linea = JSON.stringify(hallada.anterior);
   readPrevious(linea);
-  writeFileSync(path.join(RUNNER_TEMP, 'anterior.json'), `${linea}\n`);
-  writeFileSync(path.join(RUNNER_TEMP, 'incremental.diff'), hallada.diff);
+  writeFileSync(path.join(RUNNER_TEMP, ROUND_FILE.previous), `${linea}\n`);
+  writeFileSync(path.join(RUNNER_TEMP, ROUND_FILE.incremental), hallada.diff);
   appendFileSync(GITHUB_OUTPUT, `anterior=${linea}\n`);
   console.log(hallada.anterior.ronda === 1 ? `ronda 1: ${hallada.anterior.motivo}` : `ronda ${hallada.anterior.ronda}: veredicto anterior sobre ${hallada.anterior.sha}; tocados: ${hallada.anterior.tocados.length}`);
 }

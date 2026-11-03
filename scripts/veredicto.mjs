@@ -302,7 +302,8 @@ async function revisoresDeLaApp(repo, sha, token) {
 // Lo que va delante del registro en output.text: la ronda y, si los hay, los avisos con su prueba (ya limpia: cleanProof). Cada prueba va
 // entre comillas invertidas, sin ninguna dentro: se ve como texto y no puede meter HTML, un enlace ni un «aprobado» falso.
 // Sin memoria (un registro de error), nada.
-const comoCodigo = (s) => `\`${String(s ?? '').replaceAll('`', "'")}\``;
+const COMILLA = String.fromCharCode(96);
+const comoCodigo = (s) => COMILLA + String(s ?? '').replaceAll(COMILLA, "'") + COMILLA;
 export function textoDeRonda(registro, anterior) {
   if (!('ronda' in registro)) return '';
   const cabecera = registro.ronda === 1 ? `Ronda 1${anterior?.motivo ? `: ${anterior.motivo}` : ''}.` : `Ronda ${registro.ronda}, sobre el veredicto anterior de ${registro.anterior}.`;

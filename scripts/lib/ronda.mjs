@@ -12,6 +12,9 @@ export const MOTIVO = {
   unreadable: 'no se pudo leer el veredicto anterior',
 };
 export const MOTIVOS = Object.values(MOTIVO);
+// The two files the ronda step of revisor.yml leaves for the judge in $RUNNER_TEMP (scripts/preparar-ronda.mjs), named in the
+// workflow's prompt; scripts/golden-run.mjs lays the same two, as a round 1, in each case's workspace.
+export const ROUND_FILE = Object.freeze({ previous: 'anterior.json', incremental: 'incremental.diff' });
 const SHA = /^[0-9a-f]{40}$/;
 const NULL_SHA = /^0{40}$/;
 const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
