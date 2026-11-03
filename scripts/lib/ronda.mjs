@@ -95,21 +95,22 @@ export function readPrevious(text) {
   if (!plain(x.answers) || !Object.values(x.answers).every((a) => a === null || ANSWERS.includes(a))) throw new Error('ronda: bad answers');
   if (!plain(x.pruebas) || !Object.values(x.pruebas).every((p) => typeof p === 'string')) throw new Error('ronda: bad pruebas');
   if (!Array.isArray(x.tocados) || !x.tocados.every((t) => typeof t === 'string')) throw new Error('ronda: bad tocados');
-  return { ronda: x.ronda, sha: x.sha, answers: x.answers, pruebas: x.pruebas, tocados: x.tocados };
+  if (!Array.isArray(x.ficheros) || !x.ficheros.every((t) => typeof t === 'string')) throw new Error('ronda: bad ficheros');
+  return { ronda: x.ronda, sha: x.sha, answers: x.answers, pruebas: x.pruebas, tocados: x.tocados, ficheros: x.ficheros };
 }
 
 // One question in a round 2+. previous: the round it read (readPrevious); r: the model's answer, already known to be a «no».
 // Returns { kind: 'no' } (fails as in round 1), { kind: 'grave', grave } (fails, marked) or { kind: 'aviso', answer } (does not fail;
 // the answer kept is the previous one).
 // It is a plain «no» when the question was no before, when the new code touches a file its old proof cited, or when the new finding
-// is about new code: its proof cites a touched file, or cites no file at all (then nobody can tell it is about code already judged).
-// Without that last rule a PR could open with something trivial, get its round 1, and push the real code to be judged only for graves.
+// is about new code: its proof cites a touched file, or cites no file of the PR at all (then nobody can tell it is about code already
+// judged). Only files of the PR (previous.ficheros) count as cited: «res.json» or «standards/code.md» are not a file the PR changed.
+// Without that rule a PR could open with something trivial, get its round 1, and push the real code to be judged only for graves.
 export function newFinding(id, r, previous) {
   const before = previous?.answers?.[id];
   const wasFine = before === ANSWER.yes || before === ANSWER.notApplicable;
   if (!previous || previous.ronda < 2 || !wasFine || citesTouched(previous.pruebas?.[id], previous.tocados)) return { kind: 'no' };
-  const nuevaCita = citedPaths(r?.prueba);
-  if (nuevaCita.length === 0 || citesTouched(r?.prueba, previous.tocados)) return { kind: 'no' };
+  if (!citesTouched(r?.prueba, previous.ficheros ?? []) || citesTouched(r?.prueba, previous.tocados)) return { kind: 'no' };
   if (GRAVES.includes(r?.grave)) return { kind: 'grave', grave: r.grave, located: /\S+:\d+/.test(String(r.prueba ?? '')) };
   return { kind: 'aviso', answer: before };
 }

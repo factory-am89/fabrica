@@ -22,6 +22,7 @@ const ronda2 = (extra = {}) => ({
   answers: { ...Object.fromEntries(ids.map((id) => [id, 'sí'])), [A]: 'no' },
   pruebas: Object.fromEntries(ids.map((id) => [id, `scripts/x.mjs:${id.slice(1)}`])),
   tocados: [],
+  ficheros: ['a.mjs', 'apps/web/nuevo.ts', 'db.mjs', 'scripts/x.mjs'],
   ...extra,
 });
 const con = (cambios) => buenas().map((r) => ({ ...r, ...(cambios[r.id] ?? {}) }));
@@ -80,6 +81,10 @@ test('ronda 2: una pega nueva sobre código nuevo (su prueba cita un fichero toc
   assert.deepEqual(sobreNuevo.fallos, [`${B}: no`]);
   const sinFichero = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'falta una decisión' } }), ctx({ anterior }));
   assert.deepEqual(sinFichero.fallos, [`${B}: no`]);
+  // Security review: a word with a dot is not a file. Only files of the PR count as cited.
+  for (const prueba of ['falta comprobar res.ok antes de res.json() en el código nuevo', 'incumple standards/code.md:40']) {
+    assert.deepEqual(juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba } }), ctx({ anterior })).fallos, [`${B}: no`], prueba);
+  }
 });
 
 test('ronda 2: una pregunta sin respuesta anterior (nueva en el estándar) se juzga como en la ronda 1', () => {
@@ -99,7 +104,7 @@ test('citesTouched: casa la ruta citada, con o sin carpetas, con letras como la 
 test('readPrevious: la ronda 1 lleva un motivo cerrado; la 2+ su sha, respuestas, pruebas y tocados; lo demás lanza', () => {
   assert.deepEqual(readPrevious(JSON.stringify({ ronda: 1, motivo: MOTIVO.old })), { ronda: 1, motivo: MOTIVO.old });
   assert.deepEqual(readPrevious(JSON.stringify(ronda2())), ronda2());
-  for (const malo of ['{', '{"ronda":1}', '{"ronda":1,"motivo":"lo que diga el PR"}', JSON.stringify(ronda2({ sha: 'x' })), JSON.stringify(ronda2({ answers: { C5: 'quizá' } })), JSON.stringify(ronda2({ tocados: 'x' }))]) {
+  for (const malo of ['{', '{"ronda":1}', '{"ronda":1,"motivo":"lo que diga el PR"}', JSON.stringify(ronda2({ sha: 'x' })), JSON.stringify(ronda2({ answers: { C5: 'quizá' } })), JSON.stringify(ronda2({ tocados: 'x' })), JSON.stringify(ronda2({ ficheros: undefined }))]) {
     assert.throws(() => readPrevious(malo), undefined, malo);
   }
 });
@@ -156,6 +161,13 @@ test('registro: la memoria va entera o no va; las pruebas, limpias; las graves, 
   assert.equal(cleanProof(`${'Q'.repeat(60)}.tsx`), '[quitado].tsx', 'sin carpetas no es una ruta');
   const prueba = 'mira <!-- [ok](http://x) a.mjs:1';
   assert.equal(cleanProof(cleanProof(prueba)), cleanProof(prueba));
+  // Security review: a cut right before the «.» of a long path left a proof a second pass would change; the record rejects those.
+  const cortada = `${'x '.repeat(270)}${'apps/menuplan-web/src/components/recipe-editor/'}RecipeEditor.tsx:1`;
+  assert.equal(cleanProof(cleanProof(cortada)), cleanProof(cortada));
+  for (let n = 500; n < 620; n += 1) {
+    const t = `${'y'.repeat(n)} apps/menuplan-web/src/components/recipe-editor/RecipeEditor.tsx:1`;
+    assert.equal(cleanProof(cleanProof(t)), cleanProof(t), String(n));
+  }
 });
 
 // buscarRonda with the GitHub API faked in-process: check-runs per sha, the PR's commits, the compares and the incremental diff.
@@ -204,7 +216,7 @@ test('buscarRonda: con un veredicto anterior, la ronda siguiente, sus respuestas
   };
   const diff = 'diff --git a/b.mjs b/b.mjs\n+arreglo\ndiff --git a/de-la-base.mjs b/de-la-base.mjs\n+main\n';
   const { r, pedidas } = await conGitHubFalsa({ checks: { [ANTES]: [checkCon(5, registro())] }, commits: [ANTES, SHA], files, diff }, busca);
-  assert.deepEqual(r.anterior, { ronda: 2, sha: ANTES, answers: { C5: 'no' }, pruebas: { C5: 'a.mjs:1' }, tocados: ['b.mjs'] });
+  assert.deepEqual(r.anterior, { ronda: 2, sha: ANTES, answers: { C5: 'no' }, pruebas: { C5: 'a.mjs:1' }, tocados: ['b.mjs'], ficheros: ['a.mjs', 'b.mjs'] });
   assert.equal(r.diff, 'diff --git a/b.mjs b/b.mjs\n+arreglo\n');
   assert.deepEqual(readPrevious(JSON.stringify(r.anterior)), r.anterior);
   assert.ok(pedidas.includes(`/repos/o/r/compare/${ANTES}...${SHA} (diff)`));
@@ -219,7 +231,7 @@ test('buscarRonda: un veredicto en un commit que no es la cabeza ni la de antes 
 });
 
 test('buscarRonda: el cuerpo editado (misma cabeza) es ronda 2 sin tocados ni diff', async () => {
-  const { r } = await conGitHubFalsa({ checks: { [SHA]: [checkCon(5, registro({ sha: SHA }))] }, commits: [SHA] }, busca);
+  const { r } = await conGitHubFalsa({ checks: { [SHA]: [checkCon(5, registro({ sha: SHA }))] }, commits: [SHA], files: { [SHA]: [{ filename: 'a.mjs', status: 'modified', sha: '1' }] } }, busca);
   assert.deepEqual({ ronda: r.anterior.ronda, tocados: r.anterior.tocados, diff: r.diff }, { ronda: 2, tocados: [], diff: '' });
 });
 

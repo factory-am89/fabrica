@@ -251,10 +251,14 @@ export async function buscarRonda({ repo, pr, sha, base, antes, token }) {
   if (!hasMemory(registro)) return { anterior: { ronda: 1, motivo: MOTIVO.old }, diff: '' };
   let tocados = [];
   let diff = '';
+  // Los ficheros del PR de ahora: solo una ruta de esta lista cuenta como fichero citado por una prueba (newFinding).
+  const ahora = await ficherosDelCompare(repo, base, sha, token);
+  // Con 300 ficheros el compare puede venir cortado y no se sabría qué cambió: se juzga como ronda 1.
+  if (ahora.length >= COMPARE_FILE_LIMIT) throw new Error(`el compare llega a ${COMPARE_FILE_LIMIT} ficheros`);
+  const ficheros = [...new Set(ahora.flatMap((f) => [f.filename, f.previous_filename].filter((n) => typeof n === 'string')))].sort();
   if (registro.sha !== sha) {
-    const [antes_, ahora] = await Promise.all([ficherosDelCompare(repo, base, registro.sha, token), ficherosDelCompare(repo, base, sha, token)]);
-    // Con 300 ficheros el compare puede venir cortado y no se sabría qué cambió: se juzga como ronda 1.
-    if (Math.max(antes_.length, ahora.length) >= COMPARE_FILE_LIMIT) throw new Error(`el compare llega a ${COMPARE_FILE_LIMIT} ficheros`);
+    const antes_ = await ficherosDelCompare(repo, base, registro.sha, token);
+    if (antes_.length >= COMPARE_FILE_LIMIT) throw new Error(`el compare llega a ${COMPARE_FILE_LIMIT} ficheros`);
     tocados = touchedFiles(antes_, ahora);
     if (tocados.length) {
       const res = await leerApi(token, `/repos/${repo}/compare/${registro.sha}...${sha}`, 'application/vnd.github.diff');
@@ -262,7 +266,7 @@ export async function buscarRonda({ repo, pr, sha, base, antes, token }) {
       diff = filterDiff(await res.text(), tocados);
     }
   }
-  return { anterior: { ronda: registro.ronda + 1, sha: registro.sha, answers: registro.answers, pruebas: registro.pruebas, tocados }, diff };
+  return { anterior: { ronda: registro.ronda + 1, sha: registro.sha, answers: registro.answers, pruebas: registro.pruebas, tocados, ficheros }, diff };
 }
 
 const publicarCheck = (repo, sha, token, conclusion, output) =>

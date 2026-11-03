@@ -43,11 +43,22 @@ const LONG_RUN = /[A-Za-z0-9+/=_-]{48,}/g;
 const isPath = (run, next) => next === '.' && run.includes('/') && !/[+=]/.test(run) && run.split('/').every((s) => s.length <= 40);
 export const REDACTED = '[quitado]';
 // The proof as it may travel in a check: one line, no backtick fence (a ``` would break the one-json-block rule), no secret shape, capped.
-export function cleanProof(text) {
+// One pass can leave something a second pass would change (the cut can drop the «.» that made a long run a path), and a record only
+// holds proofs that a pass leaves as they are: so it repeats until nothing changes. Each pass only shortens or redacts, so it ends fast.
+function cleanOnce(text) {
   let t = String(text ?? '').replace(/\s+/g, ' ').replace(/`{3,}/g, "'").trim();
   for (const re of SECRET_SHAPES) t = t.replace(re, REDACTED);
   t = t.replace(LONG_RUN, (run, at, all) => (isPath(run, all[at + run.length]) ? run : REDACTED));
   return t.length > MAX_PROOF ? `${t.slice(0, MAX_PROOF - 1)}…` : t;
+}
+export function cleanProof(text) {
+  let t = cleanOnce(text);
+  for (let i = 0; i < 10; i += 1) {
+    const again = cleanOnce(t);
+    if (again === t) return t;
+    t = again;
+  }
+  throw new Error('cleanProof: the proof does not settle');
 }
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
