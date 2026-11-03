@@ -35,6 +35,9 @@ const reviewerNoValues = (key) => (root) => JSON.parse(readReviewerNo(root)).row
 export const VALUE_READERS = Object.freeze({
   [ENTITY.lesson]: { [LESSON_NOTE]: (root) => readLessons(root).map((l) => JSON.parse(l.text)[LESSON_NOTE]).filter((v) => v !== undefined) },
   [ENTITY.reviewerNo]: { [REVIEWER_NO_KEYS.kindNote]: reviewerNoValues(REVIEWER_NO_KEYS.kindNote), [REVIEWER_NO_KEYS.outcomeNote]: reviewerNoValues(REVIEWER_NO_KEYS.outcomeNote) },
+  // The proofs of the judge live in the `revisor` check-runs on GitHub, not in the repo: this local audit has none to read (no network),
+  // and they are the judge's prose, never a list to close. `node scripts/records.mjs` reads the check-runs.
+  [ENTITY.reviewRecord]: { pruebas: () => [] },
   [ENTITY.goal]: { [GOAL_KEY.name]: goalValues(GOAL_LIST.goals, GOAL_KEY.name), [GOAL_KEY.holeNote]: goalValues(GOAL_LIST.goals, GOAL_KEY.holeNote) },
   [ENTITY.invariant]: { [GOAL_KEY.text]: goalValues(GOAL_LIST.invariants, GOAL_KEY.text) },
   [ENTITY.plan]: {
