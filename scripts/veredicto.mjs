@@ -238,24 +238,12 @@ async function ficherosDelCompare(repo, base, head, token) {
   }
 }
 
-// Los commits del PR (la API da como mucho 250, del más viejo al más nuevo).
-async function commitsDelPr(repo, pr, token) {
-  const shas = [];
-  for (let pagina = 1; pagina <= 3; pagina += 1) {
-    const res = await leerApi(token, `/repos/${repo}/pulls/${pr}/commits?per_page=100&page=${pagina}`, 'application/vnd.github+json');
-    const lote = res ? await res.json() : [];
-    if (!Array.isArray(lote)) throw new Error('commits: la API no devolvió una lista');
-    shas.push(...lote.map((c) => c?.sha));
-    if (lote.length < 100) break;
-  }
-  return shas;
-}
-
-// La ronda que toca juzgar (scripts/preparar-ronda.mjs, antes de Claude, con el token de solo lectura): busca el último veredicto de la App en este PR
-// y, si trae memoria, lo que cambió el PR desde su sha. Devuelve { anterior (lo que lee readPrevious), diff (el incremental) }.
+// La ronda que toca juzgar (scripts/preparar-ronda.mjs, antes de Claude, con el token de solo lectura): busca el último veredicto de la
+// App en este PR, en la cabeza o en la de antes del push (candidates), y, si trae memoria, lo que cambió el PR desde su sha.
+// Devuelve { anterior (lo que lee readPrevious), diff (el incremental) }.
 export async function buscarRonda({ repo, pr, sha, base, antes, token }) {
   let registro = null;
-  for (const candidato of candidates(sha, antes, await commitsDelPr(repo, pr, token))) {
+  for (const candidato of candidates(sha, antes)) {
     registro = previousRecord(await revisoresDeLaApp(repo, candidato, token), { repo, pr });
     if (registro) break;
   }
@@ -311,13 +299,15 @@ async function revisoresDeLaApp(repo, sha, token) {
   return checks.filter((c) => c.app?.slug === slug).sort((a, b) => b.id - a.id);
 }
 
-// Lo que va delante del registro en output.text: la ronda y, si los hay, los avisos con su prueba (ya limpia: cleanProof). Sin memoria
-// (un registro de error), nada.
+// Lo que va delante del registro en output.text: la ronda y, si los hay, los avisos con su prueba (ya limpia: cleanProof). Cada prueba va
+// entre comillas invertidas, sin ninguna dentro: se ve como texto y no puede meter HTML, un enlace ni un «aprobado» falso.
+// Sin memoria (un registro de error), nada.
+const comoCodigo = (s) => `\`${String(s ?? '').replaceAll('`', "'")}\``;
 export function textoDeRonda(registro, anterior) {
   if (!('ronda' in registro)) return '';
   const cabecera = registro.ronda === 1 ? `Ronda 1${anterior?.motivo ? `: ${anterior.motivo}` : ''}.` : `Ronda ${registro.ronda}, sobre el veredicto anterior de ${registro.anterior}.`;
   if (registro.avisos.length === 0) return cabecera;
-  const avisos = registro.avisos.map((id) => `- ${id}: ${registro.pruebas[id] ?? ''}`).join('\n');
+  const avisos = registro.avisos.map((id) => `- ${id}: ${comoCodigo(registro.pruebas[id])}`).join('\n');
   return `${cabecera}\n\nAvisos (pegas nuevas que no son graves; no ponen el check en rojo):\n${avisos}`;
 }
 

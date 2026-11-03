@@ -19,7 +19,8 @@ En CI, `$RUNNER_TEMP/anterior.json` dice qué ronda es. En la 1 (o sin ese fiche
 
 - Lo que dijo `no`: míralo otra vez. Si está arreglado, `sí`; si no, `no`.
 - Lo que dijo `sí` o `no aplica`: se queda así, salvo que su prueba citara un fichero de `tocados`; entonces se juzga como en la ronda 1.
-- Una pega nueva (un `no` donde antes había `sí` o `no aplica`, sin ese cambio) solo pone el check en rojo si es grave. Entonces lleva `grave` con uno de estos valores, y su prueba lleva ruta:línea:
+- Una pega sobre código nuevo (su prueba cita un fichero de `tocados`) es un `no` de siempre: lo nuevo se juzga entero. Y una prueba de un `no` cita siempre el fichero y la línea: sin fichero, la máquina no puede saber si es código ya juzgado y lo cuenta como `no`.
+- Una pega nueva sobre código ya juzgado (un `no` donde antes había `sí` o `no aplica`, sin ese cambio) solo pone el check en rojo si es grave. Entonces lleva `grave` con uno de estos valores, y su prueba lleva ruta:línea:
   - `produccion`: rompe algo en producción.
   - `datos`: datos que se pisan o se pierden.
   - `seguridad`: seguridad o permisos.

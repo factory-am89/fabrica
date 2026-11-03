@@ -36,13 +36,17 @@ export const GRAVES = Object.values(GRAVE);
 export const MAX_PROOF = 600;
 // Anything that looks like a credential or an encoded blob: GitHub and Anthropic token prefixes, a JWT, or 48+ characters with no
 // space of the base64/hex alphabet. The model can Read files outside the diff (the action cannot narrow Read), so its text could
-// carry a secret; the check is public where the repo is. A 40-hex sha is shorter than 48 and survives.
-const SECRET_SHAPES = [/\b(?:sk-ant-|gh[pousr]_|github_pat_)[A-Za-z0-9_-]+/g, /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+/g, /[A-Za-z0-9+/=_-]{48,}/g];
+// carry a secret; the check is public where the repo is. A 40-hex sha is shorter than 48 and survives, and so does a long path (folders
+// of at most 40 characters, no + nor =, followed by a file extension), which the next round needs to know what the proof cited.
+const SECRET_SHAPES = [/\b(?:sk-ant-|gh[pousr]_|github_pat_)[A-Za-z0-9_-]+/g, /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+/g];
+const LONG_RUN = /[A-Za-z0-9+/=_-]{48,}/g;
+const isPath = (run, next) => next === '.' && run.includes('/') && !/[+=]/.test(run) && run.split('/').every((s) => s.length <= 40);
 export const REDACTED = '[quitado]';
 // The proof as it may travel in a check: one line, no backtick fence (a ``` would break the one-json-block rule), no secret shape, capped.
 export function cleanProof(text) {
   let t = String(text ?? '').replace(/\s+/g, ' ').replace(/`{3,}/g, "'").trim();
   for (const re of SECRET_SHAPES) t = t.replace(re, REDACTED);
+  t = t.replace(LONG_RUN, (run, at, all) => (isPath(run, all[at + run.length]) ? run : REDACTED));
   return t.length > MAX_PROOF ? `${t.slice(0, MAX_PROOF - 1)}…` : t;
 }
 

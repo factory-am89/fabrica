@@ -1,7 +1,8 @@
 // The judge with memory (Pablo, 2026-11-03, intervenciones.md): round 1 answers everything; from round 2 on, a «no» is checked again,
-// a «sí» or «no aplica» stays unless the new code touches a file its proof cited, and a new finding only fails the check if it is severe
-// (record.mjs GRAVE); the rest is an aviso. The previous verdict comes only from a `revisor` check of the App (its record), never from
-// the PR. Pure: no network. scripts/veredicto.mjs (MODO=ronda) does the API calls and `decidir` applies the rule.
+// a «sí» or «no aplica» stays unless the new code touches a file its proof cited, a finding on new code counts as always, and a new
+// finding on code already judged only fails the check if it is severe (record.mjs GRAVE); the rest is an aviso. The previous verdict
+// comes only from a `revisor` check of the App (its record), never from the PR. Pure: no network. scripts/preparar-ronda.mjs and
+// buscarRonda in scripts/veredicto.mjs do the API calls, and `decidir` applies the rule.
 import { ANSWER, ANSWERS, GRAVES, MEMORY_FIELDS, extractRecord } from './record.mjs';
 
 // Why a judgment is a round 1: closed reasons, the only text of this module that reaches a check.
@@ -11,17 +12,15 @@ export const MOTIVO = {
   unreadable: 'no se pudo leer el veredicto anterior',
 };
 export const MOTIVOS = Object.values(MOTIVO);
-// How many shas of the PR are searched for a previous verdict, newest first; each one is one API call.
-export const MAX_CANDIDATES = 15;
 const SHA = /^[0-9a-f]{40}$/;
 const NULL_SHA = /^0{40}$/;
 const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
-// Where to look for the previous verdict, newest first: the head itself (the body was edited, or a rerun), the head before the push
-// (github.event.before; it covers a force-push, whose old commits leave the PR) and the PR's commits from the newest. No repeats.
-export function candidates(sha, before, commits) {
-  const all = [sha, before, ...[...commits].reverse()].filter((s) => typeof s === 'string' && SHA.test(s) && !NULL_SHA.test(s));
-  return [...new Set(all)].slice(0, MAX_CANDIDATES);
+// Where the previous verdict may be: the head itself (the body was edited, or a rerun) and the head right before this push
+// (github.event.before, only in synchronize). Nothing older: a verdict on an older commit could skip a later «no» (a force-push that
+// drops the commit that got it, or a push whose run was cancelled), so without one of these two it is a round 1, the strict one.
+export function candidates(sha, before) {
+  return [...new Set([sha, before].filter((s) => typeof s === 'string' && SHA.test(s) && !NULL_SHA.test(s)))];
 }
 
 // The newest record among the App's `revisor` check-runs of one sha (already filtered by App and sorted newest first) that belongs to
@@ -68,12 +67,12 @@ export function filterDiff(diff, touched) {
     .join('');
 }
 
-// Paths a proof cites: anything with a file extension, with or without folders («scripts/veredicto.mjs:120», «revisor.yml»).
-const CITED = /[\w./-]*[\w-]\.[A-Za-z][A-Za-z0-9]{0,7}\b/g;
-export function citesTouched(proof, touched) {
-  const cited = String(proof ?? '').match(CITED) ?? [];
-  return cited.some((c) => touched.some((t) => t === c || t.endsWith(`/${c.replace(/^\.?\//, '')}`)));
-}
+// Paths a proof cites: anything with a file extension, with or without folders («scripts/veredicto.mjs:120», «revisor.yml»,
+// «planes/diseño.md»).
+const CITED = /[\p{L}\p{N}_./-]*[\p{L}\p{N}_-]\.[A-Za-z][A-Za-z0-9]{0,7}(?![\p{L}\p{N}_])/gu;
+export const citedPaths = (proof) => String(proof ?? '').match(CITED) ?? [];
+const sameFile = (cited, file) => file === cited || file.endsWith(`/${cited.replace(/^\.?\//, '')}`);
+export const citesTouched = (proof, touched) => citedPaths(proof).some((c) => touched.some((t) => sameFile(c, t)));
 
 // What MODO=ronda hands to the verdict step (one line of GITHUB_OUTPUT) and to the model (anterior.json). Throws on anything else:
 // it is written by the judge itself, so a bad shape is a bug, never a round 1 in silence.
@@ -99,10 +98,15 @@ export function readPrevious(text) {
 // One question in a round 2+. previous: the round it read (readPrevious); r: the model's answer, already known to be a «no».
 // Returns { kind: 'no' } (fails as in round 1), { kind: 'grave', grave } (fails, marked) or { kind: 'aviso', answer } (does not fail;
 // the answer kept is the previous one).
+// It is a plain «no» when the question was no before, when the new code touches a file its old proof cited, or when the new finding
+// is about new code: its proof cites a touched file, or cites no file at all (then nobody can tell it is about code already judged).
+// Without that last rule a PR could open with something trivial, get its round 1, and push the real code to be judged only for graves.
 export function newFinding(id, r, previous) {
   const before = previous?.answers?.[id];
   const wasFine = before === ANSWER.yes || before === ANSWER.notApplicable;
   if (!previous || previous.ronda < 2 || !wasFine || citesTouched(previous.pruebas?.[id], previous.tocados)) return { kind: 'no' };
+  const nuevaCita = citedPaths(r?.prueba);
+  if (nuevaCita.length === 0 || citesTouched(r?.prueba, previous.tocados)) return { kind: 'no' };
   if (GRAVES.includes(r?.grave)) return { kind: 'grave', grave: r.grave, located: /\S+:\d+/.test(String(r.prueba ?? '')) };
   return { kind: 'aviso', answer: before };
 }

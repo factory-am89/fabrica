@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import { GRAVE, GRAVES, MEMORY_FIELDS, buildRecord, cleanProof, extractRecord, formatBlock, parseRecord } from '../scripts/lib/record.mjs';
-import { MAX_CANDIDATES, MOTIVO, candidates, citesTouched, filterDiff, previousRecord, readPrevious, touchedFiles } from '../scripts/lib/ronda.mjs';
+import { MOTIVO, candidates, citesTouched, filterDiff, previousRecord, readPrevious, touchedFiles } from '../scripts/lib/ronda.mjs';
 import { buscarRonda } from '../scripts/veredicto.mjs';
 import { REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
 import { buenas, ctx, esCheck, juzga, leer, SHA } from './apoyo/fabrica.mjs';
@@ -59,7 +59,7 @@ test('ronda 2: una pega nueva grave, con ruta:línea, pone el check en rojo y di
 });
 
 test('ronda 2: una pega grave sin ruta:línea también para (falla en alto), y una «grave» fuera de la lista es un aviso', () => {
-  const sinRuta = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'pierde datos', grave: GRAVE.data } }), ctx({ anterior: ronda2() }));
+  const sinRuta = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'pierde datos en db.mjs', grave: GRAVE.data } }), ctx({ anterior: ronda2() }));
   assert.deepEqual(sinRuta.fallos, [`${B}: no (grave sin ruta:línea)`]);
   const inventada = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'a.mjs:1', grave: 'estilo' } }), ctx({ anterior: ronda2() }));
   assert.equal(inventada.ok, true);
@@ -73,13 +73,23 @@ test('ronda 2: si el código nuevo toca un fichero que citaba la prueba de un s�
   assert.deepEqual(v.memoria.avisos, []);
 });
 
+// Security review: a PR that opens with something trivial and pushes the real code later must not get that code judged for graves only.
+test('ronda 2: una pega nueva sobre código nuevo (su prueba cita un fichero tocado) o que no cita ningún fichero es un no de siempre', () => {
+  const anterior = ronda2({ tocados: ['apps/web/nuevo.ts'] });
+  const sobreNuevo = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'lista copiada en apps/web/nuevo.ts:3' } }), ctx({ anterior }));
+  assert.deepEqual(sobreNuevo.fallos, [`${B}: no`]);
+  const sinFichero = juzga(con({ [A]: { respuesta: 'sí' }, [B]: { respuesta: 'no', prueba: 'falta una decisión' } }), ctx({ anterior }));
+  assert.deepEqual(sinFichero.fallos, [`${B}: no`]);
+});
+
 test('ronda 2: una pregunta sin respuesta anterior (nueva en el estándar) se juzga como en la ronda 1', () => {
   const anterior = ronda2();
   delete anterior.answers[C];
   assert.deepEqual(juzga(con({ [A]: { respuesta: 'sí' }, [C]: { respuesta: 'no' } }), ctx({ anterior })).fallos, [`${C}: no`]);
 });
 
-test('citesTouched: casa la ruta citada, con o sin carpetas, y no otra', () => {
+test('citesTouched: casa la ruta citada, con o sin carpetas, con letras como la ñ, y no otra', () => {
+  assert.equal(citesTouched('planes/diseño.md:3', ['planes/diseño.md']), true);
   assert.equal(citesTouched('ver scripts/veredicto.mjs:12', ['scripts/veredicto.mjs']), true);
   assert.equal(citesTouched('veredicto.mjs:12 lo dice', ['scripts/veredicto.mjs']), true);
   assert.equal(citesTouched('ver scripts/otro.mjs:12', ['scripts/veredicto.mjs']), false);
@@ -94,11 +104,12 @@ test('readPrevious: la ronda 1 lleva un motivo cerrado; la 2+ su sha, respuestas
   }
 });
 
-test('candidates: la cabeza, la de antes del push y los commits del más nuevo; sin repetir, sin el sha nulo, con tope', () => {
+test('candidates: solo la cabeza y la de antes del push; sin repetir y sin el sha nulo', () => {
   const s = (c) => c.repeat(40);
-  assert.deepEqual(candidates(s('a'), s('0'), [s('d'), s('e'), s('a')]), [s('a'), s('e'), s('d')]);
-  assert.deepEqual(candidates(s('a'), '', [s('d')]), [s('a'), s('d')]);
-  assert.equal(candidates(s('a'), s('b'), Array.from({ length: 40 }, (_, i) => i.toString(16).padStart(40, '1'))).length, MAX_CANDIDATES);
+  assert.deepEqual(candidates(s('a'), s('b')), [s('a'), s('b')]);
+  assert.deepEqual(candidates(s('a'), s('0')), [s('a')]);
+  assert.deepEqual(candidates(s('a'), ''), [s('a')]);
+  assert.deepEqual(candidates(s('a'), s('a')), [s('a')]);
 });
 
 test('touchedFiles: lo que solo cambió la base no está; lo que cambió el PR, lo nuevo y lo que dejó de estar, sí', () => {
@@ -140,6 +151,11 @@ test('registro: la memoria va entera o no va; las pruebas, limpias; las graves, 
   assert.throws(() => parseRecord(JSON.stringify({ ...r, avisos: ['C5'] })), /round 1/);
   assert.equal(cleanProof('a\n```json\nb'), "a 'json b");
   assert.equal(cleanProof('y'.repeat(2000)).length <= 600, true);
+  const larga = 'apps/menuplan-web/src/components/recipe-editor-panel/RecipeEditor.tsx:12';
+  assert.equal(cleanProof(larga), larga, 'una ruta larga no es una clave');
+  assert.equal(cleanProof(`${'Q'.repeat(60)}.tsx`), '[quitado].tsx', 'sin carpetas no es una ruta');
+  const prueba = 'mira <!-- [ok](http://x) a.mjs:1';
+  assert.equal(cleanProof(cleanProof(prueba)), cleanProof(prueba));
 });
 
 // buscarRonda with the GitHub API faked in-process: check-runs per sha, the PR's commits, the compares and the incremental diff.
@@ -165,7 +181,7 @@ async function conGitHubFalsa(datos, fn) {
 }
 const BASE = 'b'.repeat(40);
 process.env.REVISOR_APP_SLUG = REVISOR_APP_SLUG;
-const busca = (extra = {}) => buscarRonda({ repo: 'o/r', pr: '2', sha: SHA, base: BASE, antes: '', token: 't', ...extra });
+const busca = (extra = {}) => buscarRonda({ repo: 'o/r', pr: '2', sha: SHA, base: BASE, antes: ANTES, token: 't', ...extra });
 
 test('buscarRonda: sin veredicto de la App es ronda 1; un registro sin memoria (juez de antes), también', async () => {
   assert.deepEqual((await conGitHubFalsa({ checks: {} }, busca)).r.anterior, { ronda: 1, motivo: MOTIVO.none });
@@ -192,6 +208,14 @@ test('buscarRonda: con un veredicto anterior, la ronda siguiente, sus respuestas
   assert.equal(r.diff, 'diff --git a/b.mjs b/b.mjs\n+arreglo\n');
   assert.deepEqual(readPrevious(JSON.stringify(r.anterior)), r.anterior);
   assert.ok(pedidas.includes(`/repos/o/r/compare/${ANTES}...${SHA} (diff)`));
+});
+
+// Security review: a verdict on an older commit is never the previous one. Otherwise: round 1 on A says sí, round 2 on B says no;
+// draft, force-push C onto A without B, ready_for_review (no «before»): the no of B would be forgotten.
+test('buscarRonda: un veredicto en un commit que no es la cabeza ni la de antes del push no cuenta; ronda 1', async () => {
+  const { r, pedidas } = await conGitHubFalsa({ checks: { [ANTES]: [checkCon(5, registro())] }, commits: [ANTES, SHA] }, () => busca({ antes: '' }));
+  assert.deepEqual(r.anterior, { ronda: 1, motivo: MOTIVO.none });
+  assert.ok(!pedidas.some((x) => x.endsWith('/pulls/2/commits')), 'no se buscan los commits del PR');
 });
 
 test('buscarRonda: el cuerpo editado (misma cabeza) es ronda 2 sin tocados ni diff', async () => {
@@ -232,7 +256,7 @@ test('veredicto de punta a punta: en ronda 2 un aviso deja el check en verde, ap
   const c = publicado.find((p) => esCheck(p)).cuerpo;
   assert.equal(c.conclusion, 'success');
   assert.ok(publicado.some((p) => p.ruta.endsWith('/reviews')), 'un aviso no quita la aprobación');
-  assert.ok(c.output.text.startsWith(`Ronda 2, sobre el veredicto anterior de ${ANTES}.\n\nAvisos (pegas nuevas que no son graves; no ponen el check en rojo):\n- ${B}: copia de la lista en a.mjs:3\n`), c.output.text);
+  assert.ok(c.output.text.startsWith(`Ronda 2, sobre el veredicto anterior de ${ANTES}.\n\nAvisos (pegas nuevas que no son graves; no ponen el check en rojo):\n- ${B}: \`copia de la lista en a.mjs:3\`\n`), c.output.text);
   assert.deepEqual(extractRecord(c.output.text).avisos, [B]);
   assert.doesNotMatch(c.output.summary, /aviso/i, 'el resumen (lo que anula un dueño) no lleva avisos');
   const malo = spawnSync(process.execPath, ['--import', precarga, fileURLToPath(new URL('../scripts/veredicto.mjs', import.meta.url))], {
