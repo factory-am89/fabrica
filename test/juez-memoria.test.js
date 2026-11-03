@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
-import { GRAVE, GRAVES, MEMORY_FIELDS, buildRecord, cleanProof, extractRecord, formatBlock, parseRecord } from '../scripts/lib/record.mjs';
+import { GRAVE, GRAVES, MAX_PROOF, MEMORY_FIELDS, buildRecord, cleanProof, extractRecord, formatBlock, parseRecord } from '../scripts/lib/record.mjs';
 import { MOTIVO, candidates, citesTouched, filterDiff, previousRecord, readPrevious, touchedFiles } from '../scripts/lib/ronda.mjs';
 import { buscarRonda } from '../scripts/veredicto.mjs';
 import { REVISOR_APP_SLUG } from '../scripts/lib/repo.mjs';
@@ -143,6 +143,16 @@ test('previousRecord: el registro más nuevo de ESTE PR, sin error; salta los ch
   const checks = [{ id: 9, status: 'in_progress', output: { title: 'juzgando' } }, checkCon(8, otroPr), checkCon(7, conError), { id: 6, status: 'completed', output: { title: 'override by x' } }, checkCon(5, bueno)];
   assert.deepEqual(previousRecord(checks, { repo: 'o/r', pr: '2' }), bueno);
   assert.equal(previousRecord([checkCon(1, otroPr)], { repo: 'o/r', pr: '2' }), null);
+  const sinTexto = { id: 4, status: 'completed', conclusion: 'failure', output: { title: 'Veredicto: no', summary: '- el juez falló antes de dar veredicto' } };
+  const cortado = { id: 3, status: 'completed', conclusion: 'failure', output: { title: 'juicio cortado', text: 'x' } };
+  assert.deepEqual(previousRecord([sinTexto, cortado, checkCon(2, bueno)], { repo: 'o/r', pr: '2' }), bueno);
+});
+
+// The reviewer of #202 (C5): a check of the App with a record that does not read is not «no previous verdict» in silence.
+test('previousRecord: un check de la App con un registro que no se lee lanza (buscarRonda lo convierte en ronda 1 con su motivo)', async () => {
+  const roto = { id: 9, status: 'completed', conclusion: 'success', output: { title: 'Veredicto: sí', text: '```json\n{"v":9}\n```' } };
+  assert.throws(() => previousRecord([roto, checkCon(5, registro())], { repo: 'o/r', pr: '2' }), /record/);
+  await assert.rejects(conGitHubFalsa({ checks: { [SHA]: [{ ...roto, app: { slug: REVISOR_APP_SLUG } }] } }, busca).then((x) => x.r), /record/);
 });
 
 test('registro: la memoria va entera o no va; las pruebas, limpias; las graves, de la lista cerrada', () => {
@@ -155,16 +165,16 @@ test('registro: la memoria va entera o no va; las pruebas, limpias; las graves, 
   assert.throws(() => parseRecord(JSON.stringify({ ...r, ronda: 2, anterior: SHA, graves: { C5: 'estilo' } })), /grave/);
   assert.throws(() => parseRecord(JSON.stringify({ ...r, avisos: ['C5'] })), /round 1/);
   assert.equal(cleanProof('a\n```json\nb'), "a 'json b");
-  assert.equal(cleanProof('y'.repeat(2000)).length <= 600, true);
+  assert.equal(cleanProof('y'.repeat(2000)).length <= MAX_PROOF, true);
   const larga = 'apps/menuplan-web/src/components/recipe-editor-panel/RecipeEditor.tsx:12';
   assert.equal(cleanProof(larga), larga, 'una ruta larga no es una clave');
   assert.equal(cleanProof(`${'Q'.repeat(60)}.tsx`), '[quitado].tsx', 'sin carpetas no es una ruta');
   const prueba = 'mira <!-- [ok](http://x) a.mjs:1';
   assert.equal(cleanProof(cleanProof(prueba)), cleanProof(prueba));
   // Security review: a cut right before the «.» of a long path left a proof a second pass would change; the record rejects those.
-  const cortada = `${'x '.repeat(270)}${'apps/menuplan-web/src/components/recipe-editor/'}RecipeEditor.tsx:1`;
+  const cortada = `${"x ".repeat(470)}${'apps/menuplan-web/src/components/recipe-editor/'}RecipeEditor.tsx:1`;
   assert.equal(cleanProof(cleanProof(cortada)), cleanProof(cortada));
-  for (let n = 500; n < 620; n += 1) {
+  for (let n = MAX_PROOF - 100; n < MAX_PROOF + 20; n += 1) {
     const t = `${'y'.repeat(n)} apps/menuplan-web/src/components/recipe-editor/RecipeEditor.tsx:1`;
     assert.equal(cleanProof(cleanProof(t)), cleanProof(t), String(n));
   }

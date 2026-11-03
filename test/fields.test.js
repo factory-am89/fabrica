@@ -1,6 +1,7 @@
 // fields.json: every field the entities of entities.json have in code is declared (the real files are read, the
 // sources are the real exports), and each fault code has a bad case that turns it red.
 import { test } from 'node:test';
+import { FIELDS as RECORD_FIELDS, MEMORY_FIELDS } from '../scripts/lib/record.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,11 +31,12 @@ test('the real registry has no fault: every field the sources list is declared, 
   assert.deepEqual(fieldFaults(real(), entities(), RAIZ), []);
 });
 
-test('the sources are the real exports: lesson, reviewer-no, intervention, plan, goal and invariant names are all discovered', () => {
+test('the sources are the real exports: lesson, reviewer-no, review-record, intervention, plan, goal and invariant names are all discovered', () => {
   const found = discoveredFields(entities()).map((d) => `${d.owner}.${d.name}`);
   const expected = [
     ...LESSON_FIELDS.map((n) => `lesson.${n}`),
     ...REVIEWER_NO_FIELDS.map((n) => `${ENTITY.reviewerNo}.${n}`),
+    ...[...RECORD_FIELDS, ...MEMORY_FIELDS].map((n) => `${ENTITY.reviewRecord}.${n}`),
     ...CAMPOS.map((n) => `intervention.${n}`),
     ...Object.values(PLAN_FIELDS).map((n) => `plan.${n}`),
     ...GOAL_FIELDS.map((n) => `${ENTITY.goal}.${n}`),

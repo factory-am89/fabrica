@@ -204,7 +204,7 @@ jobs:
 
       # Publica el check `revisor` (y la aprobación si es sí) como la App. Título y resumen solo llevan ids y textos fijos.
       # El único texto del modelo que viaja son las pruebas, en el registro (la memoria de la ronda siguiente) y en los avisos,
-      # y van limpias (cleanProof de scripts/lib/record.mjs: sin nada con forma de clave, una línea, 600 caracteres como mucho),
+      # y van limpias (cleanProof de scripts/lib/record.mjs: sin nada con forma de clave, una línea, 1.000 caracteres como mucho),
       # porque Read no se puede acotar al diff en esta acción y el check es público donde lo es el repo.
       # Si Claude falló, SALIDA va vacía y el veredicto es no.
       - if: always()

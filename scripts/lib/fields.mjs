@@ -12,6 +12,7 @@ import { CAMPOS } from './intervention-log.mjs';
 import { FIELDS as LESSON_FIELDS } from './lessons.mjs';
 import { PLAN_FIELDS } from './plan.mjs';
 import { REVIEWER_NO_FIELDS } from './reviewer-no.mjs';
+import { FIELDS as RECORD_FIELDS, MEMORY_FIELDS } from './record.mjs';
 import { NO_PATH, OTHER } from './entities.mjs';
 
 export const FIELDS_FILE = 'fields.json';
@@ -63,12 +64,13 @@ export const TEXT = 'texto';
 export const TEXT_REASONS = ['prosa-juzgada', OTHER];
 
 // The entity ids of entities.json that have fields in code, written once.
-export const ENTITY = Object.freeze({ lesson: 'lesson', reviewerNo: 'reviewer-no',intervention: 'intervention', plan: 'plan', goal: 'goal', invariant: 'invariant' });
+export const ENTITY = Object.freeze({ lesson: 'lesson', reviewerNo: 'reviewer-no', reviewRecord: 'review-record', intervention: 'intervention', plan: 'plan', goal: 'goal', invariant: 'invariant' });
 
 // Where each entity's fields are listed in code. Keys are entity ids of entities.json; values return the field names.
 export const FIELD_SOURCES = Object.freeze({
   [ENTITY.lesson]: () => LESSON_FIELDS,
   [ENTITY.reviewerNo]: () => REVIEWER_NO_FIELDS,
+  [ENTITY.reviewRecord]: () => [...RECORD_FIELDS, ...MEMORY_FIELDS],
   [ENTITY.intervention]: () => CAMPOS,
   [ENTITY.plan]: () => Object.values(PLAN_FIELDS),
   [ENTITY.goal]: () => GOAL_FIELDS,

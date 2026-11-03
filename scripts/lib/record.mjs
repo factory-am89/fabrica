@@ -24,7 +24,7 @@ export const PENDING_TITLE = 'juzgando';
 // Title of the `revisor` check-run that closes, in failure, a judgment that was cut before its verdict (run cancelled); it has no record and is not a round (counted in `cut`).
 export const CUT_TITLE = 'juicio cortado';
 export const UNANSWERED = 'sin-respuesta'; // aggregate's bucket for a question with a null answer
-const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
+export const FIELDS = ['v', 'repo', 'pr', 'sha', 'standard', 'ok', 'answers', 'invalid', 'error', 'run'];
 // The judge's memory: all five or none (a record without them was written by a judge before the memory, and the next round is a
 // round 1). ronda: 1, 2…; anterior: the sha of the record that round read (null in round 1); pruebas: {id: cleaned proof};
 // avisos: ids of new non-severe findings of a round 2+, which do not fail the check (their answer stays the previous one);
@@ -33,7 +33,9 @@ export const MEMORY_FIELDS = ['ronda', 'anterior', 'pruebas', 'avisos', 'graves'
 // What makes a new finding in round 2+ severe enough to fail the check (Pablo, 2026-11-03, intervenciones.md). Closed list.
 export const GRAVE = { production: 'produccion', data: 'datos', security: 'seguridad', falseClaim: 'afirmacion-falsa' };
 export const GRAVES = Object.values(GRAVE);
-export const MAX_PROOF = 600;
+// 1000: the 247 real proofs of HoMenu (2026-10-30 to 11-03) run to 916 at most, so none is cut; 600 cut 48 of them (19%). With some 15
+// questions the record stays near 15,000 of the 65,535 characters a check text holds.
+export const MAX_PROOF = 1000;
 // Anything that looks like a credential or an encoded blob: GitHub and Anthropic token prefixes, a JWT, or 48+ characters with no
 // space of the base64/hex alphabet. The model can Read files outside the diff (the action cannot narrow Read), so its text could
 // carry a secret; the check is public where the repo is. A 40-hex sha is shorter than 48 and survives, and so does a long path (folders

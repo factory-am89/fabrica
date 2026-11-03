@@ -3,7 +3,7 @@
 // finding on code already judged only fails the check if it is severe (record.mjs GRAVE); the rest is an aviso. The previous verdict
 // comes only from a `revisor` check of the App (its record), never from the PR. Pure: no network. scripts/preparar-ronda.mjs and
 // buscarRonda in scripts/veredicto.mjs do the API calls, and `decidir` applies the rule.
-import { ANSWER, ANSWERS, GRAVES, MEMORY_FIELDS, extractRecord } from './record.mjs';
+import { ANSWER, ANSWERS, CUT_TITLE, GRAVES, MEMORY_FIELDS, extractRecord, isOverrideTitle } from './record.mjs';
 
 // Why a judgment is a round 1: closed reasons, the only text of this module that reaches a check.
 export const MOTIVO = {
@@ -27,16 +27,14 @@ export function candidates(sha, before) {
 }
 
 // The newest record among the App's `revisor` check-runs of one sha (already filtered by App and sorted newest first) that belongs to
-// this PR and says something about the questions (no error). Check-runs without a record (judging, cut, override) are skipped.
+// this PR and says something about the questions (no error). The check-runs that never carry a record are skipped: in progress, cut
+// (CUT_TITLE), an override, or one with no text at all (a «no» published before the record could be built). Any other one whose record
+// does not read throws: buscarRonda's caller turns it into a round 1 with MOTIVO.unreadable, never into «no previous verdict».
 export function previousRecord(checkRuns, { repo, pr }) {
   for (const c of checkRuns) {
-    if (c?.status !== 'completed') continue;
-    let r;
-    try {
-      r = extractRecord(c?.output?.text);
-    } catch {
-      continue;
-    }
+    if (c?.status !== 'completed' || c?.output?.title === CUT_TITLE || isOverrideTitle(c?.output?.title)) continue;
+    if (typeof c?.output?.text !== 'string' || c.output.text.trim() === '') continue;
+    const r = extractRecord(c.output.text);
     if (r.repo === repo && r.pr === Number(pr) && r.error === null) return r;
   }
   return null;
