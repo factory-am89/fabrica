@@ -19,6 +19,7 @@ import yaml from 'js-yaml';
 import { CLEAN, CORPUS, STANDARD, workflowIn, answersOf, format, loadCorpus, loadOutputs, score } from './golden.mjs';
 import { CASE_FILE } from './lib/golden-guard.mjs';
 import { ANSWER } from './lib/record.mjs';
+import { MOTIVO, ROUND_FILE } from './lib/ronda.mjs';
 import { cargarPreguntas } from './veredicto.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
@@ -96,7 +97,9 @@ export function promptFor(prompt, workspace) {
     .replace(GH_SENTENCE, `el título y la descripción del PR, en ${path.join(workspace, CASE_FILE.body)}`)
     .replaceAll('${{ github.event.pull_request.number }}', FAKE_PR)
     .replaceAll('${{ github.repository }}', FAKE_REPO)
-    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, CASE_FILE.diff));
+    .replaceAll('${{ runner.temp }}/pr.diff', path.join(workspace, CASE_FILE.diff))
+    .replaceAll(`\${{ runner.temp }}/${ROUND_FILE.previous}`, path.join(workspace, ROUND_FILE.previous))
+    .replaceAll(`\${{ runner.temp }}/${ROUND_FILE.incremental}`, path.join(workspace, ROUND_FILE.incremental));
   const left = text.match(/\$\{\{[^}]*\}\}/);
   if (left) throw new Error(`the prompt of revisor.yml has a placeholder this runner does not know: ${left[0]}`);
   return text;
@@ -121,6 +124,9 @@ export function layWorkspace(workspace, judge, { diff, body }) {
   cpSync(judge, path.join(workspace, JUDGE_DIR), { recursive: true });
   writeFileSync(path.join(workspace, CASE_FILE.diff), diff);
   writeFileSync(path.join(workspace, CASE_FILE.body), body);
+  // Every case is a first judgment: round 1, as scripts/preparar-ronda.mjs leaves it when the PR has no previous verdict.
+  writeFileSync(path.join(workspace, ROUND_FILE.previous), `${JSON.stringify({ ronda: 1, motivo: MOTIVO.none })}\n`);
+  writeFileSync(path.join(workspace, ROUND_FILE.incremental), '');
 }
 
 // The commit under test without the corpus, extracted once; returns the folder. Relative paths to tar: GNU tar reads "C:" as a host.

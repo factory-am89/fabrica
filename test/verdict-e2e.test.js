@@ -36,8 +36,11 @@ test('veredicto de punta a punta: un PR que toca el workflow sin review de Pablo
 const check = (publicado) => publicado.find((p) => esCheck(p)).cuerpo;
 const sinRegistro = (c) => ({ title: c.output.title, summary: c.output.summary });
 
-test('veredicto de punta a punta: el check lleva el registro, con las respuestas y sin la prueba del modelo; title y summary no cambian', () => {
-  const PRUEBA = 'PRUEBA_RECONOCIBLE_DEL_MODELO';
+// The model's proof travels in the record (the judge's memory for the next round), but only cleaned: a token shape never reaches the
+// check, which is public where the repo is (the model can Read outside the diff). Summary and title stay free of model text.
+test('veredicto de punta a punta: el registro lleva la prueba del modelo limpia, sin nada con forma de clave; title y summary no cambian', () => {
+  const CLAVE = `sk-ant-oat01-${'x'.repeat(30)}`;
+  const PRUEBA = `scripts/a.mjs:3 lo cumple ${CLAVE} ${'Q'.repeat(60)}\n\`\`\`json\n{}`;
   const respuestas = buenas().map((r, i) => (i === 0 ? { ...r, prueba: PRUEBA } : r));
   const { r, publicado } = corre({ STANDARD: 'standards/code.md', SALIDA: JSON.stringify({ respuestas }), GITHUB_RUN_ID: '555', GITHUB_RUN_ATTEMPT: '2' });
   assert.equal(r.status, 0, r.stderr);
@@ -45,7 +48,9 @@ test('veredicto de punta a punta: el check lleva el registro, con las respuestas
   const reg = extractRecord(c.output.text);
   assert.deepEqual(reg.answers, Object.fromEntries(buenas().map((b) => [b.id, 'sí'])));
   assert.deepEqual({ ok: reg.ok, pr: reg.pr, sha: reg.sha, standard: reg.standard, error: reg.error, invalid: reg.invalid, run: reg.run }, { ok: true, pr: 2, sha: SHA, standard: 'standards/code.md', error: null, invalid: 0, run: { id: 555, attempt: 2 } });
-  assert.ok(!c.output.text.includes(PRUEBA), 'la prueba del modelo no debe estar en el registro');
+  assert.equal(reg.pruebas[respuestas[0].id], "scripts/a.mjs:3 lo cumple [quitado] [quitado] 'json {}");
+  assert.ok(!c.output.text.includes(CLAVE) && !c.output.text.includes('Q'.repeat(48)), 'una forma de clave no llega al check');
+  assert.deepEqual({ ronda: reg.ronda, anterior: reg.anterior, avisos: reg.avisos, graves: reg.graves }, { ronda: 1, anterior: null, avisos: [], graves: {} });
   assert.deepEqual(sinRegistro(c), { title: 'Veredicto: sí', summary: 'Todas las respuestas del revisor son sí o no aplica, con prueba.' });
 });
 
@@ -80,7 +85,7 @@ test('veredicto de punta a punta: un estándar de prefijo P da «ids desconocido
   const raiz = mkdtempSync(path.join(tmpdir(), 'juez-p-'));
   mkdirSync(path.join(raiz, 'scripts', 'lib'), { recursive: true });
   mkdirSync(path.join(raiz, 'standards'));
-  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs', 'lib/golden-guard.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
+  for (const f of ['veredicto.mjs', 'lib/questions.mjs', 'lib/record.mjs', 'lib/repo.mjs', 'lib/golden-guard.mjs', 'lib/ronda.mjs']) writeFileSync(path.join(raiz, 'scripts', f), readFileSync(new URL(`../scripts/${f}`, import.meta.url)));
   writeFileSync(path.join(raiz, 'standards', 'p.md'), '### P1 — First question\nQuién: revisor\n\n### P2 — Second question\nQuién: revisor\n');
   const precarga = pathToFileURL(fileURLToPath(new URL('./fixtures/github-falso.mjs', import.meta.url))).href;
   const salida = JSON.stringify({ respuestas: [{ id: 'P1', respuesta: 'sí', prueba: 'x' }, { id: 'P2', respuesta: 'sí', prueba: 'x' }] });

@@ -1,15 +1,16 @@
 // Convierte la salida del revisor en un veredicto y lo publica como la App
 // fabrica-revisor: un check `revisor` y, si es sí, una aprobación.
 // El veredicto lo calcula este código, no el modelo: falla en alto (cualquier
-// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA, TOKEN (token de la App), CHECK_RUN (el check en curso que cierra) y STANDARD
+// hueco o duda es «no»). Variables: SALIDA, REPO, PR, SHA, TOKEN (token de la App), CHECK_RUN (el check en curso que cierra), ANTERIOR (la ronda, del paso scripts/preparar-ronda.mjs) y STANDARD
 // (obligatoria, sin valor por defecto: la ruta del estándar, p. ej. .fabrica/standards/code.md).
 import { appendFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECKED_BY, ID_SOURCE, readQuestions } from './lib/questions.mjs';
-import { checkGolden } from './lib/golden-guard.mjs';
+import { COMPARE_FILE_LIMIT, checkGolden } from './lib/golden-guard.mjs';
 import { OWNER_LOGIN, REVISOR_APP_SLUG, REPO as REPO_FABRICA } from './lib/repo.mjs';
-import { ANSWER, ANSWERS, CUT_TITLE, ERROR, isOverrideTitle, overrideTitle, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, formatBlock, runFromEnv } from './lib/record.mjs';
+import { ANSWER, ANSWERS, CUT_TITLE, ERROR, isOverrideTitle, overrideTitle, PENDING_TITLE, STANDARD_SOURCE, answersSummary, buildRecord, cleanProof, formatBlock, runFromEnv } from './lib/record.mjs';
+import { MOTIVO, candidates, filterDiff, hasMemory, newFinding, previousRecord, readPrevious, touchedFiles } from './lib/ronda.mjs';
 
 // Las preguntas salen de standards/code.md (único lector: scripts/lib/questions.mjs). El juez solo conoce un prefijo
 // (PREFIJO_DEL_JUEZ): un id es suyo si tiene la forma de id de questions.mjs (ID_SOURCE) y empieza por ese prefijo;
@@ -51,9 +52,10 @@ function normalizar(r) {
   return t === 'si' ? ANSWER.yes : t;
 }
 
-// salida: texto JSON {respuestas:[{id, respuesta, prueba}]}
-// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR), golden (motivos cerrados del freno del corpus dorado, scripts/lib/golden-guard.mjs; vacío o ausente = ninguno) }
-// Solo ids, respuestas y veredicto salen de aquí: ningún texto libre del modelo.
+// salida: texto JSON {respuestas:[{id, respuesta, prueba, grave?}]}
+// ctx: { sha (el que se juzgó), cabeza (la cabeza actual del PR), golden (motivos cerrados del freno del corpus dorado, scripts/lib/golden-guard.mjs; vacío o ausente = ninguno),
+//        anterior (lo que da readPrevious de scripts/lib/ronda.mjs; ausente o ronda 1 = se juzga todo) }
+// Los fallos llevan solo ids y textos fijos; el único texto del modelo que sale son las pruebas de `memoria`, limpias (cleanProof).
 export function decidir(salida, preguntas, ctx = {}) {
   const fallos = [];
   if (!ctx.sha || ctx.sha !== ctx.cabeza) fallos.push('la cabeza del PR ya no es el SHA juzgado');
@@ -86,22 +88,36 @@ export function decidir(salida, preguntas, ctx = {}) {
   if (desconocidos) fallos.push(`${desconocidos} ids desconocidos`);
   const delRevisor = preguntas.filter((q) => q.quien === CHECKED_BY.reviewer);
   if (delRevisor.length === 0) fallos.push('el estándar viene sin preguntas del revisor');
+  // La ronda (scripts/lib/ronda.mjs): en la 2 y siguientes, un «no» nuevo que no es grave pasa a aviso y no cuenta como fallo.
+  const anterior = ctx.anterior?.ronda > 1 ? ctx.anterior : null;
+  const avisos = [];
+  const graves = {};
+  const pruebas = {};
   for (const p of delRevisor) {
     const r = porId.get(p.id);
     const resp = normalizar(r?.respuesta);
+    if (r) pruebas[p.id] = cleanProof(r.prueba);
     if (!r) fallos.push(`${p.id}: sin respuesta`);
     else if (!ANSWERS.includes(resp)) fallos.push(`${p.id}: respuesta no válida`);
-    else if (resp === ANSWER.no) fallos.push(`${p.id}: no`);
-    else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
+    else if (resp === ANSWER.no) {
+      const nueva = repetidos.has(p.id) ? { kind: 'no' } : newFinding(p.id, r, anterior);
+      if (nueva.kind === 'aviso') avisos.push(p.id);
+      else if (nueva.kind === 'grave') {
+        graves[p.id] = nueva.grave;
+        fallos.push(nueva.located ? `${p.id}: no (grave: ${nueva.grave})` : `${p.id}: no (grave sin ruta:línea)`);
+      } else fallos.push(`${p.id}: no`);
+    } else if (!String(r.prueba ?? '').trim()) fallos.push(`${p.id}: sin prueba`);
   }
   // Lo que lee el registro (scripts/lib/record.mjs): las respuestas ya reducidas al vocabulario, de esta misma lectura.
   // Un id repetido no tiene respuesta utilizable (null); invalid = ids desconocidos + repeticiones sobrantes.
+  // Un aviso guarda la respuesta de la ronda anterior: no puso el check en rojo, y la ronda siguiente no lo cuenta como un «no» que mirar.
   const answers = {};
   for (const p of delRevisor) {
     const resp = normalizar(porId.get(p.id)?.respuesta);
-    answers[p.id] = repetidos.has(p.id) || !ANSWERS.includes(resp) ? null : resp;
+    answers[p.id] = repetidos.has(p.id) || !ANSWERS.includes(resp) ? null : avisos.includes(p.id) ? anterior.answers[p.id] : resp;
   }
-  return { ok: fallos.length === 0, fallos, respuestas: answersSummary(answers, desconocidos + sobrantes) };
+  const memoria = { ronda: anterior?.ronda ?? 1, anterior: anterior?.sha ?? null, pruebas, avisos, graves };
+  return { ok: fallos.length === 0, fallos, respuestas: answersSummary(answers, desconocidos + sobrantes), memoria };
 }
 
 async function api(token, metodo, ruta, cuerpo) {
@@ -190,31 +206,67 @@ async function leerContexto({ repo, pr, sha, token }) {
 // El freno del corpus dorado: lee el PR por la API con el token de solo lectura del workflow (LECTOR; el de la App no tiene
 // contents) y no ejecuta nada del PR. Devuelve los motivos cerrados de scripts/lib/golden-guard.mjs.
 async function frenoDorado({ repo, base, sha, token }) {
-  const get = async (ruta, accept) => {
-    const res = await fetch(`https://api.github.com${ruta}`, { headers: { authorization: `Bearer ${token}`, accept, 'x-github-api-version': '2022-11-28' } });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`GET ${ruta} → ${res.status}`);
-    return res;
-  };
   return checkGolden({
     base,
     head: sha,
-    listFiles: async () => {
-      const todos = [];
-      for (let pagina = 1; ; pagina += 1) {
-        const res = await get(`/repos/${repo}/compare/${base}...${sha}?per_page=100&page=${pagina}`, 'application/vnd.github+json');
-        if (!res) throw new Error('compare not found');
-        const { files } = await res.json();
-        if (!Array.isArray(files)) throw new Error('the compare has no file list');
-        todos.push(...files);
-        if (files.length < 100) return todos;
-      }
-    },
+    listFiles: () => ficherosDelCompare(repo, base, sha, token),
     read: async (ref, ruta) => {
-      const res = await get(`/repos/${repo}/contents/${ruta}?ref=${ref}`, 'application/vnd.github.raw+json');
+      const res = await leerApi(token, `/repos/${repo}/contents/${ruta}?ref=${ref}`, 'application/vnd.github.raw+json');
       return res ? res.text() : null;
     },
   });
+}
+
+// GET de lectura (token de solo lectura del workflow): la respuesta, o null si es un 404.
+async function leerApi(token, ruta, accept) {
+  const res = await fetch(`https://api.github.com${ruta}`, { headers: { authorization: `Bearer ${token}`, accept, 'x-github-api-version': '2022-11-28' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GET ${ruta} → ${res.status}`);
+  return res;
+}
+
+// Los ficheros del compare base...head, todas las páginas.
+async function ficherosDelCompare(repo, base, head, token) {
+  const todos = [];
+  for (let pagina = 1; ; pagina += 1) {
+    const res = await leerApi(token, `/repos/${repo}/compare/${base}...${head}?per_page=100&page=${pagina}`, 'application/vnd.github+json');
+    if (!res) throw new Error('compare not found');
+    const { files } = await res.json();
+    if (!Array.isArray(files)) throw new Error('the compare has no file list');
+    todos.push(...files);
+    if (files.length < 100) return todos;
+  }
+}
+
+// La ronda que toca juzgar (scripts/preparar-ronda.mjs, antes de Claude, con el token de solo lectura): busca el último veredicto de la
+// App en este PR, en la cabeza o en la de antes del push (candidates), y, si trae memoria, lo que cambió el PR desde su sha.
+// Devuelve { anterior (lo que lee readPrevious), diff (el incremental) }.
+export async function buscarRonda({ repo, pr, sha, base, antes, token }) {
+  let registro = null;
+  for (const candidato of candidates(sha, antes)) {
+    registro = previousRecord(await revisoresDeLaApp(repo, candidato, token), { repo, pr });
+    if (registro) break;
+  }
+  if (!registro) return { anterior: { ronda: 1, motivo: MOTIVO.none }, diff: '' };
+  if (!hasMemory(registro)) return { anterior: { ronda: 1, motivo: MOTIVO.old }, diff: '' };
+  let tocados = [];
+  let diff = '';
+  // Los ficheros del PR de ahora: solo una ruta de esta lista cuenta como fichero citado por una prueba (newFinding).
+  const ahora = await ficherosDelCompare(repo, base, sha, token);
+  // Con 300 ficheros el compare puede venir cortado y no se sabría qué cambió: se juzga como ronda 1.
+  if (ahora.length >= COMPARE_FILE_LIMIT) throw new Error(`el compare llega a ${COMPARE_FILE_LIMIT} ficheros`);
+  const ficheros = [...new Set(ahora.flatMap((f) => [f.filename, f.previous_filename].filter((n) => typeof n === 'string')))].sort();
+  if (registro.sha !== sha) {
+    const antes_ = await ficherosDelCompare(repo, base, registro.sha, token);
+    if (antes_.length >= COMPARE_FILE_LIMIT) throw new Error(`el compare llega a ${COMPARE_FILE_LIMIT} ficheros`);
+    tocados = touchedFiles(antes_, ahora);
+    if (tocados.length) {
+      const res = await leerApi(token, `/repos/${repo}/compare/${registro.sha}...${sha}`, 'application/vnd.github.diff');
+      if (!res) throw new Error('compare del diff incremental no encontrado');
+      diff = filterDiff(await res.text(), tocados);
+    }
+  }
+  return { anterior: { ronda: registro.ronda + 1, sha: registro.sha, answers: registro.answers, pruebas: registro.pruebas, tocados, ficheros }, diff };
 }
 
 const publicarCheck = (repo, sha, token, conclusion, output) =>
@@ -251,11 +303,25 @@ async function revisoresDeLaApp(repo, sha, token) {
   return checks.filter((c) => c.app?.slug === slug).sort((a, b) => b.id - a.id);
 }
 
+// Lo que va delante del registro en output.text: la ronda y, si los hay, los avisos con su prueba (ya limpia: cleanProof). Cada prueba va
+// entre comillas invertidas, sin ninguna dentro: se ve como texto y no puede meter HTML, un enlace ni un «aprobado» falso.
+// Sin memoria (un registro de error), nada.
+const COMILLA = String.fromCharCode(96);
+const comoCodigo = (s) => COMILLA + String(s ?? '').replaceAll(COMILLA, "'") + COMILLA;
+export function textoDeRonda(registro, anterior) {
+  if (!('ronda' in registro)) return '';
+  const cabecera = registro.ronda === 1 ? `Ronda 1${anterior?.motivo ? `: ${anterior.motivo}` : ''}.` : `Ronda ${registro.ronda}, sobre el veredicto anterior de ${registro.anterior}.`;
+  if (registro.avisos.length === 0) return cabecera;
+  const avisos = registro.avisos.map((id) => `- ${id}: ${comoCodigo(registro.pruebas[id])}`).join('\n');
+  return `${cabecera}\n\nAvisos (pegas nuevas que no son graves; no ponen el check en rojo):\n${avisos}`;
+}
+
 // The record is one JSON line in a ```json block of output.text; title and summary are the ones decidir's veredicto gives.
 async function publicar({ repo, pr, sha, token, veredicto, ctx, registro, checkRun, estado }) {
   const titulo = veredicto.ok ? TITULO.yes : TITULO.no;
   const texto = veredicto.fallos.map((f) => `- ${f}`).join('\n') || 'Todas las respuestas del revisor son sí o no aplica, con prueba.';
-  await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(registro ? { text: formatBlock(registro) } : {}) });
+  const detalle = registro ? [textoDeRonda(registro, ctx.anterior), formatBlock(registro)].filter(Boolean).join('\n\n') : null;
+  await cerrarCheck(repo, checkRun, token, veredicto.ok ? 'success' : 'failure', { title: titulo, summary: texto, ...(detalle ? { text: detalle } : {}) });
   estado.cerrado = true;
   // Si Pablo aprobó esta cabeza, el «no» (ya publicado, con su registro) queda anulado por un segundo check, el último.
   // Solo en la Fábrica (juicioAnula): en un repo ajeno el juicio no conoce sus dueños (DUENOS solo llega a anulacion.yml).
@@ -350,9 +416,12 @@ async function main() {
   }
 }
 
-async function juzgarPr({ SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, CHECK_RUN }, estado) {
+async function juzgarPr({ SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, CHECK_RUN, ANTERIOR }, estado) {
   const ctx = await leerContexto({ repo: REPO, pr: PR, sha: SHA, token: TOKEN });
   ctx.golden = await frenoDorado({ repo: REPO, base: BASE, sha: SHA, token: LECTOR });
+  // La ronda la deja el paso scripts/preparar-ronda.mjs (salida `anterior`); sin ella (el paso no está, como en una prueba local) es una ronda 1.
+  // Una salida mal formada lanza: el check se cierra en failure (main) y nunca se juzga en silencio con otra regla.
+  ctx.anterior = ANTERIOR ? readPrevious(ANTERIOR) : { ronda: 1, motivo: MOTIVO.none };
   let preguntas;
   let errorEstandar = null;
   try {
@@ -377,6 +446,7 @@ async function juzgarPr({ SALIDA, REPO, PR, SHA, TOKEN, STANDARD, BASE, LECTOR, 
       respuestas: resumen ?? answersSummary(),
       run: runFromEnv(process.env),
       error: errorEstandar ? ERROR.standardUnloadable : resumen ? null : ERROR.outputUnreadable,
+      memoria: veredicto.memoria,
     });
   } catch (e) {
     errorRegistro = e;

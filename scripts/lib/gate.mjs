@@ -20,6 +20,8 @@ const BASE = [
   'scripts/lib/questions.mjs', // imported by scripts/veredicto.mjs: the only reader of the questions
   'scripts/lib/record.mjs', // imported by scripts/veredicto.mjs: the verdict record schema and its writer
   'scripts/lib/golden-guard.mjs', // imported by scripts/veredicto.mjs: the brake on a PR that weakens the golden corpus
+  'scripts/lib/ronda.mjs', // imported by scripts/veredicto.mjs: the judge's memory, which round it is and what an aviso is
+  'scripts/preparar-ronda.mjs', // the ronda step of revisor.yml: reads the previous verdict before Claude; run from .fabrica/
   'standards/code.md', // the questions the verdict is built from (read by veredicto.mjs)
   '.claude/agents/revisor.md', // the reviewer role the revisor.yml prompt tells Claude to follow
   'eslint.config.js', // lint rules tests.yml applies from .fabrica/ (C1, C3)
